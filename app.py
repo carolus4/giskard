@@ -32,6 +32,23 @@ def write_lines(lines):
     else:
         TODO_PATH.write_text("", encoding="utf-8")
 
+def parse_task_text(text):
+    """Parse task text to extract title and description"""
+    if " | " in text:
+        title, description = text.split(" | ", 1)
+        # Unescape newlines in description
+        description = description.replace("\\n", "\n")
+        return title.strip(), description.strip()
+    return text.strip(), ""
+
+def format_task_text(title, description=""):
+    """Format task title and description for storage"""
+    if description:
+        # Escape newlines in description to keep todo.txt single-line per task
+        escaped_description = description.replace("\n", "\\n")
+        return f"{title} | {escaped_description}"
+    return title
+
 def parse_tasks(lines):
     """Parse tasks into categories: (open, in_progress, done)"""
     open_tasks = []
@@ -44,24 +61,28 @@ def parse_tasks(lines):
             continue
             
         if line.startswith("x "):
-            # Completed task: "x 2024-01-15 Task title" or "x Task title"
+            # Completed task: "x 2024-01-15 Task title | description" or "x Task title"
             parts = line[2:].strip().split(" ", 1)
             if len(parts) >= 2 and parts[0].count('-') == 2:
                 # Has date format YYYY-MM-DD
-                title = parts[1]
+                task_text = parts[1]
             else:
-                # No date, everything after "x " is the title
-                title = line[2:].strip()
-            done_tasks.append((idx, title))
+                # No date, everything after "x " is the task text
+                task_text = line[2:].strip()
+            
+            title, description = parse_task_text(task_text)
+            done_tasks.append((idx, title, description))
             
         elif "status:in_progress" in line:
-            # In progress task: "Task title status:in_progress"
-            title = line.replace("status:in_progress", "").strip()
-            in_progress_tasks.append((idx, title))
+            # In progress task: "Task title | description status:in_progress"
+            task_text = line.replace("status:in_progress", "").strip()
+            title, description = parse_task_text(task_text)
+            in_progress_tasks.append((idx, title, description))
             
         else:
             # Open task: just the plain text
-            open_tasks.append((idx, line))
+            title, description = parse_task_text(line)
+            open_tasks.append((idx, title, description))
     
     return open_tasks, in_progress_tasks, done_tasks
 
@@ -85,30 +106,33 @@ def get_tasks():
     }
     
     # In progress tasks first (these show up in "Today")
-    for file_idx, title in in_progress_tasks:
+    for file_idx, title, description in in_progress_tasks:
         ui_tasks['in_progress'].append({
             'id': task_num,
             'file_idx': file_idx,
             'title': title,
+            'description': description,
             'status': 'in_progress'
         })
         task_num += 1
     
     # Open tasks next
-    for file_idx, title in open_tasks:
+    for file_idx, title, description in open_tasks:
         ui_tasks['open'].append({
             'id': task_num,
             'file_idx': file_idx,
             'title': title,
+            'description': description,
             'status': 'open'
         })
         task_num += 1
     
     # Done tasks (no numbering needed)
-    for file_idx, title in done_tasks:
+    for file_idx, title, description in done_tasks:
         ui_tasks['done'].append({
             'file_idx': file_idx,
             'title': title,
+            'description': description,
             'status': 'done'
         })
     
@@ -133,12 +157,14 @@ def add_task():
     try:
         data = request.get_json()
         title = data.get('title', '').strip()
+        description = data.get('description', '').strip()
         
         if not title:
             return jsonify({'error': 'Task title is required'}), 400
         
         lines = read_lines()
-        lines.append(title)
+        task_text = format_task_text(title, description)
+        lines.append(task_text)
         write_lines(lines)
         
         return jsonify({'success': True, 'message': f'Added: {title}'})
@@ -158,9 +184,10 @@ def mark_done(task_id):
         if task_id < 1 or task_id > len(all_active_tasks):
             return jsonify({'error': 'Invalid task ID'}), 400
         
-        file_idx, title = all_active_tasks[task_id-1]
+        file_idx, title, description = all_active_tasks[task_id-1]
         completion_date = datetime.now().strftime("%Y-%m-%d")
-        lines[file_idx] = f"x {completion_date} {title}"
+        task_text = format_task_text(title, description)
+        lines[file_idx] = f"x {completion_date} {task_text}"
         write_lines(lines)
         
         return jsonify({'success': True, 'message': f'Done: {title}'})
@@ -180,8 +207,9 @@ def start_task(task_id):
         if open_task_num < 1 or open_task_num > len(open_tasks):
             return jsonify({'error': 'Invalid task ID for starting'}), 400
         
-        file_idx, title = open_tasks[open_task_num-1]
-        lines[file_idx] = f"{title} status:in_progress"
+        file_idx, title, description = open_tasks[open_task_num-1]
+        task_text = format_task_text(title, description)
+        lines[file_idx] = f"{task_text} status:in_progress"
         write_lines(lines)
         
         return jsonify({'success': True, 'message': f'Started: {title}'})
@@ -199,8 +227,9 @@ def stop_task(task_id):
         if task_id < 1 or task_id > len(in_progress_tasks):
             return jsonify({'error': 'Invalid task ID for stopping'}), 400
         
-        file_idx, title = in_progress_tasks[task_id-1]
-        lines[file_idx] = title
+        file_idx, title, description = in_progress_tasks[task_id-1]
+        task_text = format_task_text(title, description)
+        lines[file_idx] = task_text
         write_lines(lines)
         
         return jsonify({'success': True, 'message': f'Stopped: {title}'})
@@ -227,20 +256,166 @@ def uncomplete_task():
         if not line.startswith("x "):
             return jsonify({'error': 'Task is not completed'}), 400
         
-        # Extract the task title (remove "x 2025-09-02 " prefix)
+        # Extract the task text (remove "x 2025-09-02 " prefix)
         parts = line[2:].strip().split(" ", 1)
         if len(parts) >= 2 and parts[0].count('-') == 2:
             # Has date format YYYY-MM-DD
-            title = parts[1]
+            task_text = parts[1]
         else:
-            # No date, everything after "x " is the title
-            title = line[2:].strip()
+            # No date, everything after "x " is the task text
+            task_text = line[2:].strip()
+        
+        title, description = parse_task_text(task_text)
         
         # Make it an open task again
-        lines[file_idx] = title
+        lines[file_idx] = format_task_text(title, description)
         write_lines(lines)
         
         return jsonify({'success': True, 'message': f'Uncompleted: {title}'})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tasks/<int:file_idx>/details')
+def get_task_details(file_idx):
+    """Get detailed information for a specific task"""
+    try:
+        lines = read_lines()
+        if file_idx < 0 or file_idx >= len(lines):
+            return jsonify({'error': 'Task not found'}), 404
+        
+        line = lines[file_idx].strip()
+        if not line:
+            return jsonify({'error': 'Task not found'}), 404
+        
+        # Parse the task
+        if line.startswith("x "):
+            # Completed task
+            parts = line[2:].strip().split(" ", 1)
+            if len(parts) >= 2 and parts[0].count('-') == 2:
+                task_text = parts[1]
+                completion_date = parts[0]
+            else:
+                task_text = line[2:].strip()
+                completion_date = None
+            
+            title, description = parse_task_text(task_text)
+            status = 'done'
+        elif "status:in_progress" in line:
+            # In progress task
+            task_text = line.replace("status:in_progress", "").strip()
+            title, description = parse_task_text(task_text)
+            status = 'in_progress'
+            completion_date = None
+        else:
+            # Open task
+            title, description = parse_task_text(line)
+            status = 'open'
+            completion_date = None
+        
+        return jsonify({
+            'file_idx': file_idx,
+            'title': title,
+            'description': description,
+            'status': status,
+            'completion_date': completion_date,
+            'project': 'Inbox',  # Default for now
+            'date': 'Today' if status != 'done' else completion_date,
+            'priority': None,
+            'labels': [],
+            'reminders': [],
+            'location': None
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tasks/<int:file_idx>/update', methods=['POST'])
+def update_task(file_idx):
+    """Update title and description for a specific task"""
+    try:
+        data = request.get_json()
+        new_title = data.get('title', '').strip()
+        new_description = data.get('description', '').strip()
+        
+        if not new_title:
+            return jsonify({'error': 'Task title cannot be empty'}), 400
+        
+        lines = read_lines()
+        if file_idx < 0 or file_idx >= len(lines):
+            return jsonify({'error': 'Task not found'}), 404
+        
+        line = lines[file_idx].strip()
+        if not line:
+            return jsonify({'error': 'Task not found'}), 404
+        
+        # Parse the current task and update with new title and description
+        if line.startswith("x "):
+            # Completed task
+            parts = line[2:].strip().split(" ", 1)
+            if len(parts) >= 2 and parts[0].count('-') == 2:
+                completion_prefix = f"x {parts[0]} "
+            else:
+                completion_prefix = "x "
+            
+            lines[file_idx] = completion_prefix + format_task_text(new_title, new_description)
+            
+        elif "status:in_progress" in line:
+            # In progress task
+            lines[file_idx] = format_task_text(new_title, new_description) + " status:in_progress"
+            
+        else:
+            # Open task
+            lines[file_idx] = format_task_text(new_title, new_description)
+        
+        write_lines(lines)
+        return jsonify({'success': True, 'message': 'Task updated'})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tasks/<int:file_idx>/update_description', methods=['POST'])
+def update_task_description(file_idx):
+    """Update description for a specific task (deprecated - use /update instead)"""
+    try:
+        data = request.get_json()
+        new_description = data.get('description', '').strip()
+        
+        lines = read_lines()
+        if file_idx < 0 or file_idx >= len(lines):
+            return jsonify({'error': 'Task not found'}), 404
+        
+        line = lines[file_idx].strip()
+        if not line:
+            return jsonify({'error': 'Task not found'}), 404
+        
+        # Parse the current task to extract title
+        if line.startswith("x "):
+            # Completed task
+            parts = line[2:].strip().split(" ", 1)
+            if len(parts) >= 2 and parts[0].count('-') == 2:
+                completion_prefix = f"x {parts[0]} "
+                task_text = parts[1]
+            else:
+                completion_prefix = "x "
+                task_text = line[2:].strip()
+            
+            title, _ = parse_task_text(task_text)
+            lines[file_idx] = completion_prefix + format_task_text(title, new_description)
+            
+        elif "status:in_progress" in line:
+            # In progress task
+            task_text = line.replace("status:in_progress", "").strip()
+            title, _ = parse_task_text(task_text)
+            lines[file_idx] = format_task_text(title, new_description) + " status:in_progress"
+            
+        else:
+            # Open task
+            title, _ = parse_task_text(line)
+            lines[file_idx] = format_task_text(title, new_description)
+        
+        write_lines(lines)
+        return jsonify({'success': True, 'message': 'Description updated'})
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500

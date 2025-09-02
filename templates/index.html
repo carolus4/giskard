@@ -94,6 +94,49 @@
         </div>
     </div>
 
+    <!-- Task Detail View -->
+    <div class="task-detail-overlay" id="task-detail-modal">
+        <div class="task-detail-content">
+            <div class="task-detail-header">
+                <button class="task-detail-close" id="detail-close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="task-detail-body">
+                <div class="task-detail-main">
+                    <div class="task-title-row">
+                        <div class="task-checkbox-large">
+                            <input type="checkbox" class="task-check-large" id="detail-checkbox">
+                            <span class="checkmark-large"></span>
+                        </div>
+                        <input type="text" class="task-detail-title-input" id="detail-title" placeholder="Task title...">
+                        <div class="task-title-actions">
+                            <button class="progress-btn-inline" id="detail-progress-btn">
+                                <i class="fas fa-play"></i>
+                                <span>start</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="task-detail-content-area">
+                        <div class="task-detail-description">
+                            <i class="fas fa-align-left description-icon"></i>
+                            <textarea class="description-input" id="detail-description" placeholder="Add description..."></textarea>
+                        </div>
+                        
+                        <div class="description-actions">
+                            <button class="save-btn" id="save-task-btn">
+                                Save
+                                <span class="keyboard-shortcut">⌘↵</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Task Template -->
     <template id="task-template">
         <div class="task-item" data-task-id="">

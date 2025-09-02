@@ -2,6 +2,7 @@
 class TodoApp {
     constructor() {
         this.currentView = 'today';
+        this.currentTaskData = null;
         this.tasks = {
             in_progress: [],
             open: [],
@@ -22,9 +23,19 @@ class TodoApp {
     init() {
         this.bindEvents();
         this.loadTasks(true); // Initial load with animation
+        this.updateKeyboardShortcutDisplay();
         
         // Smart auto-refresh every 30 seconds - only if data changed
         setInterval(() => this.smartRefresh(), 30000);
+    }
+
+    updateKeyboardShortcutDisplay() {
+        // Show appropriate shortcut for user's platform
+        const shortcutSpan = document.querySelector('.keyboard-shortcut');
+        if (shortcutSpan) {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            shortcutSpan.textContent = isMac ? '⌘↵' : 'Ctrl+↵';
+        }
     }
 
     bindEvents() {
@@ -65,9 +76,65 @@ class TodoApp {
             modalAdd.disabled = !e.target.value.trim();
         });
         
-        // ESC to close modal
+        // ESC to close modal, Cmd+Enter to save
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') this.closeAddTaskModal();
+            if (e.key === 'Escape') {
+                this.closeAddTaskModal();
+                this.closeTaskDetail();
+            }
+            
+            // Cmd+Enter or Ctrl+Enter to save task (only when detail modal is open)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                const detailModal = document.getElementById('task-detail-modal');
+                if (detailModal && detailModal.classList.contains('show')) {
+                    e.preventDefault(); // Prevent any default behavior
+                    
+                    // Brief visual feedback on the save button
+                    const saveBtn = document.getElementById('save-task-btn');
+                    if (saveBtn) {
+                        saveBtn.style.transform = 'scale(0.95)';
+                        setTimeout(() => {
+                            saveBtn.style.transform = '';
+                        }, 150);
+                    }
+                    
+                    this.saveTask(); // This will now close the popup automatically
+                }
+            }
+        });
+
+        // Task detail modal controls
+        const detailClose = document.getElementById('detail-close-btn');
+        const detailModal = document.getElementById('task-detail-modal');
+        const saveTaskBtn = document.getElementById('save-task-btn');
+        const progressBtn = document.getElementById('detail-progress-btn');
+        const detailCheckbox = document.getElementById('detail-checkbox');
+        
+        detailClose.addEventListener('click', () => this.closeTaskDetail());
+        detailModal.addEventListener('click', (e) => {
+            if (e.target === detailModal) this.closeTaskDetail();
+        });
+        
+        saveTaskBtn.addEventListener('click', () => this.saveTask());
+        progressBtn.addEventListener('click', () => this.toggleTaskProgress());
+        
+        // Handle checkbox in detail modal
+        detailCheckbox.addEventListener('change', (e) => {
+            if (!this.currentTaskData) return;
+            
+            if (this.currentTaskData.status === 'done') {
+                // Uncomplete the task
+                e.target.checked = true; // Keep checked while processing
+                this.uncompleteTask(this.currentTaskData.file_idx);
+            } else if (e.target.checked) {
+                // Complete the task
+                this.markTaskDone(this.currentTaskData.id);
+            }
+            
+            // Close detail modal after changing status
+            setTimeout(() => {
+                this.closeTaskDetail();
+            }, 500);
         });
     }
 
@@ -250,6 +317,8 @@ class TodoApp {
         taskItem.dataset.status = task.status;
         title.textContent = task.title;
         
+        // Description removed from task list - available in detail view only
+        
         // Add status classes
         if (task.status === 'in_progress') {
             taskItem.classList.add('in-progress');
@@ -293,6 +362,15 @@ class TodoApp {
             e.stopPropagation();
             this.stopTask(task.id);
         });
+
+        // Make task clickable to open detail view
+        taskItem.addEventListener('click', (e) => {
+            // Don't open detail if clicking on checkbox or action buttons
+            if (e.target.closest('.task-checkbox') || e.target.closest('.task-actions')) {
+                return;
+            }
+            this.openTaskDetail(task.file_idx);
+        });
         
         return taskEl;
     }
@@ -319,7 +397,9 @@ class TodoApp {
 
     async addTaskFromModal() {
         const input = document.getElementById('modal-task-name');
+        const description = document.getElementById('modal-task-description');
         const title = input.value.trim();
+        const desc = description.value.trim();
         
         if (!title) return;
         
@@ -329,7 +409,10 @@ class TodoApp {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ title })
+                body: JSON.stringify({ 
+                    title: title,
+                    description: desc 
+                })
             });
             
             const result = await response.json();
@@ -438,6 +521,128 @@ class TodoApp {
 
     showError(message) {
         this.showNotification(message, 'error');
+    }
+
+    async openTaskDetail(fileIdx) {
+        try {
+            const response = await fetch(`/api/tasks/${fileIdx}/details`);
+            const task = await response.json();
+            
+            if (response.ok) {
+                this.showTaskDetail(task);
+            } else {
+                this.showError(task.error || 'Failed to load task details');
+            }
+            
+        } catch (error) {
+            console.error('Failed to load task details:', error);
+            this.showError('Failed to load task details');
+        }
+    }
+
+    showTaskDetail(task) {
+        const modal = document.getElementById('task-detail-modal');
+        const checkbox = document.getElementById('detail-checkbox');
+        const titleRow = document.querySelector('.task-title-row');
+        const progressBtn = document.getElementById('detail-progress-btn');
+        
+        // Populate task details
+        document.getElementById('detail-title').value = task.title;
+        document.getElementById('detail-description').value = task.description || '';
+        
+        // Set checkbox state
+        checkbox.checked = task.status === 'done';
+        if (task.status === 'done') {
+            titleRow.classList.add('completed');
+        } else {
+            titleRow.classList.remove('completed');
+        }
+        
+        // Set progress button state
+        if (task.status === 'in_progress') {
+            progressBtn.classList.add('in-progress');
+            progressBtn.innerHTML = '<i class="fas fa-pause"></i><span>pause</span>';
+        } else {
+            progressBtn.classList.remove('in-progress');
+            progressBtn.innerHTML = '<i class="fas fa-play"></i><span>start</span>';
+        }
+        
+        // Show modal
+        modal.classList.add('show');
+        modal.dataset.fileIdx = task.file_idx;
+        this.currentTaskData = task;
+        
+        // Update keyboard shortcut display when modal opens
+        this.updateKeyboardShortcutDisplay();
+    }
+
+    closeTaskDetail() {
+        const modal = document.getElementById('task-detail-modal');
+        modal.classList.remove('show');
+        this.currentTaskData = null;
+    }
+
+    async saveTask() {
+        if (!this.currentTaskData) return;
+        
+        const title = document.getElementById('detail-title').value.trim();
+        const description = document.getElementById('detail-description').value.trim();
+        const fileIdx = this.currentTaskData.file_idx;
+        
+        if (!title) {
+            this.showError('Task title cannot be empty');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/tasks/${fileIdx}/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title: title,
+                    description: description
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                this.showSuccess('Task saved!');
+                this.loadTasks(); // Refresh the task list
+                // Update current task data
+                this.currentTaskData.title = title;
+                this.currentTaskData.description = description;
+                // Close the popup
+                this.closeTaskDetail();
+            } else {
+                this.showError(data.error || 'Failed to save task');
+            }
+            
+        } catch (error) {
+            console.error('Failed to save task:', error);
+            this.showError('Failed to save task');
+        }
+    }
+
+    async toggleTaskProgress() {
+        if (!this.currentTaskData) return;
+        
+        const task = this.currentTaskData;
+        
+        if (task.status === 'in_progress') {
+            // Stop the task
+            this.stopTask(task.id);
+        } else {
+            // Start the task
+            this.startTask(task.id);
+        }
+        
+        // Close the detail modal after changing status
+        setTimeout(() => {
+            this.closeTaskDetail();
+        }, 500);
     }
 
     showNotification(message, type = 'info') {
