@@ -4,11 +4,20 @@ Mini Todo - Beautiful Todoist-like web app
 """
 
 from flask import Flask, render_template
+from flask_cors import CORS
 from api.routes import api
 from utils.file_manager import TodoFileManager
 
 # Create Flask app
 app = Flask(__name__)
+
+# Enable CORS for Tauri desktop app (any localhost port)
+CORS(app, origins=[
+    "http://127.0.0.1:1430", "http://localhost:1430",  # Original port
+    "http://127.0.0.1:1431", "http://localhost:1431",  # New port  
+    "http://127.0.0.1:1432", "http://localhost:1432",  # Future ports
+    "tauri://localhost"
+], supports_credentials=True)
 
 # Register API blueprint
 app.register_blueprint(api)
