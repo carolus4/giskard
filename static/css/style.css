@@ -18,6 +18,9 @@ body {
     display: flex;
     height: 100vh;
     background: #fafafa;
+    /* Performance optimizations */
+    will-change: auto;
+    contain: layout style;
 }
 
 /* Sidebar */
@@ -211,6 +214,9 @@ body {
     transition: all 0.2s ease;
     cursor: pointer;
     position: relative;
+    /* Performance optimizations for smooth animations */
+    will-change: transform, box-shadow, border-color;
+    transform: translateZ(0); /* Force GPU acceleration */
 }
 
 .task-item.selected-for-move {
@@ -461,6 +467,23 @@ body.dragging .insertion-line {
 
 .task-item.new-task {
     animation: slideIn 0.3s ease;
+}
+
+.task-item.highlighted {
+    animation: highlight 2s ease-out;
+    border-color: #dc4c3e;
+    box-shadow: 0 2px 12px rgba(220, 76, 62, 0.3);
+}
+
+@keyframes highlight {
+    0% {
+        background-color: #fff3f0;
+        border-color: #dc4c3e;
+    }
+    100% {
+        background-color: #fff;
+        border-color: #e8e8e8;
+    }
 }
 
 /* Responsive */

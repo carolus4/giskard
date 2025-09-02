@@ -2,7 +2,7 @@ x 2025-09-02 Test mini_todo.md functionality |  | 1
 x 2025-09-02 Make task order draggable | Re prioritise; especially for new tasks with high pri | 3
 Add activity log |  | 4
 LLM integration | Integrate Ollama for intelligent task suggestions, automatic categorization, and smart deadline recommendations. | 3
-Refactor (>500 line app.py) | > analyse this code base and identify opportunities to refactor and simplify. Keep functionality as-is. Present a plan and ask questions as needed before making changes\n\n[x] back-end restructure\n[x] test restructure\n[x] front-end modularisation\n[ ] Code Quality Improvements | 2
+Refactor (>500 line app.py) | > analyse this code base and identify opportunities to refactor and simplify. Keep functionality as-is. Present a plan and ask questions as needed before making changes\n\n[x] back-end restructure\n[x] test restructure\n[x] front-end modularisation\n[ ] Code Quality Improvements | 2 status:in_progress
 Evals | Create comprehensive test suite for the todo system | 7
 x 2025-09-02 Test todo.txt format conversion |  | 10
 Notifications | Set up push notifications for due tasks and daily reminders | 5
