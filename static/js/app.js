@@ -17,6 +17,15 @@ class TodoApp {
         this.lastTasksHash = '';
         this.isUserAction = false;
         
+        // Drag and drop properties
+        this.insertionIndex = -1;
+        this.draggedTask = null;
+        this.taskListContainer = null;
+        this.dragOverHandler = null;
+        this.dropHandler = null;
+        this.lastMouseY = 0;
+        this.isDropping = false;
+        
         this.init();
     }
 
@@ -81,6 +90,7 @@ class TodoApp {
             if (e.key === 'Escape') {
                 this.closeAddTaskModal();
                 this.closeTaskDetail();
+                this.clearTaskSelection(); // Clear any task selection
             }
             
             // Cmd+Enter or Ctrl+Enter to save task (only when detail modal is open)
@@ -363,14 +373,27 @@ class TodoApp {
             this.stopTask(task.id);
         });
 
+        // Store task data on the element
+        taskItem.dataset.fileIdx = task.file_idx;
+        taskItem.dataset.order = task.order || task.file_idx; // Use file_idx as fallback
+
         // Make task clickable to open detail view
         taskItem.addEventListener('click', (e) => {
-            // Don't open detail if clicking on checkbox or action buttons
-            if (e.target.closest('.task-checkbox') || e.target.closest('.task-actions')) {
+            // Don't open detail if clicking on checkbox, action buttons, or drag handle
+            if (e.target.closest('.task-checkbox') || e.target.closest('.task-actions') || e.target.closest('.task-drag-handle')) {
                 return;
             }
+            
+            // Don't open detail if we have a task selected for moving
+            if (document.querySelector('.task-item.selected-for-move')) {
+                return; // Let the drag handler deal with it
+            }
+            
             this.openTaskDetail(task.file_idx);
         });
+
+        // Add simplified drag handlers (Todoist-style)
+        this.addDragHandlers(taskItem, task);
         
         return taskEl;
     }
@@ -643,6 +666,401 @@ class TodoApp {
         setTimeout(() => {
             this.closeTaskDetail();
         }, 500);
+    }
+
+    addDragHandlers(taskItem, task) {
+        const dragHandle = taskItem.querySelector('.task-drag-handle');
+        
+        // Make the entire task item draggable, but only when initiated from the handle
+        taskItem.draggable = false;
+        
+        // Drag handle mouse down - enable dragging
+        dragHandle.addEventListener('mousedown', (e) => {
+            console.log('🖱️ Mouse down on drag handle for:', task.title);
+            taskItem.draggable = true;
+        });
+        
+        // Also enable dragging when mouse leaves the handle (in case user drags quickly)
+        dragHandle.addEventListener('mouseleave', (e) => {
+            setTimeout(() => {
+                taskItem.draggable = false;
+            }, 100);
+        });
+        
+        // Drag start
+        taskItem.addEventListener('dragstart', (e) => {
+            if (!taskItem.draggable) {
+                e.preventDefault();
+                return;
+            }
+            
+            console.log('🎯 DRAG START: Dragging task:', task.title, 'file_idx:', task.file_idx);
+            
+            // Add dragging state
+            document.body.classList.add('dragging');
+            taskItem.classList.add('selected-for-move');
+            
+            // Store the dragged task data
+            this.draggedTask = {
+                file_idx: task.file_idx,
+                title: task.title,
+                element: taskItem
+            };
+            
+            // Store the task data for drop event
+            e.dataTransfer.setData('text/plain', JSON.stringify({
+                file_idx: task.file_idx,
+                title: task.title
+            }));
+            e.dataTransfer.effectAllowed = 'move';
+            
+            // Create insertion line and add mouse tracking
+            setTimeout(() => this.initializeInsertionTracking(), 10);
+        });
+        
+        // Drag end
+        taskItem.addEventListener('dragend', (e) => {
+            console.log('Drag ended');
+            document.body.classList.remove('dragging');
+            taskItem.draggable = false;
+            this.cleanupDragState();
+        });
+    }
+    
+
+    
+    cleanupDragState() {
+        // Remove dragging state from tasks
+        document.querySelectorAll('.task-item').forEach(item => {
+            item.classList.remove('selected-for-move');
+        });
+        
+        // Remove insertion line
+        const insertionLine = document.querySelector('.insertion-line');
+        if (insertionLine) {
+            insertionLine.remove();
+        }
+        
+        // Remove event listeners
+        if (this.taskListContainer) {
+            this.taskListContainer.removeEventListener('dragover', this.dragOverHandler);
+            this.taskListContainer.removeEventListener('drop', this.dropHandler);
+        }
+        
+        // Clear drag data
+        this.draggedTask = null;
+        this.taskListContainer = null;
+        this.insertionIndex = -1;
+        this.lastMouseY = 0;
+        this.isDropping = false;
+    }
+    
+    initializeInsertionTracking() {
+        console.log('Initializing insertion tracking...');
+        
+        // Find the actual tasks container (where tasks are rendered)
+        const firstTask = document.querySelector('.task-item');
+        if (!firstTask) {
+            console.error('No tasks found to determine container');
+            return;
+        }
+        
+        this.taskListContainer = firstTask.parentElement;
+        console.log('Task container found:', this.taskListContainer.className);
+        
+        // Create insertion line in the same container
+        this.createInsertionLine();
+        
+        // Add event listeners to the broader content area for better mouse tracking
+        const contentArea = document.querySelector('.content-body') || this.taskListContainer;
+        
+        this.dragOverHandler = (e) => this.handleDragOver(e);
+        this.dropHandler = (e) => this.handleDrop(e);
+        
+        contentArea.addEventListener('dragover', this.dragOverHandler);
+        contentArea.addEventListener('drop', this.dropHandler);
+        
+        console.log('✅ Insertion tracking initialized');
+    }
+    
+    createInsertionLine() {
+        // Remove any existing insertion line
+        const existing = document.querySelector('.insertion-line');
+        if (existing) {
+            existing.remove();
+        }
+        
+        // Create new insertion line with fixed positioning
+        const insertionLine = document.createElement('div');
+        insertionLine.className = 'insertion-line';
+        insertionLine.style.top = '-10px'; // Start hidden
+        
+        // Add to document body for fixed positioning
+        document.body.appendChild(insertionLine);
+        
+        console.log('Created fixed-position insertion line');
+    }
+    
+    handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        if (!this.draggedTask) return;
+        
+        // Store mouse position and update insertion line position
+        this.lastMouseY = e.clientY;
+        
+        // Calculate insertion index for drop logic
+        const insertionIndex = this.calculateInsertionIndex(e.clientY);
+        this.insertionIndex = insertionIndex;
+        
+        // Update insertion line to follow mouse directly
+        this.updateInsertionLinePosition();
+    }
+    
+    calculateInsertionIndex(mouseY) {
+        const taskItems = Array.from(document.querySelectorAll('.task-item')).filter(
+            item => !item.classList.contains('selected-for-move')
+        );
+        
+        if (taskItems.length === 0) {
+            return 0;
+        }
+        
+        // Find which task boundary we're closest to
+        let insertIndex = 0;
+        let minDistance = Infinity;
+        
+        // Check before first task
+        const firstRect = taskItems[0].getBoundingClientRect();
+        const distanceToFirst = Math.abs(mouseY - (firstRect.top - 5));
+        if (distanceToFirst < minDistance) {
+            minDistance = distanceToFirst;
+            insertIndex = 0;
+        }
+        
+        // Check after each task
+        taskItems.forEach((taskItem, i) => {
+            const rect = taskItem.getBoundingClientRect();
+            const afterTaskY = rect.bottom + 5;
+            const distance = Math.abs(mouseY - afterTaskY);
+            
+            if (distance < minDistance) {
+                minDistance = distance;
+                // Insert after this task means the file_idx position plus 1
+                insertIndex = i + 1;
+            }
+        });
+        
+        return insertIndex;
+    }
+    
+    updateInsertionLinePosition() {
+        const insertionLine = document.querySelector('.insertion-line');
+        if (!insertionLine || !this.lastMouseY) return;
+        
+        // Find the closest task boundary for snapping
+        const snappedY = this.findClosestTaskBoundary(this.lastMouseY);
+        
+        // Use the snapped position
+        insertionLine.style.top = `${snappedY}px`;
+        
+        // Simple debug logging
+        console.log(`Mouse Y: ${this.lastMouseY}, Snapped Y: ${snappedY}, Insert Index: ${this.insertionIndex}`);
+    }
+    
+    findClosestTaskBoundary(mouseY) {
+        const taskItems = Array.from(document.querySelectorAll('.task-item')).filter(
+            item => !item.classList.contains('selected-for-move')
+        );
+        
+        if (taskItems.length === 0) {
+            return mouseY;
+        }
+        
+        let closestY = mouseY;
+        let minDistance = Infinity;
+        
+        // Check position before first task
+        const firstTask = taskItems[0];
+        const firstRect = firstTask.getBoundingClientRect();
+        const beforeFirst = firstRect.top - 5;
+        const distanceToFirst = Math.abs(mouseY - beforeFirst);
+        if (distanceToFirst < minDistance) {
+            minDistance = distanceToFirst;
+            closestY = beforeFirst;
+        }
+        
+        // Check position after each task
+        taskItems.forEach((task) => {
+            const rect = task.getBoundingClientRect();
+            const afterTask = rect.bottom + 5;
+            const distance = Math.abs(mouseY - afterTask);
+            
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestY = afterTask;
+            }
+        });
+        
+        return closestY;
+    }
+    
+    calculateSimpleReorder(draggedVisualIndex, targetVisualIndex) {
+        // Get all visible tasks in current order (including dragged one)
+        const allVisibleTasks = Array.from(document.querySelectorAll('.task-item'));
+        
+        // Create array of task orders in current visual order
+        const currentOrderList = allVisibleTasks.map(task => parseInt(task.dataset.order));
+        
+        // Move the dragged task from its current position to target position
+        const draggedOrder = currentOrderList[draggedVisualIndex];
+        currentOrderList.splice(draggedVisualIndex, 1);  // Remove from current position
+        currentOrderList.splice(targetVisualIndex, 0, draggedOrder);  // Insert at target position
+        
+        console.log('Simple reorder: moving visual index', draggedVisualIndex, '→', targetVisualIndex, 'order', draggedOrder, '→ sequence:', currentOrderList);
+        
+        return currentOrderList;
+    }
+    
+    handleDrop(e) {
+        e.preventDefault();
+        
+        if (!this.draggedTask || this.insertionIndex === -1) {
+            console.log('No valid drop target');
+            return;
+        }
+        
+        // Prevent multiple drops
+        if (this.isDropping) {
+            console.log('Drop already in progress, ignoring');
+            return;
+        }
+        this.isDropping = true;
+        
+        console.log('DROP: Moving task', this.draggedTask.file_idx, 'to visual position', this.insertionIndex);
+        
+        // Get all tasks in their original order (including the dragged one)
+        const allTaskItems = Array.from(document.querySelectorAll('.task-item'));
+        // Get visible tasks (excluding dragged one) - this matches what calculateInsertionIndex uses
+        const visibleTasks = allTaskItems.filter(item => !item.classList.contains('selected-for-move'));
+        
+        // Find the original index of the dragged task in the full list
+        const draggedOriginalIndex = allTaskItems.findIndex(
+            item => parseInt(item.dataset.fileIdx) === this.draggedTask.file_idx
+        );
+        
+        console.log('Dragged task original index:', draggedOriginalIndex, 'Target insertion index:', this.insertionIndex);
+        
+        // Work with the actual visual positions and their corresponding file indices
+        const draggedFileIdx = this.draggedTask.file_idx;
+        
+        // Find where the dragged task currently appears visually
+        const draggedVisualPos = allTaskItems.findIndex(item => parseInt(item.dataset.fileIdx) === draggedFileIdx);
+        
+        console.log('Dragged task visual position:', draggedVisualPos, 'Insertion index:', this.insertionIndex);
+        
+        // Don't move if dropping in the same place
+        if (this.insertionIndex === draggedVisualPos) {
+            console.log('Same visual position, not moving');
+            this.isDropping = false;
+            return;
+        }
+        
+        // The insertionIndex is calculated relative to the visible tasks (without the dragged task)
+        // This is exactly what the backend expects: where to insert after removing the dragged task
+        const targetFileIdx = this.insertionIndex;
+        
+        console.log('  Using insertion index directly as target file index');
+        
+        console.log('REORDER CALCULATION:');
+        console.log('  Current visual position:', draggedVisualPos);  
+        console.log('  Target insertion index:', this.insertionIndex);
+        console.log('  Direction:', this.insertionIndex <= draggedVisualPos ? 'backwards' : 'forwards');
+        console.log('  Final target file index:', targetFileIdx);
+        console.log('Moving task from visual position', draggedVisualPos, 'to file index', targetFileIdx);
+        
+        // Simple approach: calculate the complete new order sequence
+        const newOrderSequence = this.calculateSimpleReorder(draggedVisualPos, this.insertionIndex);
+        
+        console.log('📝 SIMPLE REORDER: Complete new order sequence');
+        
+        // Perform the reorder with the complete sequence
+        this.reorderTasksSimple(newOrderSequence).finally(() => {
+            this.isDropping = false;
+        });
+    }
+    
+    getTaskDataFromElement(taskElement) {
+        // Extract task data from the DOM element
+        const taskId = taskElement.dataset.taskId;
+        const fileIdx = parseInt(taskElement.dataset.fileIdx);
+        
+        // Find the task in our current tasks data
+        const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
+        return allTasks.find(task => task.file_idx === fileIdx);
+    }
+
+    async reorderTasksSimple(newOrderSequence) {
+        console.log('🔄 SIMPLE REORDERING with sequence:', newOrderSequence);
+        
+        try {
+            const response = await fetch('/api/tasks/reorder-simple', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    new_order_sequence: newOrderSequence
+                })
+            });
+            
+            const data = await response.json();
+            console.log('Backend response:', data);
+            
+            if (response.ok) {
+                console.log('✅ Tasks reordered successfully');
+                // Refresh the task list to show the updated order
+                await this.loadTasks();
+            } else {
+                console.error('❌ Backend error:', data.error);
+            }
+        } catch (error) {
+            console.error('❌ Request failed:', error);
+        }
+    }
+
+    async reorderTask_OLD(taskOrder, targetOrder) {
+        console.log('🔄 REORDERING: task order', taskOrder, '→ target order', targetOrder);
+        
+        try {
+            const response = await fetch('/api/tasks/reorder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    task_order: taskOrder,
+                    target_order: targetOrder
+                })
+            });
+            
+            const data = await response.json();
+            console.log('Backend response:', data);
+            
+            if (response.ok) {
+                console.log('✅ Task reordered successfully');
+                this.showSuccess('Task reordered!');
+                this.loadTasks(); // Refresh the task list
+            } else {
+                console.error('❌ Backend error:', data.error);
+                this.showError(data.error || 'Failed to reorder task');
+            }
+            
+        } catch (error) {
+            console.error('❌ Network error:', error);
+            this.showError('Failed to reorder task');
+        }
     }
 
     showNotification(message, type = 'info') {

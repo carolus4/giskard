@@ -33,21 +33,87 @@ def write_lines(lines):
         TODO_PATH.write_text("", encoding="utf-8")
 
 def parse_task_text(text):
-    """Parse task text to extract title and description"""
+    """Parse task text to extract title, description, and order"""
     if " | " in text:
-        title, description = text.split(" | ", 1)
-        # Unescape newlines in description
-        description = description.replace("\\n", "\n")
-        return title.strip(), description.strip()
-    return text.strip(), ""
+        parts = text.split(" | ")
+        title = parts[0].strip()
+        description = parts[1].replace("\\n", "\n").strip() if len(parts) > 1 else ""
+        # Check if there's an order number (third part)
+        order = None
+        if len(parts) >= 3 and parts[2].strip().isdigit():
+            order = int(parts[2].strip())
+        return title, description, order
+    return text.strip(), "", None
 
-def format_task_text(title, description=""):
-    """Format task title and description for storage"""
+def format_task_text(title, description="", order=None):
+    """Format task title, description, and order for storage"""
+    result = title
     if description:
         # Escape newlines in description to keep todo.txt single-line per task
         escaped_description = description.replace("\n", "\\n")
-        return f"{title} | {escaped_description}"
-    return title
+        result += f" | {escaped_description}"
+    elif order is not None:
+        # If we have an order but no description, add empty description with space
+        result += " | "
+    
+    if order is not None:
+        result += f" | {order}"
+    
+    return result
+
+def assign_missing_orders():
+    """Auto-assign order numbers to tasks that don't have them"""
+    lines = read_lines()
+    next_order = 1
+    modified = False
+    
+    for i, line in enumerate(lines):
+        if not line.strip():
+            continue
+            
+        # Parse the current task to see if it has an order
+        if line.startswith('x '):
+            # Completed task: "x 2023-12-01 Task text" or "x Task text"
+            line_after_x = line[2:].strip()
+            parts = line_after_x.split(" ", 1)
+            if len(parts) > 1 and len(parts[0]) == 10 and parts[0].count('-') == 2:
+                # Looks like a date format (YYYY-MM-DD)
+                task_text = parts[1]
+            else:
+                # No date, everything after "x " is the task text
+                task_text = line_after_x
+            title, description, order = parse_task_text(task_text)
+        elif "status:in_progress" in line:
+            task_text = line.replace("status:in_progress", "").strip()
+            title, description, order = parse_task_text(task_text)
+        else:
+            title, description, order = parse_task_text(line)
+            
+        # If no order, assign one
+        if order is None:
+            order = next_order
+            modified = True
+            
+            # Reconstruct the line with order
+            if line.startswith('x '):
+                if " " in line[2:] and line[2:].split(" ")[0].isdigit():
+                    # Has completion date
+                    completion_date = line[2:].split(" ")[0]
+                    lines[i] = f"x {completion_date} {format_task_text(title, description, order)}"
+                else:
+                    lines[i] = f"x {format_task_text(title, description, order)}"
+            elif "status:in_progress" in line:
+                lines[i] = f"{format_task_text(title, description, order)} status:in_progress"
+            else:
+                lines[i] = format_task_text(title, description, order)
+                
+        next_order = max(next_order, (order or 0) + 1)
+    
+    if modified:
+        write_lines(lines)
+        print(f"Auto-assigned orders up to {next_order - 1}")
+    
+    return next_order
 
 def parse_tasks(lines):
     """Parse tasks into categories: (open, in_progress, done)"""
@@ -70,19 +136,19 @@ def parse_tasks(lines):
                 # No date, everything after "x " is the task text
                 task_text = line[2:].strip()
             
-            title, description = parse_task_text(task_text)
-            done_tasks.append((idx, title, description))
+            title, description, order = parse_task_text(task_text)
+            done_tasks.append((idx, title, description, order))
             
         elif "status:in_progress" in line:
             # In progress task: "Task title | description status:in_progress"
             task_text = line.replace("status:in_progress", "").strip()
-            title, description = parse_task_text(task_text)
-            in_progress_tasks.append((idx, title, description))
+            title, description, order = parse_task_text(task_text)
+            in_progress_tasks.append((idx, title, description, order))
             
         else:
             # Open task: just the plain text
-            title, description = parse_task_text(line)
-            open_tasks.append((idx, title, description))
+            title, description, order = parse_task_text(line)
+            open_tasks.append((idx, title, description, order))
     
     return open_tasks, in_progress_tasks, done_tasks
 
@@ -97,6 +163,14 @@ def get_tasks():
     lines = read_lines()
     open_tasks, in_progress_tasks, done_tasks = parse_tasks(lines)
     
+    # Sort tasks by their order field (None orders go to end)
+    def sort_by_order(tasks):
+        return sorted(tasks, key=lambda x: x[3] if x[3] is not None else float('inf'))
+    
+    in_progress_tasks = sort_by_order(in_progress_tasks)
+    open_tasks = sort_by_order(open_tasks) 
+    done_tasks = sort_by_order(done_tasks)
+    
     # Convert to UI format with continuous numbering
     task_num = 1
     ui_tasks = {
@@ -106,33 +180,36 @@ def get_tasks():
     }
     
     # In progress tasks first (these show up in "Today")
-    for file_idx, title, description in in_progress_tasks:
+    for file_idx, title, description, order in in_progress_tasks:
         ui_tasks['in_progress'].append({
             'id': task_num,
             'file_idx': file_idx,
             'title': title,
             'description': description,
+            'order': order,
             'status': 'in_progress'
         })
         task_num += 1
     
     # Open tasks next
-    for file_idx, title, description in open_tasks:
+    for file_idx, title, description, order in open_tasks:
         ui_tasks['open'].append({
             'id': task_num,
             'file_idx': file_idx,
             'title': title,
             'description': description,
+            'order': order,
             'status': 'open'
         })
         task_num += 1
     
     # Done tasks (no numbering needed)
-    for file_idx, title, description in done_tasks:
+    for file_idx, title, description, order in done_tasks:
         ui_tasks['done'].append({
             'file_idx': file_idx,
             'title': title,
             'description': description,
+            'order': order,
             'status': 'done'
         })
     
@@ -184,7 +261,7 @@ def mark_done(task_id):
         if task_id < 1 or task_id > len(all_active_tasks):
             return jsonify({'error': 'Invalid task ID'}), 400
         
-        file_idx, title, description = all_active_tasks[task_id-1]
+        file_idx, title, description, order = all_active_tasks[task_id-1]
         completion_date = datetime.now().strftime("%Y-%m-%d")
         task_text = format_task_text(title, description)
         lines[file_idx] = f"x {completion_date} {task_text}"
@@ -207,7 +284,7 @@ def start_task(task_id):
         if open_task_num < 1 or open_task_num > len(open_tasks):
             return jsonify({'error': 'Invalid task ID for starting'}), 400
         
-        file_idx, title, description = open_tasks[open_task_num-1]
+        file_idx, title, description, order = open_tasks[open_task_num-1]
         task_text = format_task_text(title, description)
         lines[file_idx] = f"{task_text} status:in_progress"
         write_lines(lines)
@@ -227,7 +304,7 @@ def stop_task(task_id):
         if task_id < 1 or task_id > len(in_progress_tasks):
             return jsonify({'error': 'Invalid task ID for stopping'}), 400
         
-        file_idx, title, description = in_progress_tasks[task_id-1]
+        file_idx, title, description, order = in_progress_tasks[task_id-1]
         task_text = format_task_text(title, description)
         lines[file_idx] = task_text
         write_lines(lines)
@@ -265,10 +342,10 @@ def uncomplete_task():
             # No date, everything after "x " is the task text
             task_text = line[2:].strip()
         
-        title, description = parse_task_text(task_text)
+        title, description, order = parse_task_text(task_text)
         
         # Make it an open task again
-        lines[file_idx] = format_task_text(title, description)
+        lines[file_idx] = format_task_text(title, description, order)
         write_lines(lines)
         
         return jsonify({'success': True, 'message': f'Uncompleted: {title}'})
@@ -299,17 +376,17 @@ def get_task_details(file_idx):
                 task_text = line[2:].strip()
                 completion_date = None
             
-            title, description = parse_task_text(task_text)
+            title, description, order = parse_task_text(task_text)
             status = 'done'
         elif "status:in_progress" in line:
             # In progress task
             task_text = line.replace("status:in_progress", "").strip()
-            title, description = parse_task_text(task_text)
+            title, description, order = parse_task_text(task_text)
             status = 'in_progress'
             completion_date = None
         else:
             # Open task
-            title, description = parse_task_text(line)
+            title, description, order = parse_task_text(line)
             status = 'open'
             completion_date = None
         
@@ -400,22 +477,167 @@ def update_task_description(file_idx):
                 completion_prefix = "x "
                 task_text = line[2:].strip()
             
-            title, _ = parse_task_text(task_text)
+            title, _, _ = parse_task_text(task_text)
             lines[file_idx] = completion_prefix + format_task_text(title, new_description)
             
         elif "status:in_progress" in line:
             # In progress task
             task_text = line.replace("status:in_progress", "").strip()
-            title, _ = parse_task_text(task_text)
+            title, _, _ = parse_task_text(task_text)
             lines[file_idx] = format_task_text(title, new_description) + " status:in_progress"
             
         else:
             # Open task
-            title, _ = parse_task_text(line)
+            title, _, _ = parse_task_text(line)
             lines[file_idx] = format_task_text(title, new_description)
         
         write_lines(lines)
         return jsonify({'success': True, 'message': 'Description updated'})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tasks/reorder-simple', methods=['POST'])
+def reorder_tasks_simple():
+    """Reorder tasks using a complete new order sequence"""
+    try:
+        data = request.get_json()
+        new_order_sequence = data.get('new_order_sequence')
+        
+        if not new_order_sequence or not isinstance(new_order_sequence, list):
+            return jsonify({'error': 'Missing or invalid new_order_sequence'}), 400
+        
+        print(f"Reordering tasks to sequence: {new_order_sequence}")
+        
+        lines = read_lines()
+        updated_lines = []
+        
+        # Create a mapping of old_order -> new_order
+        order_mapping = {}
+        for new_position, old_order in enumerate(new_order_sequence):
+            order_mapping[old_order] = new_position + 1
+        
+        print(f"Order mapping: {order_mapping}")
+        
+        for line in lines:
+            if not line.strip():
+                updated_lines.append(line)
+                continue
+                
+            # Parse the task to get its current order
+            if line.startswith('x '):
+                # Completed task
+                line_after_x = line[2:].strip()
+                parts = line_after_x.split(" ", 1)
+                if len(parts) > 1 and len(parts[0]) == 10 and parts[0].count('-') == 2:
+                    task_text = parts[1]
+                    completion_prefix = f"x {parts[0]} "
+                else:
+                    task_text = line_after_x
+                    completion_prefix = "x "
+                title, description, order = parse_task_text(task_text)
+            elif "status:in_progress" in line:
+                task_text = line.replace("status:in_progress", "").strip()
+                title, description, order = parse_task_text(task_text)
+                completion_prefix = ""
+                in_progress_suffix = " status:in_progress"
+            else:
+                title, description, order = parse_task_text(line)
+                completion_prefix = ""
+                in_progress_suffix = ""
+            
+            # Update the order based on the mapping
+            new_order = order_mapping.get(order, order)  # Keep original if not in mapping
+            
+            # Reconstruct the line with the new order
+            new_task_text = format_task_text(title, description, new_order)
+            if line.startswith('x '):
+                updated_lines.append(f"{completion_prefix}{new_task_text}")
+            elif "status:in_progress" in line:
+                updated_lines.append(f"{new_task_text}{in_progress_suffix}")
+            else:
+                updated_lines.append(new_task_text)
+        
+        write_lines(updated_lines)
+        return jsonify({'success': True, 'message': 'Tasks reordered successfully'})
+    
+    except Exception as e:
+        print(f"Error in reorder_tasks_simple: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tasks/reorder', methods=['POST'])
+def reorder_task():
+    """Reorder a task by updating order numbers"""
+    try:
+        data = request.get_json()
+        task_order = data.get('task_order')  # Current order of the task to move
+        target_order = data.get('target_order')  # Where to move it
+        
+        if task_order is None or target_order is None:
+            return jsonify({'error': 'Missing task_order or target_order'}), 400
+        
+        if task_order == target_order:
+            return jsonify({'success': True, 'message': 'No change needed'})
+        
+        lines = read_lines()
+        updated_lines = []
+        
+        for line in lines:
+            if not line.strip():
+                updated_lines.append(line)
+                continue
+                
+            # Parse the task to get its current order
+            if line.startswith('x '):
+                # Completed task: "x 2023-12-01 Task text" or "x Task text"
+                line_after_x = line[2:].strip()
+                parts = line_after_x.split(" ", 1)
+                if len(parts) > 1 and len(parts[0]) == 10 and parts[0].count('-') == 2:
+                    # Has completion date
+                    task_text = parts[1]
+                    completion_date = parts[0]
+                    completion_prefix = f"x {completion_date} "
+                else:
+                    # No date, everything after "x " is the task text
+                    task_text = line_after_x
+                    completion_prefix = "x "
+                title, description, order = parse_task_text(task_text)
+            elif "status:in_progress" in line:
+                task_text = line.replace("status:in_progress", "").strip()
+                title, description, order = parse_task_text(task_text)
+                completion_prefix = ""
+                in_progress_suffix = " status:in_progress"
+            else:
+                title, description, order = parse_task_text(line)
+                completion_prefix = ""
+                in_progress_suffix = ""
+            
+            # Update the order based on the reordering logic
+            new_order = order
+            
+            # Only update order if task has an order number
+            if order is not None:
+                if order == task_order:
+                    # This is the task being moved
+                    new_order = target_order
+                elif task_order < target_order and order > task_order and order <= target_order:
+                    # Tasks that need to shift down
+                    new_order = order - 1
+                elif task_order > target_order and order >= target_order and order < task_order:
+                    # Tasks that need to shift up
+                    new_order = order + 1
+            
+            # Reconstruct the line with the new order
+            new_task_text = format_task_text(title, description, new_order)
+            if line.startswith('x '):
+                updated_lines.append(f"{completion_prefix}{new_task_text}")
+            elif "status:in_progress" in line:
+                updated_lines.append(f"{new_task_text}{in_progress_suffix}")
+            else:
+                updated_lines.append(new_task_text)
+        
+        write_lines(updated_lines)
+        return jsonify({'success': True, 'message': 'Task reordered successfully'})
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500

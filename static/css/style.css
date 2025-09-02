@@ -129,6 +129,7 @@ body {
     flex-direction: column;
     max-height: 100vh;
     overflow: hidden;
+    position: relative; /* For insertion line positioning */
 }
 
 .content-header {
@@ -211,6 +212,68 @@ body {
     cursor: pointer;
     position: relative;
 }
+
+.task-item.selected-for-move {
+    background: #f5f5f5 !important;
+    opacity: 0.7 !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    z-index: 100;
+    position: relative;
+}
+
+.task-drag-handle {
+    color: #ccc;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.task-item:hover .task-drag-handle {
+    opacity: 1;
+    color: #999;
+}
+
+.task-drag-handle:hover {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.task-item.selected-for-move .task-drag-handle {
+    opacity: 1;
+    color: #dc4c3e;
+    background: #fff0f0;
+}
+
+/* Insertion Line - single line that follows cursor */
+.insertion-line {
+    position: fixed;
+    left: 300px; /* Start after sidebar */
+    right: 20px;
+    height: 2px;
+    background: #dc4c3e;
+    border-radius: 1px;
+    opacity: 0;
+    z-index: 15;
+    transition: none; /* Remove transition for immediate response */
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(220, 76, 62, 0.4);
+}
+
+/* Show insertion line when dragging */
+body.dragging .insertion-line {
+    opacity: 1;
+}
+
+
 
 .task-item:hover {
     border-color: #ddd;
