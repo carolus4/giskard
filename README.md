@@ -8,46 +8,24 @@ Continuously improving.
 
 Follows the laws of robotics.
 
-## 🚀  Web UI
+## 🚀 Beautiful Task Management
 
-Launch the Todoist-inspired web interface:
+Launch the gorgeous Todoist-inspired web interface:
 
 ```bash
 ./start.sh
 ```
 
-Then open http://localhost:5000 in your browser for a beautiful, modern task management experience!
+Then open **http://localhost:5001** in your browser!
 
-## 📱 Features
+## ✨ Features
 
-- **Clean Design**: Interface inspired by Todoist
-- **Navigation**: Sidebar with Inbox, Today, Upcoming, and Completed views
+- **Beautiful Design**: Clean, modern interface inspired by Todoist
+- **Smart Navigation**: Sidebar with Inbox, Today, Upcoming, and Completed views
 - **Task Management**: Add, start, stop, and complete tasks with smooth animations
+- **Modal Interface**: Beautiful popup for adding new tasks
 - **Real-time Updates**: Auto-refreshes to stay in sync
-- **Local Data**: Uses `todo.txt` file format
-
-## 🖥️ CLI Usage (Alternative)
-
-Also works with the command line interface:
-
-```bash
-python mini_todo.py init
-# Initialized todo.txt
-
-python mini_todo.py add "Write blog post"
-# Added: Write blog post
-
-python mini_todo.py list
-# Open:
-#   1. Write blog post
-
-python mini_todo.py done 1
-# Done: Write blog post
-
-python mini_todo.py list
-# Done:
-#   - Write blog post
-```
+- **Local Data**: Simple `todo.txt` file format
 
 ## Todo.txt Format
 
