@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Todo - Beautiful Task Management</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Mini Todo</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-item active" data-view="today">
+                    <i class="fas fa-inbox"></i>
+                    <span>Inbox</span>
+                    <span class="count" id="inbox-count">0</span>
+                </div>
+                <div class="nav-item" data-view="today">
+                    <i class="fas fa-calendar-day"></i>
+                    <span>Today</span>
+                    <span class="count" id="today-count">0</span>
+                </div>
+                <div class="nav-item" data-view="upcoming">
+                    <i class="fas fa-calendar-week"></i>
+                    <span>Upcoming</span>
+                    <span class="count" id="upcoming-count">0</span>
+                </div>
+                <div class="nav-item" data-view="completed">
+                    <i class="fas fa-check"></i>
+                    <span>Completed</span>
+                    <span class="count" id="completed-count">0</span>
+                </div>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h1 id="view-title">Today</h1>
+                <p class="task-count" id="task-count">0 tasks</p>
+            </div>
+
+            <div class="content-body">
+                <!-- Today View -->
+                <div class="view-container" id="today-view">
+                    <!-- Overdue Section -->
+                    <div class="task-section" id="overdue-section" style="display: none;">
+                        <div class="section-header">
+                            <h2>Overdue</h2>
+                            <button class="reschedule-btn">Reschedule</button>
+                        </div>
+                        <div class="task-list" id="overdue-tasks"></div>
+                    </div>
+
+                    <!-- Today Section -->
+                    <div class="task-section" id="today-section">
+                        <div class="section-header">
+                            <h2 id="today-date">Today</h2>
+                        </div>
+                        <div class="task-list" id="today-tasks"></div>
+                    </div>
+                </div>
+
+                <!-- Other Views -->
+                <div class="view-container" id="inbox-view" style="display: none;">
+                    <div class="task-list" id="inbox-tasks"></div>
+                </div>
+
+                <div class="view-container" id="upcoming-view" style="display: none;">
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-plus"></i>
+                        <p>No upcoming tasks</p>
+                    </div>
+                </div>
+
+                <div class="view-container" id="completed-view" style="display: none;">
+                    <div class="task-list" id="completed-tasks"></div>
+                </div>
+            </div>
+
+            <!-- Add Task Input -->
+            <div class="add-task-container">
+                <div class="add-task-input">
+                    <i class="fas fa-plus"></i>
+                    <input type="text" id="new-task-input" placeholder="Add task">
+                    <button id="add-task-btn" class="add-btn">Add task</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Template -->
+    <template id="task-template">
+        <div class="task-item" data-task-id="">
+            <div class="task-checkbox">
+                <input type="checkbox" class="task-check">
+                <span class="checkmark"></span>
+            </div>
+            <div class="task-content">
+                <span class="task-title"></span>
+                <div class="task-actions">
+                    <button class="task-action start-btn" title="Start task">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="task-action stop-btn" title="Stop task">
+                        <i class="fas fa-pause"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
