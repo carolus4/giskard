@@ -256,7 +256,11 @@ class TodoApp {
         
         // Bind events
         checkbox.addEventListener('change', (e) => {
-            if (e.target.checked && task.status !== 'done') {
+            if (task.status === 'done') {
+                // Uncomplete completed task
+                e.target.checked = true; // Keep it visually checked while processing
+                this.uncompleteTask(task.file_idx);
+            } else if (e.target.checked) {
                 this.markTaskDone(task.id);
             }
         });
@@ -382,6 +386,30 @@ class TodoApp {
         } catch (error) {
             console.error('Failed to stop task:', error);
             this.showError('Failed to stop task');
+        }
+    }
+
+    async uncompleteTask(fileIdx) {
+        try {
+            const response = await fetch('/api/tasks/uncomplete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ file_idx: fileIdx })
+            });
+            
+            if (response.ok) {
+                this.loadTasks(); // Refresh
+                this.showSuccess('Task uncompleted!');
+            } else {
+                const result = await response.json();
+                this.showError(result.error || 'Failed to uncomplete task');
+            }
+            
+        } catch (error) {
+            console.error('Failed to uncomplete task:', error);
+            this.showError('Failed to uncomplete task');
         }
     }
 

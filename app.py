@@ -208,6 +208,43 @@ def stop_task(task_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/tasks/uncomplete', methods=['POST'])
+def uncomplete_task():
+    """Uncomplete a completed task (make it open again)"""
+    try:
+        data = request.get_json()
+        file_idx = data.get('file_idx')
+        
+        if file_idx is None:
+            return jsonify({'error': 'file_idx is required'}), 400
+        
+        lines = read_lines()
+        if file_idx < 0 or file_idx >= len(lines):
+            return jsonify({'error': 'Invalid file index'}), 400
+        
+        # Get the completed task line
+        line = lines[file_idx].strip()
+        if not line.startswith("x "):
+            return jsonify({'error': 'Task is not completed'}), 400
+        
+        # Extract the task title (remove "x 2025-09-02 " prefix)
+        parts = line[2:].strip().split(" ", 1)
+        if len(parts) >= 2 and parts[0].count('-') == 2:
+            # Has date format YYYY-MM-DD
+            title = parts[1]
+        else:
+            # No date, everything after "x " is the title
+            title = line[2:].strip()
+        
+        # Make it an open task again
+        lines[file_idx] = title
+        write_lines(lines)
+        
+        return jsonify({'success': True, 'message': f'Uncompleted: {title}'})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     ensure_file()  # Initialize todo.txt on startup
     app.run(debug=True, port=5001)
