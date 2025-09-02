@@ -1,0 +1,2 @@
+x 2025-09-02 Test mini_todo functionality
+x 2025-09-02 Test todo.txt format conversion
