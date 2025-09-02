@@ -34,23 +34,38 @@ class TodoApp {
             });
         });
 
-        // Add task
-        const addBtn = document.getElementById('add-task-btn');
-        const input = document.getElementById('new-task-input');
+        // Modal controls
+        const modalBtn = document.getElementById('add-task-modal-btn');
+        const modal = document.getElementById('add-task-modal');
+        const modalClose = document.getElementById('modal-close-btn');
+        const modalCancel = document.getElementById('modal-cancel-btn');
+        const modalAdd = document.getElementById('modal-add-btn');
+        const modalInput = document.getElementById('modal-task-name');
         
-        addBtn.addEventListener('click', () => this.addTask());
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.addTask();
+        // Open modal
+        modalBtn.addEventListener('click', () => this.openAddTaskModal());
+        
+        // Close modal
+        modalClose.addEventListener('click', () => this.closeAddTaskModal());
+        modalCancel.addEventListener('click', () => this.closeAddTaskModal());
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) this.closeAddTaskModal();
         });
         
-        // Show/hide add button based on input
-        input.addEventListener('input', (e) => {
-            const container = e.target.closest('.add-task-input');
-            if (e.target.value.trim()) {
-                container.classList.add('has-text');
-            } else {
-                container.classList.remove('has-text');
-            }
+        // Add task from modal
+        modalAdd.addEventListener('click', () => this.addTaskFromModal());
+        modalInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.addTaskFromModal();
+        });
+        
+        // Enable/disable add button based on input
+        modalInput.addEventListener('input', (e) => {
+            modalAdd.disabled = !e.target.value.trim();
+        });
+        
+        // ESC to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') this.closeAddTaskModal();
         });
     }
 
@@ -73,15 +88,29 @@ class TodoApp {
     }
 
     updateCounts() {
-        document.getElementById('inbox-count').textContent = this.counts.inbox;
-        document.getElementById('today-count').textContent = this.counts.today;
-        document.getElementById('upcoming-count').textContent = this.counts.upcoming;
-        document.getElementById('completed-count').textContent = this.counts.completed;
+        // Update counts and show/hide based on value
+        this.updateCountElement('inbox-count', this.counts.inbox);
+        this.updateCountElement('today-count', this.counts.today);
+        this.updateCountElement('upcoming-count', this.counts.upcoming);
+        // Don't show completed count at all
+        document.getElementById('completed-count').style.display = 'none';
         
         // Update task count in header
         const count = this.getTaskCountForView(this.currentView);
         const taskCountEl = document.getElementById('task-count');
         taskCountEl.textContent = `${count} task${count !== 1 ? 's' : ''}`;
+    }
+
+    updateCountElement(elementId, value) {
+        const element = document.getElementById(elementId);
+        element.textContent = value;
+        
+        // Show count only if value > 0
+        if (value > 0) {
+            element.classList.add('show');
+        } else {
+            element.classList.remove('show');
+        }
     }
 
     updateTodayDate(dateStr) {
@@ -245,8 +274,28 @@ class TodoApp {
         return taskEl;
     }
 
-    async addTask() {
-        const input = document.getElementById('new-task-input');
+    openAddTaskModal() {
+        const modal = document.getElementById('add-task-modal');
+        const input = document.getElementById('modal-task-name');
+        const addBtn = document.getElementById('modal-add-btn');
+        
+        modal.classList.add('show');
+        setTimeout(() => input.focus(), 300); // Focus after animation
+        addBtn.disabled = true; // Start disabled
+    }
+
+    closeAddTaskModal() {
+        const modal = document.getElementById('add-task-modal');
+        const input = document.getElementById('modal-task-name');
+        const description = document.getElementById('modal-task-description');
+        
+        modal.classList.remove('show');
+        input.value = '';
+        description.value = '';
+    }
+
+    async addTaskFromModal() {
+        const input = document.getElementById('modal-task-name');
         const title = input.value.trim();
         
         if (!title) return;
@@ -263,8 +312,7 @@ class TodoApp {
             const result = await response.json();
             
             if (response.ok) {
-                input.value = '';
-                input.closest('.add-task-input').classList.remove('has-text');
+                this.closeAddTaskModal();
                 this.loadTasks(); // Refresh
                 this.showSuccess('Task added!');
             } else {

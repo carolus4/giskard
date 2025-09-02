@@ -12,11 +12,12 @@
     <div class="app-container">
         <!-- Left Sidebar -->
         <div class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <i class="fas fa-check-circle"></i>
-                    <span>Mini Todo</span>
-                </div>
+            <!-- Add Task Button -->
+            <div class="add-task-header">
+                <button class="add-task-btn" id="add-task-modal-btn">
+                    <i class="fas fa-plus"></i>
+                    <span>Add task</span>
+                </button>
             </div>
             
             <nav class="sidebar-nav">
@@ -88,14 +89,8 @@
                 </div>
             </div>
 
-            <!-- Add Task Input -->
-            <div class="add-task-container">
-                <div class="add-task-input">
-                    <i class="fas fa-plus"></i>
-                    <input type="text" id="new-task-input" placeholder="Add task">
-                    <button id="add-task-btn" class="add-btn">Add task</button>
-                </div>
-            </div>
+            <!-- Keep minimal space for layout -->
+            <div class="content-footer"></div>
         </div>
     </div>
 
@@ -119,6 +114,53 @@
             </div>
         </div>
     </template>
+
+    <!-- Add Task Modal -->
+    <div class="modal-overlay" id="add-task-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add task</h3>
+                <button class="modal-close" id="modal-close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="task-input-group">
+                    <input type="text" id="modal-task-name" placeholder="Task name" class="task-name-input">
+                    <textarea id="modal-task-description" placeholder="Description" class="task-description-input"></textarea>
+                </div>
+                
+                <div class="task-options">
+                    <div class="task-tags">
+                        <button class="task-tag active">
+                            <i class="fas fa-calendar-day"></i>
+                            <span>Today</span>
+                        </button>
+                        <button class="task-tag" disabled>
+                            <i class="fas fa-flag"></i>
+                            <span>Priority</span>
+                        </button>
+                        <button class="task-tag" disabled>
+                            <i class="fas fa-bell"></i>
+                            <span>Reminders</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <div class="project-select">
+                    <i class="fas fa-inbox"></i>
+                    <span>Inbox</span>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-cancel" id="modal-cancel-btn">Cancel</button>
+                    <button class="btn-add" id="modal-add-btn">Add task</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

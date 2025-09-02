@@ -4,4 +4,4 @@ Todoist → mini_todo status:in_progress
 LLM integration
 Coaching Layer
 Notifications
-Evals
+x 2025-09-02 Evals
