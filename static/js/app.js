@@ -910,17 +910,23 @@ class TodoApp {
         // Get all visible tasks in current order (including dragged one)
         const allVisibleTasks = Array.from(document.querySelectorAll('.task-item'));
         
-        // Create array of task orders in current visual order
-        const currentOrderList = allVisibleTasks.map(task => parseInt(task.dataset.order));
+        // Extract the file indices in their current visual positions
+        const fileIndices = allVisibleTasks.map(task => parseInt(task.dataset.fileIdx));
         
-        // Move the dragged task from its current position to target position
-        const draggedOrder = currentOrderList[draggedVisualIndex];
-        currentOrderList.splice(draggedVisualIndex, 1);  // Remove from current position
-        currentOrderList.splice(targetVisualIndex, 0, draggedOrder);  // Insert at target position
+        // Get the file index of the task being dragged
+        const draggedTaskFileIdx = fileIndices[draggedVisualIndex];
         
-        console.log('Simple reorder: moving visual index', draggedVisualIndex, '→', targetVisualIndex, 'order', draggedOrder, '→ sequence:', currentOrderList);
+        // Create a new array without the dragged task
+        const reorderedFileIndices = [...fileIndices];
+        reorderedFileIndices.splice(draggedVisualIndex, 1);  // Remove dragged task
+        reorderedFileIndices.splice(targetVisualIndex, 0, draggedTaskFileIdx);  // Insert at new position
         
-        return currentOrderList;
+        console.log('Simple reorder: moving visual index', draggedVisualIndex, '→', targetVisualIndex);
+        console.log('  Original file indices:', fileIndices);
+        console.log('  Dragged task file index:', draggedTaskFileIdx);
+        console.log('  New file index sequence:', reorderedFileIndices);
+        
+        return reorderedFileIndices;
     }
     
     handleDrop(e) {
@@ -980,13 +986,13 @@ class TodoApp {
         console.log('  Final target file index:', targetFileIdx);
         console.log('Moving task from visual position', draggedVisualPos, 'to file index', targetFileIdx);
         
-        // Simple approach: calculate the complete new order sequence
-        const newOrderSequence = this.calculateSimpleReorder(draggedVisualPos, this.insertionIndex);
+        // Simple approach: calculate the complete new file index sequence
+        const newFileIdxSequence = this.calculateSimpleReorder(draggedVisualPos, this.insertionIndex);
         
-        console.log('📝 SIMPLE REORDER: Complete new order sequence');
+        console.log('📝 SIMPLE REORDER: Complete new file index sequence');
         
         // Perform the reorder with the complete sequence
-        this.reorderTasksSimple(newOrderSequence).finally(() => {
+        this.reorderTasksSimple(newFileIdxSequence).finally(() => {
             this.isDropping = false;
         });
     }
@@ -1001,8 +1007,8 @@ class TodoApp {
         return allTasks.find(task => task.file_idx === fileIdx);
     }
 
-    async reorderTasksSimple(newOrderSequence) {
-        console.log('🔄 SIMPLE REORDERING with sequence:', newOrderSequence);
+    async reorderTasksSimple(fileIdxSequence) {
+        console.log('🔄 SIMPLE REORDERING with file index sequence:', fileIdxSequence);
         
         try {
             const response = await fetch('/api/tasks/reorder-simple', {
@@ -1011,7 +1017,7 @@ class TodoApp {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    new_order_sequence: newOrderSequence
+                    file_idx_sequence: fileIdxSequence
                 })
             });
             
