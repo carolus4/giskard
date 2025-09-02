@@ -13,16 +13,18 @@ class TodoApp {
             upcoming: 0,
             completed: 0
         };
+        this.lastTasksHash = '';
+        this.isUserAction = false;
         
         this.init();
     }
 
     init() {
         this.bindEvents();
-        this.loadTasks();
+        this.loadTasks(true); // Initial load with animation
         
-        // Auto-refresh every 30 seconds
-        setInterval(() => this.loadTasks(), 30000);
+        // Smart auto-refresh every 30 seconds - only if data changed
+        setInterval(() => this.smartRefresh(), 30000);
     }
 
     bindEvents() {
@@ -69,22 +71,34 @@ class TodoApp {
         });
     }
 
-    async loadTasks() {
+    async loadTasks(allowAnimation = false) {
         try {
             const response = await fetch('/api/tasks');
             const data = await response.json();
             
-            this.tasks = data.tasks;
-            this.counts = data.counts;
+            // Create hash of current data to detect changes
+            const newHash = JSON.stringify(data);
+            const dataChanged = newHash !== this.lastTasksHash;
             
-            this.updateCounts();
-            this.updateTodayDate(data.today_date);
-            this.renderCurrentView();
+            if (dataChanged || allowAnimation) {
+                this.tasks = data.tasks;
+                this.counts = data.counts;
+                this.lastTasksHash = newHash;
+                
+                this.updateCounts();
+                this.updateTodayDate(data.today_date);
+                this.renderCurrentView(allowAnimation);
+            }
             
         } catch (error) {
             console.error('Failed to load tasks:', error);
             this.showError('Failed to load tasks');
         }
+    }
+
+    async smartRefresh() {
+        // Silent background refresh - no animations
+        await this.loadTasks(false);
     }
 
     updateCounts() {
@@ -161,24 +175,24 @@ class TodoApp {
         this.renderCurrentView();
     }
 
-    renderCurrentView() {
+    renderCurrentView(allowAnimation = false) {
         switch (this.currentView) {
             case 'inbox':
-                this.renderInboxView();
+                this.renderInboxView(allowAnimation);
                 break;
             case 'today':
-                this.renderTodayView();
+                this.renderTodayView(allowAnimation);
                 break;
             case 'upcoming':
-                this.renderUpcomingView();
+                this.renderUpcomingView(allowAnimation);
                 break;
             case 'completed':
-                this.renderCompletedView();
+                this.renderCompletedView(allowAnimation);
                 break;
         }
     }
 
-    renderInboxView() {
+    renderInboxView(allowAnimation = false) {
         const container = document.getElementById('inbox-tasks');
         container.innerHTML = '';
         
@@ -186,12 +200,12 @@ class TodoApp {
         const allActiveTasks = [...this.tasks.in_progress, ...this.tasks.open];
         
         allActiveTasks.forEach(task => {
-            const taskEl = this.createTaskElement(task);
+            const taskEl = this.createTaskElement(task, allowAnimation);
             container.appendChild(taskEl);
         });
     }
 
-    renderTodayView() {
+    renderTodayView(allowAnimation = false) {
         const todayContainer = document.getElementById('today-tasks');
         todayContainer.innerHTML = '';
         
@@ -199,7 +213,7 @@ class TodoApp {
         const todayTasks = [...this.tasks.in_progress, ...this.tasks.open];
         
         todayTasks.forEach(task => {
-            const taskEl = this.createTaskElement(task);
+            const taskEl = this.createTaskElement(task, allowAnimation);
             todayContainer.appendChild(taskEl);
         });
         
@@ -207,21 +221,21 @@ class TodoApp {
         document.getElementById('overdue-section').style.display = 'none';
     }
 
-    renderUpcomingView() {
+    renderUpcomingView(allowAnimation = false) {
         // Empty for now - no due dates
     }
 
-    renderCompletedView() {
+    renderCompletedView(allowAnimation = false) {
         const container = document.getElementById('completed-tasks');
         container.innerHTML = '';
         
         this.tasks.done.forEach(task => {
-            const taskEl = this.createTaskElement(task);
+            const taskEl = this.createTaskElement(task, allowAnimation);
             container.appendChild(taskEl);
         });
     }
 
-    createTaskElement(task) {
+    createTaskElement(task, allowAnimation = false) {
         const template = document.getElementById('task-template');
         const taskEl = template.content.cloneNode(true);
         
@@ -242,6 +256,11 @@ class TodoApp {
         } else if (task.status === 'done') {
             taskItem.classList.add('completed');
             checkbox.checked = true;
+        }
+
+        // Add animation class only when explicitly requested (new tasks)
+        if (allowAnimation) {
+            taskItem.classList.add('new-task');
         }
         
         // Show/hide action buttons based on status
@@ -317,7 +336,7 @@ class TodoApp {
             
             if (response.ok) {
                 this.closeAddTaskModal();
-                this.loadTasks(); // Refresh
+                this.loadTasks(true); // Refresh with animation for new task
                 this.showSuccess('Task added!');
             } else {
                 this.showError(result.error || 'Failed to add task');
@@ -336,7 +355,7 @@ class TodoApp {
             });
             
             if (response.ok) {
-                this.loadTasks(); // Refresh
+                this.loadTasks(); // Refresh without animation
                 this.showSuccess('Task completed!');
             } else {
                 const result = await response.json();
@@ -356,7 +375,7 @@ class TodoApp {
             });
             
             if (response.ok) {
-                this.loadTasks(); // Refresh
+                this.loadTasks(); // Refresh without animation
                 this.showSuccess('Task started!');
             } else {
                 const result = await response.json();
@@ -376,7 +395,7 @@ class TodoApp {
             });
             
             if (response.ok) {
-                this.loadTasks(); // Refresh
+                this.loadTasks(); // Refresh without animation
                 this.showSuccess('Task stopped!');
             } else {
                 const result = await response.json();
@@ -400,7 +419,7 @@ class TodoApp {
             });
             
             if (response.ok) {
-                this.loadTasks(); // Refresh
+                this.loadTasks(); // Refresh without animation
                 this.showSuccess('Task uncompleted!');
             } else {
                 const result = await response.json();

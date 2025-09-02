@@ -5,3 +5,4 @@ LLM integration
 Coaching Layer
 Notifications
 Evals
+Add activity log
