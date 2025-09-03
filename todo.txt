@@ -14,3 +14,5 @@ Test task from curl | Testing API | 6
 x 2025-09-02 Test | This was a first test | 13
 x 2025-09-02 Test adding a task |  | 14
 x 2025-09-02 test |  | 3
+x 2025-09-03 run 5k |  | 15
+x 2025-09-02 Add add task button at the bottom of the page. |  | 16

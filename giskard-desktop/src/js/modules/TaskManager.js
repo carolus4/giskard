@@ -60,10 +60,16 @@ class TaskManager {
      * Bind modal-related events
      */
     _bindModalEvents() {
-        // Add task modal
+        // Add task modal - sidebar button
         const modalBtn = document.getElementById('add-task-modal-btn');
         if (modalBtn) {
             modalBtn.addEventListener('click', () => this.addTaskModal.open());
+        }
+
+        // Add task modal - simple button in task list
+        const simpleBtn = document.getElementById('add-task-simple-btn');
+        if (simpleBtn) {
+            simpleBtn.addEventListener('click', () => this.addTaskModal.open());
         }
 
         const modalAddBtn = document.getElementById('modal-add-btn');
