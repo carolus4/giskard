@@ -366,24 +366,33 @@ def chat():
 
 
 def _build_task_context(open_tasks, in_progress_tasks, done_tasks):
-    """Build context about current tasks"""
+    """Build context about current tasks with descriptions"""
     context = []
     
     if in_progress_tasks:
         context.append("Currently in progress:")
         for task in in_progress_tasks[:5]:  # Limit to 5 most recent
-            context.append(f"- {task.title}")
+            if task.description and task.description.strip():
+                context.append(f"- {task.title}: {task.description}")
+            else:
+                context.append(f"- {task.title}")
     
     if open_tasks:
         context.append("\nOpen tasks:")
         for task in open_tasks[:10]:  # Limit to 10 most recent
-            context.append(f"- {task.title}")
+            if task.description and task.description.strip():
+                context.append(f"- {task.title}: {task.description}")
+            else:
+                context.append(f"- {task.title}")
     
     completed_today = [t for t in done_tasks if t.completion_date == datetime.now().strftime("%Y-%m-%d")]
     if completed_today:
         context.append(f"\nCompleted today ({len(completed_today)} tasks):")
         for task in completed_today[:5]:
-            context.append(f"- {task.title}")
+            if task.description and task.description.strip():
+                context.append(f"- {task.title}: {task.description}")
+            else:
+                context.append(f"- {task.title}")
     
     return "\n".join(context) if context else "No tasks currently in the system."
 
@@ -412,13 +421,15 @@ Current task context:
 
 Guidelines:
 - Keep responses concise and actionable
-- Offer specific advice based on the user's tasks
+- Offer specific advice based on the user's tasks and their descriptions
+- Use task descriptions to provide more targeted productivity advice
 - Suggest prioritization, time management, and productivity techniques
 - Be empathetic to productivity struggles
 - Don't make assumptions about tasks you can't see
 - If asked about tasks, refer to what you can see in the context above
+- When multiple tasks have similar descriptions, suggest grouping or batching them
 
-Remember: You have access to the user's current task list, so you can provide personalized advice based on their actual work."""
+Remember: You now have access to both task titles AND descriptions, so you can provide much more personalized and specific advice based on the actual work content."""
 
 
 def _send_to_ollama(system_prompt, user_input):
