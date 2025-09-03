@@ -6,8 +6,9 @@
 console.log('🚀 app.js loading...');
 
 import TaskManager from './modules/TaskManager.js';
+import ChatManager from './modules/ChatManager.js';
 
-console.log('✅ TaskManager imported');
+console.log('✅ TaskManager and ChatManager imported');
 
 /**
  * TodoApp - Main application class (simplified)
@@ -15,6 +16,7 @@ console.log('✅ TaskManager imported');
 class TodoApp {
     constructor() {
         this.taskManager = null;
+        this.chatManager = null;
         this._init();
     }
 
@@ -30,10 +32,11 @@ class TodoApp {
                 });
             }
 
-            // Initialize the main task manager
+            // Initialize managers
             this.taskManager = new TaskManager();
+            this.chatManager = new ChatManager();
             
-            console.log('✅ Mini Todo App initialized with modular architecture');
+            console.log('✅ Giskard App initialized with task management and chat coaching');
             
         } catch (error) {
             console.error('❌ Failed to initialize Todo App:', error);
@@ -46,6 +49,13 @@ class TodoApp {
     getTaskManager() {
         return this.taskManager;
     }
+
+    /**
+     * Get the chat manager instance (for debugging/testing)
+     */
+    getChatManager() {
+        return this.chatManager;
+    }
 }
 
 console.log('📝 Setting up DOMContentLoaded listener...');
@@ -53,10 +63,28 @@ console.log('📝 Setting up DOMContentLoaded listener...');
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🎯 DOM loaded - initializing TodoApp...');
-    new TodoApp();
+    window.__giskardApp = new TodoApp();
 });
 
 console.log('✅ app.js setup complete');
 
 // Make app available globally for debugging
 window.TodoApp = TodoApp;
+// Global debug functions
+window.debugChat = () => {
+    if (window.__giskardApp?.chatManager) {
+        window.__giskardApp.chatManager.debugChatState();
+    } else {
+        console.log('❌ ChatManager not found. App:', !!window.__giskardApp);
+    }
+};
+
+window.clearChatStorage = () => {
+    localStorage.removeItem('giscard_chat_history');
+    console.log('🗑️ Chat storage cleared from localStorage');
+};
+
+window.checkChatStorage = () => {
+    const stored = localStorage.getItem('giscard_chat_history');
+    console.log('💾 Chat storage:', stored ? JSON.parse(stored) : 'empty');
+};

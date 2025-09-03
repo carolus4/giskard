@@ -44,6 +44,7 @@ class UIManager {
         
         // Update view title
         const titles = {
+            giskard: 'Giskard',
             inbox: 'Inbox',
             today: 'Today',
             upcoming: 'Upcoming',
@@ -116,11 +117,15 @@ class UIManager {
      * Update task count in header
      */
     updateTaskCount() {
-        const count = this._getTaskCountForView(this.currentView);
         const taskCountEl = document.getElementById('task-count');
         
         if (taskCountEl) {
-            taskCountEl.textContent = `${count} task${count !== 1 ? 's' : ''}`;
+            if (this.currentView === 'giskard') {
+                taskCountEl.textContent = 'AI Productivity Coach';
+            } else {
+                const count = this._getTaskCountForView(this.currentView);
+                taskCountEl.textContent = `${count} task${count !== 1 ? 's' : ''}`;
+            }
         }
     }
 
@@ -129,6 +134,8 @@ class UIManager {
      */
     _getTaskCountForView(view) {
         switch (view) {
+            case 'giskard':
+                return 0; // Chat view doesn't show task count
             case 'inbox':
                 return this.counts.inbox;
             case 'today':
@@ -157,6 +164,7 @@ class UIManager {
      */
     clearView(view) {
         const containers = {
+            giskard: '#giskard-view',
             inbox: '#inbox-tasks',
             today: '#today-tasks',
             upcoming: '#upcoming-view',
@@ -177,6 +185,7 @@ class UIManager {
      */
     getViewContainer(view) {
         const containers = {
+            giskard: '#giskard-view',
             inbox: '#inbox-tasks',
             today: '#today-tasks',
             upcoming: '#upcoming-view',

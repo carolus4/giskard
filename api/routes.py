@@ -4,6 +4,8 @@ API routes for the todo application
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from typing import Dict, Any
+import requests
+import json
 
 from models.task import Task, TaskCollection
 from utils.file_manager import TodoFileManager
@@ -325,3 +327,121 @@ def reorder_task():
     
     except Exception as e:
         return APIResponse.error(str(e), 500)
+
+
+@api.route('/chat', methods=['POST'])
+def chat():
+    """Chat with Ollama AI assistant"""
+    try:
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        conversation_history = data.get('conversation_history', [])
+        
+        if not message:
+            return APIResponse.error('Message is required')
+        
+        # Load current tasks for context
+        collection = file_manager.load_tasks()
+        open_tasks, in_progress_tasks, done_tasks = collection.get_by_status()
+        
+        # Build context about tasks
+        task_context = _build_task_context(open_tasks, in_progress_tasks, done_tasks)
+        
+        # Build conversation context
+        conversation_context = _build_conversation_context(conversation_history)
+        
+        # Create the coaching prompt
+        system_prompt = _get_coaching_system_prompt(task_context)
+        
+        # Send to Ollama
+        response = _send_to_ollama(system_prompt, conversation_context + "\n\nHuman: " + message)
+        
+        return jsonify({
+            'success': True,
+            'response': response
+        })
+    
+    except Exception as e:
+        return APIResponse.error(str(e), 500)
+
+
+def _build_task_context(open_tasks, in_progress_tasks, done_tasks):
+    """Build context about current tasks"""
+    context = []
+    
+    if in_progress_tasks:
+        context.append("Currently in progress:")
+        for task in in_progress_tasks[:5]:  # Limit to 5 most recent
+            context.append(f"- {task.title}")
+    
+    if open_tasks:
+        context.append("\nOpen tasks:")
+        for task in open_tasks[:10]:  # Limit to 10 most recent
+            context.append(f"- {task.title}")
+    
+    completed_today = [t for t in done_tasks if t.completion_date == datetime.now().strftime("%Y-%m-%d")]
+    if completed_today:
+        context.append(f"\nCompleted today ({len(completed_today)} tasks):")
+        for task in completed_today[:5]:
+            context.append(f"- {task.title}")
+    
+    return "\n".join(context) if context else "No tasks currently in the system."
+
+
+def _build_conversation_context(conversation_history):
+    """Build conversation context from history"""
+    context = []
+    for msg in conversation_history[-6:]:  # Last 6 messages for context
+        role = "Human" if msg['type'] == 'user' else "Assistant"
+        context.append(f"{role}: {msg['content']}")
+    return "\n".join(context)
+
+
+def _get_coaching_system_prompt(task_context):
+    """Get the system prompt for the coaching assistant"""
+    return f"""You are Giscard, a productivity coach and personal assistant. You help users manage their tasks, stay motivated, and achieve their goals.
+
+Your personality:
+- Supportive and encouraging, but not overly cheerful
+- Direct and practical in your advice
+- Focused on productivity and getting things done
+- Understanding of the challenges of task management
+
+Current task context:
+{task_context}
+
+Guidelines:
+- Keep responses concise and actionable
+- Offer specific advice based on the user's tasks
+- Suggest prioritization, time management, and productivity techniques
+- Be empathetic to productivity struggles
+- Don't make assumptions about tasks you can't see
+- If asked about tasks, refer to what you can see in the context above
+
+Remember: You have access to the user's current task list, so you can provide personalized advice based on their actual work."""
+
+
+def _send_to_ollama(system_prompt, user_input):
+    """Send request to Ollama API"""
+    ollama_url = "http://localhost:11434/api/generate"
+    
+    payload = {
+        "model": "llama3.1:8b",
+        "prompt": f"{system_prompt}\n\n{user_input}\n\nAssistant:",
+        "stream": False,
+        "options": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "max_tokens": 500
+        }
+    }
+    
+    try:
+        response = requests.post(ollama_url, json=payload, timeout=30)
+        response.raise_for_status()
+        
+        result = response.json()
+        return result.get('response', 'Sorry, I had trouble generating a response.')
+    
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Failed to connect to Ollama: {str(e)}. Make sure Ollama is running with llama3.1:8b model.")

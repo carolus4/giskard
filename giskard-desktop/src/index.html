@@ -21,12 +21,16 @@
             </div>
             
             <nav class="sidebar-nav">
-                <div class="nav-item active" data-view="today">
+                <div class="nav-item" data-view="giskard">
+                    <i class="fas fa-robot"></i>
+                    <span>Giskard</span>
+                </div>
+                <div class="nav-item" data-view="inbox">
                     <i class="fas fa-inbox"></i>
                     <span>Inbox</span>
                     <span class="count" id="inbox-count">0</span>
                 </div>
-                <div class="nav-item" data-view="today">
+                <div class="nav-item active" data-view="today">
                     <i class="fas fa-calendar-day"></i>
                     <span>Today</span>
                     <span class="count" id="today-count">0</span>
@@ -52,6 +56,73 @@
             </div>
 
             <div class="content-body">
+                <!-- Giskard Chat View -->
+                <div class="view-container" id="giskard-view" style="display: none;">
+                    <div class="chat-container">
+                    <div class="chat-header">
+                        <div class="coach-info">
+                            <div class="coach-avatar">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="coach-details">
+                                <h3>Giscard Coach</h3>
+                                <p class="coach-status">Online • Ready to help with your productivity</p>
+                            </div>
+                        </div>
+                        <div class="chat-actions">
+                            <button class="chat-action-btn" id="clear-chat-btn" title="Clear conversation">
+                                <i class="fas fa-broom"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="welcome-message">
+                            <div class="message bot-message">
+                                <div class="message-avatar">
+                                    <i class="fas fa-robot"></i>
+                                </div>
+                                <div class="message-content">
+                                    <p>Hey there! I'm your productivity coach. I can help you organize tasks, set priorities, and stay motivated. What would you like to work on today?</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-area">
+                        <div class="chat-suggestions" id="chat-suggestions">
+                            <button class="suggestion-btn">Help me prioritize my tasks</button>
+                            <button class="suggestion-btn">What should I focus on today?</button>
+                            <button class="suggestion-btn">I'm feeling overwhelmed</button>
+                        </div>
+                        <div class="chat-input-container">
+                            <div class="chat-input-wrapper">
+                                <textarea id="chat-input" placeholder="Ask me anything about productivity, task management, or getting things done..." rows="1"></textarea>
+                                <button id="send-message-btn" class="send-btn" disabled>
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                            <div class="chat-input-footer">
+                                <span class="input-hint">Press ⌘+Enter to send</span>
+                                <div class="typing-indicator" id="typing-indicator" style="display: none;">
+                                    <span>Giscard is thinking</span>
+                                    <div class="dots">
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Inbox View -->
+                <div class="view-container" id="inbox-view" style="display: none;">
+                    <div class="task-list" id="inbox-tasks"></div>
+                </div>
+
                 <!-- Today View -->
                 <div class="view-container" id="today-view">
                     <!-- Overdue Section -->
@@ -76,11 +147,7 @@
                     </div>
                 </div>
 
-                <!-- Other Views -->
-                <div class="view-container" id="inbox-view" style="display: none;">
-                    <div class="task-list" id="inbox-tasks"></div>
-                </div>
-
+                <!-- Upcoming View -->
                 <div class="view-container" id="upcoming-view" style="display: none;">
                     <div class="empty-state">
                         <i class="fas fa-calendar-plus"></i>
@@ -88,6 +155,7 @@
                     </div>
                 </div>
 
+                <!-- Completed View -->
                 <div class="view-container" id="completed-view" style="display: none;">
                     <div class="task-list" id="completed-tasks"></div>
                 </div>
