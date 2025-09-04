@@ -224,6 +224,14 @@ class TaskCollection:
         self.tasks.append(task)
         return task
 
+    def remove_task_by_file_idx(self, file_idx: int) -> bool:
+        """Remove a task by its file index"""
+        for i, task in enumerate(self.tasks):
+            if task.file_idx == file_idx:
+                del self.tasks[i]
+                return True
+        return False
+
     def reorder_tasks(self, new_order_sequence: List[int]) -> None:
         """Reorder tasks using a complete new order sequence"""
         # Create a mapping of old_order -> new_order

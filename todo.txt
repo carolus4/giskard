@@ -19,4 +19,6 @@ x 2025-09-02 Add add task button at the bottom of the page. |  | 16
 [Todoist] Add completed dates |  | 4
 [Todoist] Projects |  | 17
 [Todoist] Priorities |  | 18
-[Networking] Organise out in tech local chapter |  | 19
+[Networking] Organise out in tech local chapter | [x] messaged the Out in Tech #vancouver slack to check interest for a networking event. | 19
+[Consulting] Follow up on lookpro notes |  | 20
+[Learning] Agents course |  | 21

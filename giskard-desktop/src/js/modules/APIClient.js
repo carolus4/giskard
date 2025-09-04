@@ -259,6 +259,15 @@ class APIClient {
     }
 
     /**
+     * Delete a task permanently
+     */
+    async deleteTask(fileIdx) {
+        return await this._fetch(`${this.baseURL}/tasks/${fileIdx}/delete`, {
+            method: 'DELETE'
+        });
+    }
+
+    /**
      * Update task description only (deprecated)
      */
     async updateTaskDescription(fileIdx, description) {

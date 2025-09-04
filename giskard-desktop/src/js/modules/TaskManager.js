@@ -2,7 +2,7 @@ import APIClient from './APIClient.js';
 import UIManager from './UIManager.js';
 import TaskList from './TaskList.js';
 import DragDropManager from './DragDropManager.js';
-import { AddTaskModal, TaskDetailModal } from './Modal.js';
+import { AddTaskModal, TaskDetailModal, ConfirmationModal } from './Modal.js';
 import Notification from './Notification.js';
 
 /**
@@ -19,6 +19,7 @@ class TaskManager {
         // Initialize modals
         this.addTaskModal = new AddTaskModal();
         this.taskDetailModal = new TaskDetailModal();
+        this.confirmationModal = new ConfirmationModal();
         
         // Application state
         this.tasks = {
@@ -114,6 +115,10 @@ class TaskManager {
 
         document.addEventListener('task:uncomplete', (e) => {
             this._handleUncompleteTask(e.detail.task);
+        });
+
+        document.addEventListener('task:delete', (e) => {
+            this._handleDeleteTask(e.detail.task);
         });
 
         document.addEventListener('task:reorder', (e) => {
@@ -384,6 +389,36 @@ class TaskManager {
             Notification.success('Task uncompleted!');
         } else {
             Notification.error(result.error || 'Failed to uncomplete task');
+        }
+    }
+
+    /**
+     * Handle deleting a task
+     */
+    async _handleDeleteTask(task) {
+        if (!task) {
+            return;
+        }
+        
+        // Show custom confirmation dialog
+        const confirmed = await this.confirmationModal.show(
+            `Are you sure you want to delete "${task.title}"?`,
+            'Confirm Deletion'
+        );
+        
+        if (!confirmed) {
+            return;
+        }
+        
+        const result = await this.api.deleteTask(task.file_idx);
+        
+        if (result.success) {
+            // Close the task detail modal since the task no longer exists
+            this.taskDetailModal.close();
+            await this.loadTasks();
+            Notification.success('Task deleted!');
+        } else {
+            Notification.error(result.error || 'Failed to delete task');
         }
     }
 

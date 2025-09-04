@@ -253,6 +253,16 @@ class TaskDetailModal extends Modal {
             });
         }
 
+        // Delete button
+        const deleteBtn = this.modal.querySelector('#detail-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                document.dispatchEvent(new CustomEvent('task:delete', {
+                    detail: { task: this.currentTaskData }
+                }));
+            });
+        }
+
         // Keyboard shortcuts
         this._setupKeyboardShortcuts();
     }
@@ -335,4 +345,70 @@ class TaskDetailModal extends Modal {
     }
 }
 
-export { Modal, AddTaskModal, TaskDetailModal };
+/**
+ * ConfirmationModal - Custom confirmation dialog
+ */
+class ConfirmationModal extends Modal {
+    constructor() {
+        super('confirmation-modal');
+        this.resolve = null;
+        this._setupConfirmationModal();
+    }
+
+    _setupConfirmationModal() {
+        const cancelBtn = this.modal.querySelector('#confirmation-cancel');
+        const confirmBtn = this.modal.querySelector('#confirmation-confirm');
+        const closeBtn = this.modal.querySelector('#confirmation-close');
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this._handleCancel());
+        }
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => this._handleConfirm());
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this._handleCancel());
+        }
+
+        // ESC key to cancel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isOpen) {
+                this._handleCancel();
+            }
+        });
+    }
+
+    _handleCancel() {
+        this.close();
+        if (this.resolve) {
+            this.resolve(false);
+            this.resolve = null;
+        }
+    }
+
+    _handleConfirm() {
+        this.close();
+        if (this.resolve) {
+            this.resolve(true);
+            this.resolve = null;
+        }
+    }
+
+    show(message, title = 'Confirm') {
+        const messageEl = this.modal.querySelector('#confirmation-message');
+        const titleEl = this.modal.querySelector('.modal-header h3');
+        
+        if (messageEl) messageEl.textContent = message;
+        if (titleEl) titleEl.textContent = title;
+
+        this.open();
+
+        return new Promise((resolve) => {
+            this.resolve = resolve;
+        });
+    }
+}
+
+export { Modal, AddTaskModal, TaskDetailModal, ConfirmationModal };

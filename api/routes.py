@@ -246,6 +246,29 @@ def update_task(file_idx):
         return APIResponse.error(str(e), 500)
 
 
+@api.route('/tasks/<int:file_idx>/delete', methods=['DELETE'])
+def delete_task(file_idx):
+    """Delete a specific task permanently"""
+    try:
+        collection = file_manager.load_tasks()
+        task = collection.get_task_by_file_idx(file_idx)
+        
+        if not task:
+            return APIResponse.error('Task not found', 404)
+        
+        # Store task title for response message
+        task_title = task.title
+        
+        # Remove the task from the collection
+        collection.remove_task_by_file_idx(file_idx)
+        file_manager.save_tasks(collection)
+        
+        return jsonify(APIResponse.success(f'Deleted: {task_title}'))
+    
+    except Exception as e:
+        return APIResponse.error(str(e), 500)
+
+
 @api.route('/tasks/<int:file_idx>/update_description', methods=['POST'])
 def update_task_description(file_idx):
     """Update description for a specific task (deprecated - use /update instead)"""
