@@ -24,4 +24,4 @@ x 2025-09-02 Add add task button at the bottom of the page. |  | 16
 Investigate ‘small models’ white paper |  | 3
 [Learning] 5 Day GenAI Course | https://www.kaggle.com/learn-guide/5-day-genai | 2
 x 2025-09-05 [Simplify] Remove independent web UI from scope |  | 1
-[Todoist] Clean up UI | [x] remove web only view\n[x] remove inbox/upcoming (keep only today)\n[x] fix play / pause bug\n[x] test bugfix\n[ ] fix header in task list\n[ ] fix header in giskard | 1 status:in_progress
+[Todoist] Clean up UI | [x] remove web only view\n[x] remove inbox/upcoming (keep only today)\n[x] fix play / pause bug\n[x] test bugfix\n[x] fix header in task list\n[x] fix header in giskard\n[ ] update ‘+ task’ ‘+ chat' | 1 status:in_progress

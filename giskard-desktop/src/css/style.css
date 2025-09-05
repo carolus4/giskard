@@ -32,36 +32,6 @@ body {
     flex-direction: column;
 }
 
-/* Add Task Header */
-.add-task-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.add-task-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 8px 12px;
-    background: #dc4c3e;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.add-task-btn:hover {
-    background: #c23c2e;
-}
-
-.add-task-btn i {
-    font-size: 12px;
-}
-
 .sidebar-nav {
     padding: 16px 0;
     flex: 1;
@@ -110,19 +80,64 @@ body {
     flex: 1;
 }
 
-.count {
+.add-task-plus-btn {
+    background: none;
+    border: none;
     color: #999;
     font-size: 12px;
     font-weight: 400;
-    display: none; /* Hidden by default, shown by JS when > 0 */
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
 }
 
-.count.show {
-    display: inline-block;
+.add-task-plus-btn:hover {
+    background: #f0f0f0;
+    color: #dc4c3e;
 }
 
-.nav-item.active .count {
+.nav-item.active .add-task-plus-btn {
     color: #777;
+}
+
+.nav-item.active .add-task-plus-btn:hover {
+    color: #dc4c3e;
+}
+
+.new-chat-btn {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 12px;
+    font-weight: 400;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+}
+
+.new-chat-btn:hover {
+    background: #f0f0f0;
+    color: #dc4c3e;
+}
+
+.nav-item.active .new-chat-btn {
+    color: #777;
+}
+
+.nav-item.active .new-chat-btn:hover {
+    color: #dc4c3e;
 }
 
 /* Main Content */

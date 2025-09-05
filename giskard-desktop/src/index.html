@@ -12,23 +12,20 @@
     <div class="app-container">
         <!-- Left Sidebar -->
         <div class="sidebar">
-            <!-- Add Task Button -->
-            <div class="add-task-header">
-                <button class="add-task-btn" id="add-task-modal-btn">
-                    <i class="fas fa-plus"></i>
-                    <span>Add task</span>
-                </button>
-            </div>
-            
             <nav class="sidebar-nav">
                 <div class="nav-item active" data-view="today">
                     <i class="fas fa-calendar-day"></i>
                     <span>Today</span>
-                    <span class="count" id="today-count">0</span>
+                    <button class="add-task-plus-btn" id="add-task-plus-btn" title="Add task">
+                        <i class="fas fa-plus"></i>
+                    </button>
                 </div>
                 <div class="nav-item" data-view="giskard">
                     <i class="fas fa-robot"></i>
                     <span>Giskard</span>
+                    <button class="new-chat-btn" id="new-chat-btn" title="New chat">
+                        <i class="fas fa-feather-alt"></i>
+                    </button>
                 </div>
             </nav>
         </div>
@@ -59,8 +56,8 @@
                     </div>
                     
                     <div class="chat-actions">
-                        <button class="chat-action-btn" id="clear-chat-btn" title="Clear conversation">
-                            <i class="fas fa-broom"></i>
+                        <button class="chat-action-btn" id="new-chat-action-btn" title="New chat">
+                            <i class="fas fa-feather-alt"></i>
                         </button>
                     </div>
                     

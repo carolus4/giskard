@@ -61,16 +61,28 @@ class TaskManager {
      * Bind modal-related events
      */
     _bindModalEvents() {
-        // Add task modal - sidebar button
-        const modalBtn = document.getElementById('add-task-modal-btn');
-        if (modalBtn) {
-            modalBtn.addEventListener('click', () => this.addTaskModal.open());
-        }
-
         // Add task modal - simple button in task list
         const simpleBtn = document.getElementById('add-task-simple-btn');
         if (simpleBtn) {
             simpleBtn.addEventListener('click', () => this.addTaskModal.open());
+        }
+
+        // Add task modal - plus button in sidebar
+        const plusBtn = document.getElementById('add-task-plus-btn');
+        if (plusBtn) {
+            plusBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent nav item click
+                this.addTaskModal.open();
+            });
+        }
+
+        // New chat button in sidebar
+        const newChatBtn = document.getElementById('new-chat-btn');
+        if (newChatBtn) {
+            newChatBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent nav item click
+                this._handleNewChatFromSidebar();
+            });
         }
 
         const modalAddBtn = document.getElementById('modal-add-btn');
@@ -451,6 +463,22 @@ class TaskManager {
         }
         
         // Don't close the modal - let user continue editing
+    }
+
+    /**
+     * Handle new chat from sidebar
+     */
+    _handleNewChatFromSidebar() {
+        // Switch to Giskard view first
+        this.ui.switchView('giskard');
+        
+        // Then trigger new chat after a brief delay to ensure view is loaded
+        setTimeout(() => {
+            // Access the chat manager through the global app instance
+            if (window.app && window.app.chatManager) {
+                window.app.chatManager._handleNewChat();
+            }
+        }, 100);
     }
 
     /**

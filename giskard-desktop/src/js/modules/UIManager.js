@@ -94,27 +94,7 @@ class UIManager {
     updateCounts(counts) {
         this.counts = { ...this.counts, ...counts };
         
-        // Update sidebar counts
-        this._updateCountElement('today-count', this.counts.today);
-        
         this.updateTaskCount();
-    }
-
-    /**
-     * Update individual count element
-     */
-    _updateCountElement(elementId, value) {
-        const element = document.getElementById(elementId);
-        if (!element) return;
-        
-        element.textContent = value;
-        
-        // Show count only if value > 0
-        if (value > 0) {
-            element.classList.add('show');
-        } else {
-            element.classList.remove('show');
-        }
     }
 
     /**
@@ -132,8 +112,8 @@ class UIManager {
             if (this.currentView === 'giskard') {
                 taskCountEl.textContent = 'AI Productivity Coach • llama3.1:8b';
             } else {
-                const count = this._getTaskCountForView(this.currentView);
-                taskCountEl.textContent = `${count} task${count !== 1 ? 's' : ''}`;
+                // Hide task count since it's not helpful
+                taskCountEl.style.display = 'none';
             }
         }
     }

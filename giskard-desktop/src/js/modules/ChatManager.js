@@ -79,11 +79,11 @@ class ChatManager {
         }
 
         // Chat actions
-        const clearBtn = document.getElementById('clear-chat-btn');
+        const newChatBtn = document.getElementById('new-chat-action-btn');
         
-        if (clearBtn) {
-            clearBtn.addEventListener('click', () => {
-                this._handleClearChat();
+        if (newChatBtn) {
+            newChatBtn.addEventListener('click', () => {
+                this._handleNewChat();
             });
         }
     }
@@ -160,10 +160,10 @@ class ChatManager {
     }
 
     /**
-     * Handle clear chat
+     * Handle new chat
      */
-    _handleClearChat() {
-        console.log('🧹 Clearing chat conversation...');
+    _handleNewChat() {
+        console.log('✨ Starting new chat conversation...');
         
         // Show brief clearing animation
         if (this.chatMessagesContainer) {
@@ -201,9 +201,9 @@ class ChatManager {
             this._scrollToBottom();
             
             // Show success notification
-            this._showNotification('Chat cleared successfully! 🧹', 'success');
+            this._showNotification('New chat started! ✨', 'success');
             
-            console.log('✅ Chat conversation cleared successfully');
+            console.log('✅ New chat conversation started successfully');
         }, 150);
     }
 
