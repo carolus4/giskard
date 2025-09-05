@@ -5,10 +5,7 @@ class UIManager {
     constructor() {
         this.currentView = 'today';
         this.counts = {
-            inbox: 0,
-            today: 0,
-            upcoming: 0,
-            completed: 0
+            today: 0
         };
         
         this._bindNavigation();
@@ -45,10 +42,7 @@ class UIManager {
         // Update view title
         const titles = {
             giskard: 'Giskard',
-            inbox: 'Inbox',
-            today: 'Today',
-            upcoming: 'Upcoming',
-            completed: 'Completed'
+            today: 'Today'
         };
         
         const titleElement = document.getElementById('view-title');
@@ -83,15 +77,7 @@ class UIManager {
         this.counts = { ...this.counts, ...counts };
         
         // Update sidebar counts
-        this._updateCountElement('inbox-count', this.counts.inbox);
         this._updateCountElement('today-count', this.counts.today);
-        this._updateCountElement('upcoming-count', this.counts.upcoming);
-        
-        // Hide completed count (as per original design)
-        const completedCount = document.getElementById('completed-count');
-        if (completedCount) {
-            completedCount.style.display = 'none';
-        }
         
         this.updateTaskCount();
     }
@@ -136,14 +122,8 @@ class UIManager {
         switch (view) {
             case 'giskard':
                 return 0; // Chat view doesn't show task count
-            case 'inbox':
-                return this.counts.inbox;
             case 'today':
                 return this.counts.today;
-            case 'upcoming':
-                return this.counts.upcoming;
-            case 'completed':
-                return this.counts.completed;
             default:
                 return 0;
         }
@@ -165,10 +145,7 @@ class UIManager {
     clearView(view) {
         const containers = {
             giskard: '#giskard-view',
-            inbox: '#inbox-tasks',
-            today: '#today-tasks',
-            upcoming: '#upcoming-view',
-            completed: '#completed-tasks'
+            today: '#today-tasks'
         };
 
         const selector = containers[view];
@@ -186,10 +163,7 @@ class UIManager {
     getViewContainer(view) {
         const containers = {
             giskard: '#giskard-view',
-            inbox: '#inbox-tasks',
-            today: '#today-tasks',
-            upcoming: '#upcoming-view',
-            completed: '#completed-tasks'
+            today: '#today-tasks'
         };
 
         const selector = containers[view];

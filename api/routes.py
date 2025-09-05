@@ -64,15 +64,11 @@ def get_tasks():
         
         # Calculate counts for sidebar
         today_count = len(in_progress_tasks) + len(open_tasks)
-        inbox_count = today_count  # Inbox only shows active tasks
         
         return jsonify({
             'tasks': ui_tasks,
             'counts': {
-                'inbox': inbox_count,
-                'today': today_count,
-                'upcoming': 0,  # No due dates yet
-                'completed': len(done_tasks)
+                'today': today_count
             },
             'today_date': datetime.now().strftime('%b %d - Today - %A')
         })
@@ -204,7 +200,18 @@ def get_task_details(file_idx):
         if not task:
             return APIResponse.error('Task not found', 404)
         
-        details = task.to_dict()
+        # Calculate UI ID using the same logic as the main tasks endpoint
+        open_tasks, in_progress_tasks, done_tasks = collection.get_by_status()
+        all_active_tasks = in_progress_tasks + open_tasks
+        
+        # Find the task in the active tasks list to get its UI ID
+        ui_id = None
+        for i, active_task in enumerate(all_active_tasks):
+            if active_task.file_idx == file_idx:
+                ui_id = i + 1
+                break
+        
+        details = task.to_dict(ui_id=ui_id)
         details.update({
             'project': 'Inbox',  # Default for now
             'date': 'Today' if task.status != 'done' else task.completion_date,

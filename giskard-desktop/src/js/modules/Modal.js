@@ -234,8 +234,16 @@ class TaskDetailModal extends Modal {
         const progressBtn = this.modal.querySelector('#detail-progress-btn');
         if (progressBtn) {
             progressBtn.addEventListener('click', () => {
+                // Create a task object with the correct ID for the API
+                const taskForAPI = {
+                    id: this.currentTaskData.id, // Use the UI ID for API calls
+                    file_idx: this.currentTaskData.file_idx,
+                    title: this.currentTaskData.title,
+                    status: this.currentTaskData.status
+                };
+                
                 this.modal.dispatchEvent(new CustomEvent('task:toggle-progress', {
-                    detail: { taskData: this.currentTaskData }
+                    detail: { taskData: taskForAPI }
                 }));
             });
         }

@@ -217,31 +217,15 @@ class TaskManager {
         const currentView = this.ui.getCurrentView();
         
         switch (currentView) {
-            case 'inbox':
-                this._renderInboxView(allowAnimation);
-                break;
             case 'today':
                 this._renderTodayView(allowAnimation);
                 break;
-            case 'upcoming':
-                this._renderUpcomingView(allowAnimation);
-                break;
-            case 'completed':
-                this._renderCompletedView(allowAnimation);
+            case 'giskard':
+                // Giskard view doesn't need task rendering
                 break;
         }
     }
 
-    /**
-     * Render inbox view (all active tasks)
-     */
-    _renderInboxView(allowAnimation = false) {
-        const container = this.ui.getViewContainer('inbox');
-        if (!container) return;
-
-        const allActiveTasks = [...this.tasks.in_progress, ...this.tasks.open];
-        this.taskList.renderTasks(allActiveTasks, container, { allowAnimation });
-    }
 
     /**
      * Render today view
@@ -260,22 +244,6 @@ class TaskManager {
         }
     }
 
-    /**
-     * Render upcoming view (placeholder)
-     */
-    _renderUpcomingView(allowAnimation = false) {
-        this.ui.showEmptyState('upcoming', 'No upcoming tasks');
-    }
-
-    /**
-     * Render completed view
-     */
-    _renderCompletedView(allowAnimation = false) {
-        const container = this.ui.getViewContainer('completed');
-        if (!container) return;
-
-        this.taskList.renderTasks(this.tasks.done, container, { allowAnimation });
-    }
 
     /**
      * Handle adding task from modal
@@ -445,16 +413,20 @@ class TaskManager {
     async _handleToggleTaskProgress(taskData) {
         if (!taskData) return;
         
+        // First, save any changes made in the modal (title, description)
+        const currentTaskData = this.taskDetailModal.getTaskData();
+        if (currentTaskData.title.trim()) {
+            await this._handleSaveTask(currentTaskData);
+        }
+        
+        // Then toggle the progress state
         if (taskData.status === 'in_progress') {
             await this._handleStopTask(taskData);
         } else {
             await this._handleStartTask(taskData);
         }
         
-        // Close the detail modal after changing status
-        setTimeout(() => {
-            this.taskDetailModal.close();
-        }, 500);
+        // Don't close the modal - let user continue editing
     }
 
     /**
@@ -463,6 +435,13 @@ class TaskManager {
     async _handleTaskCompletionToggle({ checked, taskData }) {
         if (!taskData) return;
         
+        // First, save any changes made in the modal (title, description)
+        const currentTaskData = this.taskDetailModal.getTaskData();
+        if (currentTaskData.title.trim()) {
+            await this._handleSaveTask(currentTaskData);
+        }
+        
+        // Then toggle the completion state
         if (taskData.status === 'done') {
             // Uncomplete the task
             await this._handleUncompleteTask(taskData);
@@ -471,10 +450,7 @@ class TaskManager {
             await this._handleCompleteTask(taskData);
         }
         
-        // Close detail modal after changing status
-        setTimeout(() => {
-            this.taskDetailModal.close();
-        }, 500);
+        // Don't close the modal - let user continue editing
     }
 
     /**
