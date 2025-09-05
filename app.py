@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Mini Todo - Beautiful Todoist-like web app
+Giskard API - Backend API for Tauri desktop app
 """
 
-from flask import Flask, render_template
+from flask import Flask
 from flask_cors import CORS
 from api.routes import api
 from utils.file_manager import TodoFileManager
@@ -24,11 +24,6 @@ app.register_blueprint(api)
 
 # Initialize file manager to ensure todo.txt exists
 file_manager = TodoFileManager()
-
-@app.route('/')
-def index():
-    """Serve the main UI"""
-    return render_template('index.html')
 
 if __name__ == '__main__':
     # File manager already initialized above

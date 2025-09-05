@@ -12,10 +12,10 @@ Follows the laws of robotics.
 ## 🚀 Quick Start:
 
 ```bash
-./start.sh
+./start_giskard.sh
 ```
 
-Then open **http://localhost:5001** in your browser!
+This will start the Tauri desktop app with the Flask API backend!
 
 ## ✨ Features
 
@@ -38,36 +38,42 @@ Then open **http://localhost:5001** in your browser!
 
 ## 🏗️ Architecture
 
-### **Backend (Python/Flask)**
+### **Backend (Python/Flask API)**
 ```
-app.py (27 lines)              # Clean entry point
+app.py (30 lines)              # API-only entry point
 ├── models/
 │   └── task.py               # Task model with parsing logic
 ├── api/
-│   └── routes.py             # All Flask endpoints
+│   └── routes.py             # All Flask API endpoints
 └── utils/
     └── file_manager.py       # File operations
 ```
 
-### **Frontend (ES6 Modules)**
+### **Frontend (Tauri Desktop App)**
 ```
-app.js (42 lines)             # Application entry point
-├── modules/
-│   ├── TaskManager.js        # Main orchestrator
-│   ├── APIClient.js          # HTTP requests with validation
-│   ├── UIManager.js          # View switching & UI state
-│   ├── TaskList.js           # Task rendering & interactions
-│   ├── DragDropManager.js    # Drag & drop functionality
-│   ├── Modal.js              # Reusable modal components
-│   └── Notification.js       # Toast notification system
+giskard-desktop/src/
+├── index.html                # Main UI template
+├── css/style.css            # Complete styling
+├── js/
+│   ├── app.js               # Application entry point
+│   └── modules/
+│       ├── TaskManager.js   # Main orchestrator
+│       ├── ChatManager.js   # AI coaching interface
+│       ├── APIClient.js     # HTTP requests with validation
+│       ├── UIManager.js     # View switching & UI state
+│       ├── TaskList.js      # Task rendering & interactions
+│       ├── DragDropManager.js # Drag & drop functionality
+│       ├── Modal.js         # Reusable modal components
+│       └── Notification.js  # Toast notification system
+└── src-tauri/               # Rust backend for desktop
 ```
 
 ### **Key Improvements from Refactoring**
-- **Backend**: 90% reduction in main file (648 → 27 lines)
-- **Frontend**: 96% reduction in main file (1109 → 42 lines)
-- **Architecture**: Monolithic → Modular with single responsibility
-- **Maintainability**: Professional-grade structure
-- **Extensibility**: Easy to add new features
+- **Simplified Architecture**: Removed web UI, focused on Tauri desktop app
+- **Single Source of Truth**: All frontend code consolidated in Tauri directory
+- **API-Only Backend**: Flask serves only API endpoints, no template rendering
+- **Reduced Complexity**: ~40% reduction in codebase size
+- **Cleaner Maintenance**: No duplicate code between web and desktop versions
 
 ## 📖 Developer Guide
 
@@ -110,18 +116,17 @@ if (result.success) {
 ### **File Structure**
 ```
 giskard/
-├── app.py                    # Flask entry point
+├── app.py                    # Flask API entry point
 ├── models/                   # Data models
 ├── api/                      # API endpoints
 ├── utils/                    # Utilities
-├── static/
-│   ├── js/
-│   │   ├── app.js           # Frontend entry
-│   │   └── modules/         # ES6 modules
-│   └── css/
-│       └── style.css        # Styles with performance optimizations
-├── templates/
-│   └── index.html           # Main template
+├── giskard-desktop/          # Tauri desktop app
+│   ├── src/
+│   │   ├── index.html       # Main UI template
+│   │   ├── css/style.css    # Complete styling
+│   │   └── js/              # Frontend modules
+│   └── src-tauri/           # Rust backend
+├── start_giskard.sh         # Single startup script
 └── todo.txt                 # Data storage
 ```
 
