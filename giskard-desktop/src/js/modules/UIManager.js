@@ -57,7 +57,12 @@ class UIManager {
         
         const titleElement = titleElements[view];
         if (titleElement) {
-            titleElement.textContent = titles[view] || view;
+            // For today view, don't override if we already have a date set
+            if (view === 'today' && titleElement.textContent.includes('Today -')) {
+                // Keep the existing date format
+            } else {
+                titleElement.textContent = titles[view] || view;
+            }
         }
         
         // Update subtitle for giskard view

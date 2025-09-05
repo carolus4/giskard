@@ -192,8 +192,10 @@ class TaskManager {
                 
                 // Update UI
                 this.ui.updateCounts(data.counts);
-                this.ui.updateTodayDate(data.today_date);
                 this._renderCurrentView(allowAnimation);
+                
+                // Update today date after rendering to ensure it's not overridden
+                this.ui.updateTodayDate(data.today_date);
                 
                 // Reinitialize drag drop after rendering
                 setTimeout(() => {
