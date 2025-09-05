@@ -70,7 +70,7 @@ def get_tasks():
             'counts': {
                 'today': today_count
             },
-            'today_date': datetime.now().strftime('%b %d - Today - %A')
+            'today_date': datetime.now().strftime('Today - %A %b %d')
         })
         
     except Exception as e:

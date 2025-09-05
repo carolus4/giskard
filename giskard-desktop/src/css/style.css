@@ -137,13 +137,20 @@ body {
 
 /* Removed tab navigation styles - now using sidebar navigation */
 
-.content-header {
-    padding: 32px 48px 24px;
-    border-bottom: 1px solid #e8e8e8;
-    background: #fff;
+.content-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 48px;
+    background: #fafafa;
 }
 
-.content-header h1 {
+/* Page Header - integrated into content flow */
+.page-header {
+    padding: 32px 0 24px;
+    margin-bottom: 0;
+}
+
+.page-header h1 {
     font-size: 24px;
     font-weight: 700;
     color: #202020;
@@ -154,13 +161,6 @@ body {
     color: #666;
     font-size: 14px;
     font-weight: 400;
-}
-
-.content-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 48px;
-    background: #fafafa;
 }
 
 /* Task Sections */
@@ -1221,57 +1221,12 @@ body.dragging .insertion-line {
 .chat-container {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 140px); /* Account for header and padding */
-    background: #fff;
+    flex: 1;
     padding: 0;
     transition: opacity 0.3s ease;
 }
 
-/* Chat Header */
-.chat-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 32px;
-    border-bottom: 1px solid #e8e8e8;
-    background: #fff;
-}
-
-.coach-info {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.coach-avatar {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 16px;
-}
-
-.coach-details h3 {
-    font-size: 16px;
-    font-weight: 600;
-    color: #202020;
-    margin-bottom: 2px;
-}
-
-.coach-status {
-    font-size: 13px;
-    color: #666;
-    margin: 0;
-}
-
-.chat-actions {
-    display: flex;
-    gap: 8px;
-}
+/* Chat Actions - moved to input container */
 
 .chat-action-btn {
     width: 36px;
@@ -1435,6 +1390,13 @@ body.dragging .insertion-line {
     position: relative;
 }
 
+.chat-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 16px 0;
+    margin-bottom: 16px;
+}
+
 .chat-input-wrapper {
     display: flex;
     align-items: flex-end;
@@ -1569,9 +1531,6 @@ body.dragging .insertion-line {
 
 /* Responsive Chat */
 @media (max-width: 768px) {
-    .chat-header {
-        padding: 16px 20px;
-    }
     
     .chat-messages {
         padding: 20px 20px;

@@ -39,15 +39,33 @@ class UIManager {
             activeNavItem.classList.add('active');
         }
         
-        // Update view title
-        const titles = {
-            giskard: 'Giskard',
-            today: 'Today'
+        // Update view title for each view's page header
+        const titleElements = {
+            giskard: document.getElementById('giskard-view-title'),
+            today: document.getElementById('view-title')
         };
         
-        const titleElement = document.getElementById('view-title');
+        const titles = {
+            giskard: 'Giskard',
+            today: 'Today' // Will be updated with date from API response
+        };
+        
+        const subtitles = {
+            giskard: 'AI Productivity Coach • llama3.1:8b',
+            today: '0 tasks' // Will be updated with actual count
+        };
+        
+        const titleElement = titleElements[view];
         if (titleElement) {
             titleElement.textContent = titles[view] || view;
+        }
+        
+        // Update subtitle for giskard view
+        if (view === 'giskard') {
+            const giskardSubtitle = document.getElementById('giskard-task-count');
+            if (giskardSubtitle) {
+                giskardSubtitle.textContent = subtitles.giskard;
+            }
         }
         
         // Hide all views
@@ -103,11 +121,16 @@ class UIManager {
      * Update task count in header
      */
     updateTaskCount() {
-        const taskCountEl = document.getElementById('task-count');
+        const taskCountElements = {
+            giskard: document.getElementById('giskard-task-count'),
+            today: document.getElementById('task-count')
+        };
+        
+        const taskCountEl = taskCountElements[this.currentView];
         
         if (taskCountEl) {
             if (this.currentView === 'giskard') {
-                taskCountEl.textContent = 'AI Productivity Coach';
+                taskCountEl.textContent = 'AI Productivity Coach • llama3.1:8b';
             } else {
                 const count = this._getTaskCountForView(this.currentView);
                 taskCountEl.textContent = `${count} task${count !== 1 ? 's' : ''}`;
@@ -133,9 +156,10 @@ class UIManager {
      * Update today's date display
      */
     updateTodayDate(dateStr) {
-        const todayDateElement = document.getElementById('today-date');
-        if (todayDateElement) {
-            todayDateElement.textContent = dateStr;
+        // Update the main content header title with the formatted date
+        const titleElement = document.getElementById('view-title');
+        if (titleElement && this.currentView === 'today') {
+            titleElement.textContent = dateStr;
         }
     }
 

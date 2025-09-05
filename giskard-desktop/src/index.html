@@ -35,32 +35,16 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <div class="content-header">
-                <h1 id="view-title">Today</h1>
-                <p class="task-count" id="task-count">0 tasks</p>
-            </div>
-
             <div class="content-body">
                 <!-- Giskard Chat View -->
                 <div class="view-container" id="giskard-view" style="display: none;">
-                    <div class="chat-container">
-                    <div class="chat-header">
-                        <div class="coach-info">
-                            <div class="coach-avatar">
-                                <i class="fas fa-robot"></i>
-                            </div>
-                            <div class="coach-details">
-                                <h3>Giscard Coach</h3>
-                                <p class="coach-status">Online • Ready to help with your productivity</p>
-                            </div>
-                        </div>
-                        <div class="chat-actions">
-                            <button class="chat-action-btn" id="clear-chat-btn" title="Clear conversation">
-                                <i class="fas fa-broom"></i>
-                            </button>
-                        </div>
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h1 id="giskard-view-title">Giskard</h1>
+                        <p class="task-count" id="giskard-task-count">AI Productivity Coach • llama3.1:8b</p>
                     </div>
                     
+                    <div class="chat-container">
                     <div class="chat-messages" id="chat-messages">
                         <div class="welcome-message">
                             <div class="message bot-message">
@@ -72,6 +56,12 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    
+                    <div class="chat-actions">
+                        <button class="chat-action-btn" id="clear-chat-btn" title="Clear conversation">
+                            <i class="fas fa-broom"></i>
+                        </button>
                     </div>
                     
                     <div class="chat-input-area">
@@ -105,11 +95,14 @@
 
                 <!-- Today View -->
                 <div class="view-container" id="today-view">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h1 id="view-title">Today</h1>
+                        <p class="task-count" id="task-count">0 tasks</p>
+                    </div>
+                    
                     <!-- Today Section -->
                     <div class="task-section" id="today-section">
-                        <div class="section-header">
-                            <h2 id="today-date">Today</h2>
-                        </div>
                         <div class="task-list" id="today-tasks"></div>
                         <button class="add-task-simple-btn" id="add-task-simple-btn">
                             <i class="fas fa-plus"></i>
