@@ -13,14 +13,14 @@
         <!-- Left Sidebar -->
         <div class="sidebar">
             <nav class="sidebar-nav">
-                <div class="nav-item active" data-view="today">
-                    <i class="fas fa-calendar-day"></i>
-                    <span>Today</span>
+                <div class="nav-item active" data-page="task-list">
+                    <i class="fas fa-tasks"></i>
+                    <span>Tasks</span>
                     <button class="add-task-plus-btn" id="add-task-plus-btn" title="Add task">
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
-                <div class="nav-item" data-view="giskard">
+                <div class="nav-item" data-page="chat">
                     <i class="fas fa-robot"></i>
                     <span>Giskard</span>
                     <button class="new-chat-btn" id="new-chat-btn" title="New chat">
@@ -33,79 +33,176 @@
         <!-- Main Content -->
         <div class="main-content">
             <div class="content-body">
-                <!-- Giskard Chat View -->
-                <div class="view-container" id="giskard-view" style="display: none;">
+                <!-- Task List Page -->
+                <div class="page" id="task-list-page">
                     <!-- Page Header -->
                     <div class="page-header">
-                        <h1 id="giskard-view-title">Giskard</h1>
-                        <p class="task-count" id="giskard-task-count">AI Productivity Coach • llama3.1:8b</p>
-                    </div>
-                    
-                    <div class="chat-container">
-                    <div class="chat-messages" id="chat-messages">
-                        <div class="welcome-message">
-                            <div class="message bot-message">
-                                <div class="message-avatar">
-                                    <i class="fas fa-robot"></i>
-                                </div>
-                                <div class="message-content">
-                                    <p>Hey there! I'm your productivity coach. I can help you organize tasks, set priorities, and stay motivated. What would you like to work on today?</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="chat-input-area">
-                        <div class="chat-suggestions" id="chat-suggestions">
-                            <button class="suggestion-btn">Help me prioritize my tasks</button>
-                            <button class="suggestion-btn">What should I focus on today?</button>
-                            <button class="suggestion-btn">I'm feeling overwhelmed</button>
-                        </div>
-                        <div class="chat-input-container">
-                            <div class="chat-input-wrapper">
-                                <textarea id="chat-input" placeholder="Ask me anything about productivity, task management, or getting things done..." rows="1"></textarea>
-                                <button id="send-message-btn" class="send-btn" disabled>
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </div>
-                            <div class="chat-input-footer">
-                                <span class="input-hint">Press ⌘+Enter to send</span>
-                                <div class="typing-indicator" id="typing-indicator" style="display: none;">
-                                    <span>Giscard is thinking</span>
-                                    <div class="dots">
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="chat-actions">
-                        <button class="chat-action-btn" id="new-chat-action-btn" title="New chat">
-                            <i class="fas fa-feather-alt"></i>
-                            <span>New chat</span>
-                        </button>
-                    </div>
-                    </div>
-                </div>
-
-                <!-- Today View -->
-                <div class="view-container" id="today-view">
-                    <!-- Page Header -->
-                    <div class="page-header">
-                        <h1 id="view-title">Today</h1>
+                        <h1 id="task-list-title">Tasks</h1>
                         <p class="task-count" id="task-count">0 tasks</p>
                     </div>
                     
-                    <!-- Today Section -->
-                    <div class="task-section" id="today-section">
-                        <div class="task-list" id="today-tasks"></div>
+                    <!-- Task List Section -->
+                    <div class="task-section" id="task-list-section">
+                        <div class="task-list" id="task-list-container"></div>
                         <button class="add-task-simple-btn" id="add-task-simple-btn">
                             <i class="fas fa-plus"></i>
                             <span>Add task</span>
                         </button>
+                    </div>
+                </div>
+
+                <!-- Task Detail Page -->
+                <div class="page" id="task-detail-page" style="display: none;">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <button class="back-btn" id="back-to-tasks-btn">
+                            <i class="fas fa-arrow-left"></i>
+                            <span>Back to tasks</span>
+                        </button>
+                        
+                        <!-- Task Title as H1 -->
+                        <div class="task-title-header">
+                            <div class="task-checkbox-large">
+                                <input type="checkbox" class="task-check-large" id="detail-checkbox">
+                                <span class="checkmark-large"></span>
+                            </div>
+                            <input type="text" class="task-title-h1" id="detail-title" placeholder="Task title...">
+                            <div class="task-title-actions">
+                                <button class="progress-btn-inline" id="detail-progress-btn">
+                                    <i class="fas fa-play"></i>
+                                    <span>start</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Task Detail Content -->
+                    <div class="task-detail-content">
+                        <div class="task-detail-main">
+                            <div class="task-description-section">
+                                <div class="task-detail-description">
+                                    <i class="fas fa-align-left description-icon"></i>
+                                    <textarea class="description-input" id="detail-description" placeholder="Add description..."></textarea>
+                                </div>
+                                
+                                <div class="description-actions">
+                                    <button class="delete-btn" id="detail-delete-btn" title="Delete task">
+                                        <i class="fas fa-trash"></i>
+                                        <span>Delete</span>
+                                    </button>
+                                    <button class="save-btn" id="save-task-btn">
+                                        Save
+                                        <span class="keyboard-shortcut">⌘↵</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Task Page -->
+                <div class="page" id="add-task-page" style="display: none;">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <button class="back-btn" id="back-from-add-task-btn">
+                            <i class="fas fa-arrow-left"></i>
+                            <span>Back to tasks</span>
+                        </button>
+                        <h1>Add Task</h1>
+                    </div>
+                    
+                    <!-- Add Task Content -->
+                    <div class="add-task-content">
+                        <div class="task-input-group">
+                            <input type="text" id="page-task-name" placeholder="Task name" class="task-name-input">
+                            <textarea id="page-task-description" placeholder="Description" class="task-description-input"></textarea>
+                        </div>
+                        
+                        <div class="task-options">
+                            <div class="task-tags">
+                                <button class="task-tag active">
+                                    <i class="fas fa-calendar-day"></i>
+                                    <span>Today</span>
+                                </button>
+                                <button class="task-tag" disabled>
+                                    <i class="fas fa-flag"></i>
+                                    <span>Priority</span>
+                                </button>
+                                <button class="task-tag" disabled>
+                                    <i class="fas fa-bell"></i>
+                                    <span>Reminders</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="add-task-actions">
+                            <div class="project-select">
+                                <i class="fas fa-calendar-day"></i>
+                                <span>Today</span>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="btn-cancel" id="page-cancel-btn">Cancel</button>
+                                <button class="btn-add" id="page-add-btn">Add task</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Page -->
+                <div class="page" id="chat-page" style="display: none;">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h1 id="chat-page-title">Giskard</h1>
+                        <p class="task-count" id="chat-page-subtitle">AI Productivity Coach • llama3.1:8b</p>
+                    </div>
+                    
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chat-messages">
+                            <div class="welcome-message">
+                                <div class="message bot-message">
+                                    <div class="message-avatar">
+                                        <i class="fas fa-robot"></i>
+                                    </div>
+                                    <div class="message-content">
+                                        <p>Hey there! I'm your productivity coach. I can help you organize tasks, set priorities, and stay motivated. What would you like to work on today?</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-input-area">
+                            <div class="chat-suggestions" id="chat-suggestions">
+                                <button class="suggestion-btn">Help me prioritize my tasks</button>
+                                <button class="suggestion-btn">What should I focus on today?</button>
+                                <button class="suggestion-btn">I'm feeling overwhelmed</button>
+                            </div>
+                            <div class="chat-input-container">
+                                <div class="chat-input-wrapper">
+                                    <textarea id="chat-input" placeholder="Ask me anything about productivity, task management, or getting things done..." rows="1"></textarea>
+                                    <button id="send-message-btn" class="send-btn" disabled>
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                                <div class="chat-input-footer">
+                                    <span class="input-hint">Press ⌘+Enter to send</span>
+                                    <div class="typing-indicator" id="typing-indicator" style="display: none;">
+                                        <span>Giscard is thinking</span>
+                                        <div class="dots">
+                                            <span></span>
+                                            <span></span>
+                                            <span></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-actions">
+                            <button class="chat-action-btn" id="new-chat-action-btn" title="New chat">
+                                <i class="fas fa-feather-alt"></i>
+                                <span>New chat</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -133,52 +230,6 @@
         </div>
     </div>
 
-    <!-- Task Detail View -->
-    <div class="task-detail-overlay" id="task-detail-modal">
-        <div class="task-detail-content">
-            <div class="task-detail-header">
-                <button class="task-detail-close" id="detail-close-btn">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <div class="task-detail-body">
-                <div class="task-detail-main">
-                    <div class="task-title-row">
-                        <div class="task-checkbox-large">
-                            <input type="checkbox" class="task-check-large" id="detail-checkbox">
-                            <span class="checkmark-large"></span>
-                        </div>
-                        <input type="text" class="task-detail-title-input" id="detail-title" placeholder="Task title...">
-                        <div class="task-title-actions">
-                            <button class="progress-btn-inline" id="detail-progress-btn">
-                                <i class="fas fa-play"></i>
-                                <span>start</span>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="task-detail-content-area">
-                        <div class="task-detail-description">
-                            <i class="fas fa-align-left description-icon"></i>
-                            <textarea class="description-input" id="detail-description" placeholder="Add description..."></textarea>
-                        </div>
-                        
-                        <div class="description-actions">
-                            <button class="delete-btn" id="detail-delete-btn" title="Delete task">
-                                <i class="fas fa-trash"></i>
-                                <span>Delete</span>
-                            </button>
-                            <button class="save-btn" id="save-task-btn">
-                                Save
-                                <span class="keyboard-shortcut">⌘↵</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Task Template -->
     <template id="task-template">
@@ -204,52 +255,6 @@
         </div>
     </template>
 
-    <!-- Add Task Modal -->
-    <div class="modal-overlay" id="add-task-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Add task</h3>
-                <button class="modal-close" id="modal-close-btn">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="modal-body">
-                <div class="task-input-group">
-                    <input type="text" id="modal-task-name" placeholder="Task name" class="task-name-input">
-                    <textarea id="modal-task-description" placeholder="Description" class="task-description-input"></textarea>
-                </div>
-                
-                <div class="task-options">
-                    <div class="task-tags">
-                        <button class="task-tag active">
-                            <i class="fas fa-calendar-day"></i>
-                            <span>Today</span>
-                        </button>
-                        <button class="task-tag" disabled>
-                            <i class="fas fa-flag"></i>
-                            <span>Priority</span>
-                        </button>
-                        <button class="task-tag" disabled>
-                            <i class="fas fa-bell"></i>
-                            <span>Reminders</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="modal-footer">
-                <div class="project-select">
-                    <i class="fas fa-calendar-day"></i>
-                    <span>Today</span>
-                </div>
-                <div class="modal-actions">
-                    <button class="btn-cancel" id="modal-cancel-btn">Cancel</button>
-                    <button class="btn-add" id="modal-add-btn">Add task</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Test basic JavaScript execution -->
     <script>

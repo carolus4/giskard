@@ -3,7 +3,7 @@
  */
 class UIManager {
     constructor() {
-        this.currentView = 'today';
+        this.currentView = 'task-list';
         this.counts = {
             today: 0
         };
@@ -17,8 +17,8 @@ class UIManager {
     _bindNavigation() {
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
-                const view = e.currentTarget.dataset.view;
-                this.switchView(view);
+                const page = e.currentTarget.dataset.page;
+                this.switchView(page);
             });
         });
     }
@@ -34,62 +34,57 @@ class UIManager {
             item.classList.remove('active');
         });
         
-        const activeNavItem = document.querySelector(`[data-view="${view}"]`);
+        const activeNavItem = document.querySelector(`[data-page="${view}"]`);
         if (activeNavItem) {
             activeNavItem.classList.add('active');
         }
         
         // Update view title for each view's page header
         const titleElements = {
-            giskard: document.getElementById('giskard-view-title'),
-            today: document.getElementById('view-title')
+            chat: document.getElementById('chat-page-title'),
+            'task-list': document.getElementById('task-list-title')
         };
         
         const titles = {
-            giskard: 'Giskard',
-            today: 'Today' // Will be updated with date from API response
+            chat: 'Giskard',
+            'task-list': 'Tasks'
         };
         
         const subtitles = {
-            giskard: 'AI Productivity Coach • llama3.1:8b',
-            today: '0 tasks' // Will be updated with actual count
+            chat: 'AI Productivity Coach • llama3.1:8b',
+            'task-list': '0 tasks' // Will be updated with actual count
         };
         
         const titleElement = titleElements[view];
         if (titleElement) {
-            // For today view, don't override if we already have a date set
-            if (view === 'today' && titleElement.textContent.includes('Today -')) {
-                // Keep the existing date format
-            } else {
-                titleElement.textContent = titles[view] || view;
-            }
+            titleElement.textContent = titles[view] || view;
         }
         
-        // Update subtitle for giskard view
-        if (view === 'giskard') {
-            const giskardSubtitle = document.getElementById('giskard-task-count');
-            if (giskardSubtitle) {
-                giskardSubtitle.textContent = subtitles.giskard;
+        // Update subtitle for chat view
+        if (view === 'chat') {
+            const chatSubtitle = document.getElementById('chat-page-subtitle');
+            if (chatSubtitle) {
+                chatSubtitle.textContent = subtitles.chat;
             }
         }
         
         // Hide all views
-        document.querySelectorAll('.view-container').forEach(container => {
+        document.querySelectorAll('.page').forEach(container => {
             container.style.display = 'none';
         });
         
         // Show current view
-        const currentViewElement = document.getElementById(`${view}-view`);
+        const currentViewElement = document.getElementById(`${view}-page`);
         if (currentViewElement) {
-            currentViewElement.style.display = 'block';
+            currentViewElement.style.display = 'flex';
         }
         
         this.currentView = view;
         this.updateTaskCount();
         
         // Emit view change event
-        document.dispatchEvent(new CustomEvent('view:changed', { 
-            detail: { view, previousView: this.currentView }
+        document.dispatchEvent(new CustomEvent('page:changed', { 
+            detail: { page: view, previousPage: this.currentView }
         }));
     }
 
@@ -242,6 +237,13 @@ class UIManager {
      * Get current view name
      */
     getCurrentView() {
+        return this.currentView;
+    }
+
+    /**
+     * Get current page name (alias for getCurrentView)
+     */
+    getCurrentPage() {
         return this.currentView;
     }
 

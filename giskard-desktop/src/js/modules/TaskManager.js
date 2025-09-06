@@ -2,7 +2,8 @@ import APIClient from './APIClient.js';
 import UIManager from './UIManager.js';
 import TaskList from './TaskList.js';
 import DragDropManager from './DragDropManager.js';
-import { AddTaskModal, TaskDetailModal, ConfirmationModal } from './Modal.js';
+import PageManager from './PageManager.js';
+import { ConfirmationModal } from './Modal.js';
 import Notification from './Notification.js';
 
 /**
@@ -15,10 +16,9 @@ class TaskManager {
         this.ui = new UIManager();
         this.taskList = new TaskList();
         this.dragDrop = new DragDropManager();
+        this.pageManager = new PageManager();
         
-        // Initialize modals
-        this.addTaskModal = new AddTaskModal();
-        this.taskDetailModal = new TaskDetailModal();
+        // Initialize modals (only confirmation modal needed now)
         this.confirmationModal = new ConfirmationModal();
         
         // Application state
@@ -51,56 +51,39 @@ class TaskManager {
      * Bind all application events
      */
     _bindEvents() {
-        this._bindModalEvents();
+        this._bindPageEvents();
         this._bindTaskEvents();
         this._bindKeyboardEvents();
         this._bindViewEvents();
     }
 
     /**
-     * Bind modal-related events
+     * Bind page-related events
      */
-    _bindModalEvents() {
-        // Add task modal - simple button in task list
-        const simpleBtn = document.getElementById('add-task-simple-btn');
-        if (simpleBtn) {
-            simpleBtn.addEventListener('click', () => this.addTaskModal.open());
-        }
-
-        // Add task modal - plus button in sidebar
-        const plusBtn = document.getElementById('add-task-plus-btn');
-        if (plusBtn) {
-            plusBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent nav item click
-                this.addTaskModal.open();
-            });
-        }
-
-        // New chat button in sidebar
-        const newChatBtn = document.getElementById('new-chat-btn');
-        if (newChatBtn) {
-            newChatBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent nav item click
-                this._handleNewChatFromSidebar();
-            });
-        }
-
-        const modalAddBtn = document.getElementById('modal-add-btn');
-        if (modalAddBtn) {
-            modalAddBtn.addEventListener('click', () => this._handleAddTaskFromModal());
-        }
-
-        // Task detail modal events
-        this.taskDetailModal.modal.addEventListener('task:save', (e) => {
-            this._handleSaveTask(e.detail);
+    _bindPageEvents() {
+        // Add task from page
+        document.addEventListener('task:add-from-page', (e) => {
+            this._handleAddTaskFromPage(e.detail);
         });
 
-        this.taskDetailModal.modal.addEventListener('task:toggle-progress', (e) => {
-            this._handleToggleTaskProgress(e.detail.taskData);
+        // Save task from page
+        document.addEventListener('task:save-from-page', (e) => {
+            this._handleSaveTaskFromPage(e.detail);
         });
 
-        this.taskDetailModal.modal.addEventListener('task:toggle-completion', (e) => {
-            this._handleTaskCompletionToggle(e.detail);
+        // Delete task from page
+        document.addEventListener('task:delete-from-page', (e) => {
+            this._handleDeleteTaskFromPage(e.detail);
+        });
+
+        // Toggle progress from page
+        document.addEventListener('task:toggle-progress-from-page', (e) => {
+            this._handleToggleProgressFromPage(e.detail);
+        });
+
+        // Toggle completion from page
+        document.addEventListener('task:toggle-completion-from-page', (e) => {
+            this._handleToggleCompletionFromPage(e.detail);
         });
     }
 
@@ -144,8 +127,11 @@ class TaskManager {
     _bindKeyboardEvents() {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                this.addTaskModal.close();
-                this.taskDetailModal.close();
+                // Navigate back to task list from any page
+                const currentPage = this.ui.getCurrentPage();
+                if (currentPage === 'add-task' || currentPage === 'task-detail') {
+                    this.pageManager.showPage('task-list');
+                }
                 this.taskList.clearTaskSelection();
             }
         });
@@ -155,8 +141,8 @@ class TaskManager {
      * Bind view-related events
      */
     _bindViewEvents() {
-        document.addEventListener('view:changed', (e) => {
-            this._handleViewChanged(e.detail);
+        document.addEventListener('page:changed', (e) => {
+            this._handlePageChanged(e.detail);
         });
     }
 
@@ -228,24 +214,24 @@ class TaskManager {
      * Render tasks for the current view
      */
     _renderCurrentView(allowAnimation = false) {
-        const currentView = this.ui.getCurrentView();
+        const currentPage = this.ui.getCurrentPage();
         
-        switch (currentView) {
-            case 'today':
-                this._renderTodayView(allowAnimation);
+        switch (currentPage) {
+            case 'task-list':
+                this._renderTaskListView(allowAnimation);
                 break;
-            case 'giskard':
-                // Giskard view doesn't need task rendering
+            case 'chat':
+                // Chat view doesn't need task rendering
                 break;
         }
     }
 
 
     /**
-     * Render today view
+     * Render task list view
      */
-    _renderTodayView(allowAnimation = false) {
-        const container = this.ui.getViewContainer('today');
+    _renderTaskListView(allowAnimation = false) {
+        const container = document.getElementById('task-list-container');
         if (!container) return;
 
         const todayTasks = [...this.tasks.in_progress, ...this.tasks.open];
@@ -260,11 +246,9 @@ class TaskManager {
 
 
     /**
-     * Handle adding task from modal
+     * Handle adding task from page
      */
-    async _handleAddTaskFromModal() {
-        const taskData = this.addTaskModal.getTaskData();
-        
+    async _handleAddTaskFromPage(taskData) {
         if (!taskData.title.trim()) {
             Notification.error('Task title is required');
             return;
@@ -273,7 +257,8 @@ class TaskManager {
         const result = await this.api.addTask(taskData.title, taskData.description);
         
         if (result.success) {
-            this.addTaskModal.close();
+            this.pageManager.clearAddTaskForm();
+            this.pageManager.showPage('task-list');
             await this.loadTasks(true); // Refresh with animation for new task
             Notification.success('Task added!');
         } else {
@@ -288,16 +273,17 @@ class TaskManager {
         const result = await this.api.getTaskDetails(task.file_idx);
         
         if (result.success) {
-            this.taskDetailModal.showTask(result.data);
+            this.pageManager.showTaskDetail(task.file_idx);
+            this.pageManager.loadTaskIntoDetailPage(result.data);
         } else {
             Notification.error(result.error || 'Failed to load task details');
         }
     }
 
     /**
-     * Handle saving task from detail modal
+     * Handle saving task from detail page
      */
-    async _handleSaveTask(taskData) {
+    async _handleSaveTaskFromPage(taskData) {
         if (!taskData.title.trim()) {
             Notification.error('Task title cannot be empty');
             return;
@@ -312,7 +298,7 @@ class TaskManager {
         if (result.success) {
             Notification.success('Task saved!');
             await this.loadTasks();
-            this.taskDetailModal.close();
+            this.pageManager.showPage('task-list');
         } else {
             Notification.error(result.error || 'Failed to save task');
         }
@@ -395,8 +381,43 @@ class TaskManager {
         const result = await this.api.deleteTask(task.file_idx);
         
         if (result.success) {
-            // Close the task detail modal since the task no longer exists
-            this.taskDetailModal.close();
+            // Navigate back to task list since the task no longer exists
+            this.pageManager.showPage('task-list');
+            await this.loadTasks();
+            Notification.success('Task deleted!');
+        } else {
+            Notification.error(result.error || 'Failed to delete task');
+        }
+    }
+
+    /**
+     * Handle deleting task from page
+     */
+    async _handleDeleteTaskFromPage({ taskId }) {
+        // Get task data for confirmation
+        const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
+        const task = allTasks.find(t => t.file_idx === taskId);
+        
+        if (!task) {
+            Notification.error('Task not found');
+            return;
+        }
+        
+        // Show custom confirmation dialog
+        const confirmed = await this.confirmationModal.show(
+            `Are you sure you want to delete "${task.title}"?`,
+            'Confirm Deletion'
+        );
+        
+        if (!confirmed) {
+            return;
+        }
+        
+        const result = await this.api.deleteTask(taskId);
+        
+        if (result.success) {
+            // Navigate back to task list since the task no longer exists
+            this.pageManager.showPage('task-list');
             await this.loadTasks();
             Notification.success('Task deleted!');
         } else {
@@ -422,49 +443,73 @@ class TaskManager {
     }
 
     /**
-     * Handle task progress toggle from detail modal
+     * Handle task progress toggle from detail page
      */
-    async _handleToggleTaskProgress(taskData) {
-        if (!taskData) return;
+    async _handleToggleProgressFromPage({ taskId }) {
+        // Get task data
+        const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
+        const task = allTasks.find(t => t.file_idx === taskId);
         
-        // First, save any changes made in the modal (title, description)
-        const currentTaskData = this.taskDetailModal.getTaskData();
-        if (currentTaskData.title.trim()) {
-            await this._handleSaveTask(currentTaskData);
+        if (!task) {
+            Notification.error('Task not found');
+            return;
+        }
+        
+        // First, save any changes made in the page (title, description)
+        const titleInput = document.getElementById('detail-title');
+        const descriptionInput = document.getElementById('detail-description');
+        
+        if (titleInput && titleInput.value.trim()) {
+            const taskData = {
+                fileIdx: taskId,
+                title: titleInput.value.trim(),
+                description: descriptionInput?.value.trim() || ''
+            };
+            await this._handleSaveTaskFromPage(taskData);
         }
         
         // Then toggle the progress state
-        if (taskData.status === 'in_progress') {
-            await this._handleStopTask(taskData);
+        if (task.status === 'in_progress') {
+            await this._handleStopTask(task);
         } else {
-            await this._handleStartTask(taskData);
+            await this._handleStartTask(task);
         }
-        
-        // Don't close the modal - let user continue editing
     }
 
     /**
-     * Handle task completion toggle from detail modal
+     * Handle task completion toggle from detail page
      */
-    async _handleTaskCompletionToggle({ checked, taskData }) {
-        if (!taskData) return;
+    async _handleToggleCompletionFromPage({ taskId, checked }) {
+        // Get task data
+        const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
+        const task = allTasks.find(t => t.file_idx === taskId);
         
-        // First, save any changes made in the modal (title, description)
-        const currentTaskData = this.taskDetailModal.getTaskData();
-        if (currentTaskData.title.trim()) {
-            await this._handleSaveTask(currentTaskData);
+        if (!task) {
+            Notification.error('Task not found');
+            return;
+        }
+        
+        // First, save any changes made in the page (title, description)
+        const titleInput = document.getElementById('detail-title');
+        const descriptionInput = document.getElementById('detail-description');
+        
+        if (titleInput && titleInput.value.trim()) {
+            const taskData = {
+                fileIdx: taskId,
+                title: titleInput.value.trim(),
+                description: descriptionInput?.value.trim() || ''
+            };
+            await this._handleSaveTaskFromPage(taskData);
         }
         
         // Then toggle the completion state
-        if (taskData.status === 'done') {
+        if (task.status === 'done') {
             // Uncomplete the task
-            await this._handleUncompleteTask(taskData);
+            await this._handleUncompleteTask(task);
         } else if (checked) {
             // Complete the task
-            await this._handleCompleteTask(taskData);
+            await this._handleCompleteTask(task);
         }
-        
-        // Don't close the modal - let user continue editing
     }
 
     /**
@@ -484,9 +529,9 @@ class TaskManager {
     }
 
     /**
-     * Handle view changes
+     * Handle page changes
      */
-    _handleViewChanged({ view }) {
+    _handlePageChanged({ page }) {
         this._renderCurrentView();
     }
 }
