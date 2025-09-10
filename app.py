@@ -22,7 +22,7 @@ CORS(app, origins=[
 # Register API blueprint
 app.register_blueprint(api)
 
-# Initialize file manager to ensure todo.txt exists
+# Initialize file manager to ensure data/todo.txt exists
 file_manager = TodoFileManager()
 
 # Start classification processing on startup

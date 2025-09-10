@@ -15,10 +15,11 @@ logger = logging.getLogger(__name__)
 class TaskClassificationService:
     """Service for automatically categorizing tasks using LLM"""
     
-    def __init__(self, log_file: str = "classification_predictions_log.txt"):
+    def __init__(self, log_file: str = "data/classification_predictions_log.txt"):
         self.log_file = Path(log_file)
-        self.ollama_url = "http://localhost:11434/api/generate"
-        self.model = "llama3.1:8b"
+        from config.ollama_config import OLLAMA_BASE_URL, DEFAULT_MODEL
+        self.ollama_url = OLLAMA_BASE_URL
+        self.model = DEFAULT_MODEL
         
     def classify_task(self, title: str, description: str = "") -> List[str]:
         """
@@ -75,47 +76,25 @@ class TaskClassificationService:
     
     def _build_classification_prompt(self, title: str, description: str) -> str:
         """Build the classification prompt for the LLM"""
+        from config.prompts import CLASSIFICATION_PROMPT
+        
         task_text = title
         if description:
             task_text += f" - {description}"
         
-        return f"""You are a task categorization assistant. Your job is to assign 0..n labels from {{health, career, learning}} to each task.
-
-Guidelines:
-- Be conservative: only assign categories if you're confident
-- If unsure, assign no categories (empty list)
-- High precision is more important than recall
-- Consider the task content, not just keywords
-
-Categories:
-- health: Physical health, fitness, medical, wellness, self-care
-- career: Work, networking, interviews, interview prep, applications, job-related, business
-- learning: Education, skill development, studying, knowledge acquisition, personal projects including 'Giskard' (the AI assistant)
-
-Task: "{task_text}"
-
-Respond with ONLY a valid JSON array of category strings. Examples:
-- ["health"] for "Go to the gym"
-- ["career", "learning"] for "Complete Python certification course"
-- [] for "Buy groceries"
-
-JSON:"""
+        return CLASSIFICATION_PROMPT.format(task_text=task_text)
     
     def _send_to_ollama(self, prompt: str) -> str:
         """Send request to Ollama API"""
+        from config.ollama_config import CLASSIFICATION_CONFIG, REQUEST_TIMEOUT
+        
         payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.1,  # Low temperature for consistent classification
-                "top_p": 0.9,
-                "max_tokens": 100
-            }
+            **CLASSIFICATION_CONFIG,
+            "prompt": prompt
         }
         
         try:
-            response = requests.post(self.ollama_url, json=payload, timeout=30)
+            response = requests.post(self.ollama_url, json=payload, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             
             result = response.json()

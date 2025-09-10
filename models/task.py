@@ -21,7 +21,7 @@ class Task:
 
     @classmethod
     def from_line(cls, line: str, file_idx: int) -> 'Task':
-        """Parse a single line from todo.txt into a Task object"""
+        """Parse a single line from data/todo.txt into a Task object"""
         line = line.strip()
         if not line:
             raise ValueError("Empty line cannot be parsed as task")
@@ -125,7 +125,7 @@ class Task:
         return title, description, None, categories
 
     def to_line(self) -> str:
-        """Format task back to todo.txt line format"""
+        """Format task back to data/todo.txt line format"""
         task_text = self._format_task_text()
         
         if self.status == 'done':
@@ -234,7 +234,7 @@ class TaskCollection:
 
     @classmethod
     def from_lines(cls, lines: List[str]) -> 'TaskCollection':
-        """Create TaskCollection from todo.txt lines"""
+        """Create TaskCollection from data/todo.txt lines"""
         tasks = []
         for idx, line in enumerate(lines):
             line = line.strip()
@@ -248,7 +248,7 @@ class TaskCollection:
         return cls(tasks)
 
     def to_lines(self) -> List[str]:
-        """Convert tasks back to todo.txt format lines"""
+        """Convert tasks back to data/todo.txt format lines"""
         # Create a list with empty slots for all possible file indices
         max_idx = max((t.file_idx for t in self.tasks), default=-1)
         lines = [''] * (max_idx + 1)

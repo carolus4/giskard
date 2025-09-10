@@ -127,7 +127,9 @@ giskard/
 │   │   └── js/              # Frontend modules
 │   └── src-tauri/           # Rust backend
 ├── start_giskard.sh         # Single startup script
-└── todo.txt                 # Data storage
+└── data/
+    ├── todo.txt                    # Task data storage
+    └── classification_predictions_log.txt  # AI classification logs
 ```
 
 ## 🔧 Configuration

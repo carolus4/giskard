@@ -1,5 +1,5 @@
 """
-File operations and persistence for todo.txt
+File operations and persistence for data/todo.txt
 """
 from pathlib import Path
 from typing import List
@@ -7,19 +7,19 @@ from models.task import TaskCollection
 
 
 class TodoFileManager:
-    """Handles file operations for todo.txt"""
+    """Handles file operations for data/todo.txt"""
     
-    def __init__(self, file_path: str = "todo.txt"):
+    def __init__(self, file_path: str = "data/todo.txt"):
         self.file_path = Path(file_path)
         self.ensure_file()
 
     def ensure_file(self) -> None:
-        """Ensure todo.txt exists"""
+        """Ensure data/todo.txt exists"""
         if not self.file_path.exists():
             self.file_path.write_text("", encoding="utf-8")
 
     def read_lines(self) -> List[str]:
-        """Read all lines from todo.txt"""
+        """Read all lines from data/todo.txt"""
         self.ensure_file()
         content = self.file_path.read_text(encoding="utf-8").strip()
         if not content:
@@ -27,7 +27,7 @@ class TodoFileManager:
         return content.splitlines()
 
     def write_lines(self, lines: List[str]) -> None:
-        """Write lines to todo.txt"""
+        """Write lines to data/todo.txt"""
         if lines:
             # Filter out empty lines for cleaner file
             non_empty_lines = [line for line in lines if line.strip()]
@@ -54,7 +54,7 @@ class TodoFileManager:
         self.write_lines(lines)
 
     def backup_file(self, suffix: str = None) -> Path:
-        """Create a backup of the current todo.txt file"""
+        """Create a backup of the current data/todo.txt file"""
         if suffix is None:
             from datetime import datetime
             suffix = datetime.now().strftime("%Y%m%d_%H%M%S")

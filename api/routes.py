@@ -491,51 +491,25 @@ def _build_conversation_context(conversation_history):
 
 def _get_coaching_system_prompt(task_context):
     """Get the system prompt for the coaching assistant"""
-    return f"""You are Giscard, a productivity coach and personal assistant. You help users manage their tasks, stay motivated, and achieve their goals.
-
-Your personality:
-- Supportive and encouraging, but not overly cheerful
-- Direct and practical in your advice
-- Focused on productivity and getting things done
-- Understanding of the challenges of task management
-
-Current task context:
-{task_context}
-
-Guidelines:
-- Keep responses concise and actionable
-- Offer specific advice based on the user's tasks and their descriptions
-- Use task descriptions to provide more targeted productivity advice
-- Suggest prioritization, time management, and productivity techniques
-- Be empathetic to productivity struggles
-- Don't make assumptions about tasks you can't see
-- If asked about tasks, refer to what you can see in the context above
-- When multiple tasks have similar descriptions, suggest grouping or batching them
-
-Remember: You now have access to both task titles AND descriptions, so you can provide much more personalized and specific advice based on the actual work content."""
+    from config.prompts import COACHING_SYSTEM_PROMPT
+    return COACHING_SYSTEM_PROMPT.format(task_context=task_context)
 
 
 def _send_to_ollama(system_prompt, user_input):
     """Send request to Ollama API"""
-    ollama_url = "http://localhost:11434/api/generate"
+    from config.ollama_config import OLLAMA_BASE_URL, CHAT_CONFIG, REQUEST_TIMEOUT
     
     payload = {
-        "model": "llama3.1:8b",
-        "prompt": f"{system_prompt}\n\n{user_input}\n\nAssistant:",
-        "stream": False,
-        "options": {
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "max_tokens": 500
-        }
+        **CHAT_CONFIG,
+        "prompt": f"{system_prompt}\n\n{user_input}\n\nAssistant:"
     }
     
     try:
-        response = requests.post(ollama_url, json=payload, timeout=30)
+        response = requests.post(OLLAMA_BASE_URL, json=payload, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         
         result = response.json()
         return result.get('response', 'Sorry, I had trouble generating a response.')
     
     except requests.exceptions.RequestException as e:
-        raise Exception(f"Failed to connect to Ollama: {str(e)}. Make sure Ollama is running with llama3.1:8b model.")
+        raise Exception(f"Failed to connect to Ollama: {str(e)}. Make sure Ollama is running with {CHAT_CONFIG['model']} model.")
