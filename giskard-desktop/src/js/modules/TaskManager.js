@@ -129,7 +129,7 @@ class TaskManager {
             if (e.key === 'Escape') {
                 // Navigate back to task list from any page
                 const currentPage = this.ui.getCurrentPage();
-                if (currentPage === 'add-task' || currentPage === 'task-detail') {
+                if (currentPage === 'task-detail') {
                     this.pageManager.showPage('task-list');
                 }
                 this.taskList.clearTaskSelection();
@@ -257,7 +257,6 @@ class TaskManager {
         const result = await this.api.addTask(taskData.title, taskData.description);
         
         if (result.success) {
-            this.pageManager.clearAddTaskForm();
             this.pageManager.showPage('task-list');
             await this.loadTasks(true); // Refresh with animation for new task
             Notification.success('Task added!');

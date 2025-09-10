@@ -186,24 +186,25 @@ body {
     font-size: 12px;
 }
 
-/* Add Task Page */
-.add-task-content {
-    flex: 1;
-    padding: 24px;
-    max-width: 600px;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+/* Add button styling for task detail page */
+.add-btn {
+    background: #dc4c3e;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.add-task-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 32px;
-    padding-top: 24px;
-    border-top: 1px solid #e8e8e8;
+.add-btn:hover {
+    background: #c73e2f;
+    transform: translateY(-1px);
+}
+
+.add-btn:active {
+    transform: translateY(0);
 }
 
 .action-buttons {
@@ -365,8 +366,7 @@ body {
         padding: 16px 16px 0 16px;
     }
     
-    .task-detail-content,
-    .add-task-content {
+    .task-detail-content {
         padding: 16px;
     }
     

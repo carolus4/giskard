@@ -38,18 +38,12 @@ class PageManager {
             });
         }
 
-        const backFromAddTaskBtn = document.getElementById('back-from-add-task-btn');
-        if (backFromAddTaskBtn) {
-            backFromAddTaskBtn.addEventListener('click', () => {
-                this.showPage('task-list');
-            });
-        }
 
         // Add task buttons
         const addTaskSimpleBtn = document.getElementById('add-task-simple-btn');
         if (addTaskSimpleBtn) {
             addTaskSimpleBtn.addEventListener('click', () => {
-                this.showPage('add-task');
+                this.showAddTask();
             });
         }
 
@@ -57,7 +51,7 @@ class PageManager {
         if (addTaskPlusBtn) {
             addTaskPlusBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.showPage('add-task');
+                this.showAddTask();
             });
         }
 
@@ -84,38 +78,6 @@ class PageManager {
      * Bind form events for page-specific functionality
      */
     _bindPageFormEvents() {
-        // Add task page form
-        const pageAddBtn = document.getElementById('page-add-btn');
-        const pageCancelBtn = document.getElementById('page-cancel-btn');
-        const pageTaskName = document.getElementById('page-task-name');
-
-        if (pageAddBtn) {
-            pageAddBtn.addEventListener('click', () => {
-                this._handleAddTaskFromPage();
-            });
-        }
-
-        if (pageCancelBtn) {
-            pageCancelBtn.addEventListener('click', () => {
-                this.showPage('task-list');
-            });
-        }
-
-        if (pageTaskName) {
-            // Enable/disable add button based on title input
-            pageTaskName.addEventListener('input', () => {
-                if (pageAddBtn) {
-                    pageAddBtn.disabled = !pageTaskName.value.trim();
-                }
-            });
-
-            // Enter key to submit
-            pageTaskName.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && pageAddBtn && !pageAddBtn.disabled) {
-                    pageAddBtn.click();
-                }
-            });
-        }
 
         // Task detail page form
         const saveTaskBtn = document.getElementById('save-task-btn');
@@ -211,6 +173,14 @@ class PageManager {
     }
 
     /**
+     * Show add task page (using task detail page)
+     */
+    showAddTask() {
+        this.showPage('task-detail', 'new');
+        this._setupAddTaskMode();
+    }
+
+    /**
      * Update sidebar active state
      */
     _updateSidebarActiveState(activePage) {
@@ -238,25 +208,43 @@ class PageManager {
     }
 
     /**
-     * Handle adding task from page
+     * Setup add task mode in task detail page
      */
-    async _handleAddTaskFromPage() {
-        const titleInput = document.getElementById('page-task-name');
-        const descriptionInput = document.getElementById('page-task-description');
-        
-        if (!titleInput || !titleInput.value.trim()) {
-            return;
+    _setupAddTaskMode() {
+        const titleInput = document.getElementById('detail-title');
+        const descriptionInput = document.getElementById('detail-description');
+        const checkbox = document.getElementById('detail-checkbox');
+        const progressBtn = document.getElementById('detail-progress-btn');
+        const deleteBtn = document.getElementById('detail-delete-btn');
+        const saveBtn = document.getElementById('save-task-btn');
+        const titleHeader = document.querySelector('.task-title-header');
+
+        // Clear all fields
+        if (titleInput) titleInput.value = '';
+        if (descriptionInput) descriptionInput.value = '';
+        if (checkbox) checkbox.checked = false;
+
+        // Hide elements not needed for add mode
+        if (checkbox) checkbox.style.display = 'none';
+        if (progressBtn) progressBtn.style.display = 'none';
+        if (deleteBtn) deleteBtn.style.display = 'none';
+
+        // Update save button text
+        if (saveBtn) {
+            saveBtn.textContent = 'Add task';
+            saveBtn.classList.remove('save-btn');
+            saveBtn.classList.add('add-btn');
         }
 
-        const taskData = {
-            title: titleInput.value.trim(),
-            description: descriptionInput?.value.trim() || ''
-        };
+        // Update title header styling
+        if (titleHeader) {
+            titleHeader.classList.remove('completed');
+        }
 
-        // Dispatch event to TaskManager
-        document.dispatchEvent(new CustomEvent('task:add-from-page', {
-            detail: taskData
-        }));
+        // Focus on title input
+        setTimeout(() => {
+            if (titleInput) titleInput.focus();
+        }, 100);
     }
 
     /**
@@ -270,16 +258,31 @@ class PageManager {
             return;
         }
 
-        const taskData = {
-            fileIdx: this.currentTaskId,
-            title: titleInput.value.trim(),
-            description: descriptionInput?.value.trim() || ''
-        };
+        // Check if we're in add mode or edit mode
+        if (this.currentTaskId === 'new') {
+            // Add mode
+            const taskData = {
+                title: titleInput.value.trim(),
+                description: descriptionInput?.value.trim() || ''
+            };
 
-        // Dispatch event to TaskManager
-        document.dispatchEvent(new CustomEvent('task:save-from-page', {
-            detail: taskData
-        }));
+            // Dispatch event to TaskManager
+            document.dispatchEvent(new CustomEvent('task:add-from-page', {
+                detail: taskData
+            }));
+        } else {
+            // Edit mode
+            const taskData = {
+                fileIdx: this.currentTaskId,
+                title: titleInput.value.trim(),
+                description: descriptionInput?.value.trim() || ''
+            };
+
+            // Dispatch event to TaskManager
+            document.dispatchEvent(new CustomEvent('task:save-from-page', {
+                detail: taskData
+            }));
+        }
     }
 
     /**
@@ -327,27 +330,37 @@ class PageManager {
         const checkbox = document.getElementById('detail-checkbox');
         const titleHeader = document.querySelector('.task-title-header');
         const progressBtn = document.getElementById('detail-progress-btn');
+        const deleteBtn = document.getElementById('detail-delete-btn');
+        const saveBtn = document.getElementById('save-task-btn');
 
         if (titleInput) titleInput.value = taskData.title || '';
         if (descriptionInput) descriptionInput.value = taskData.description || '';
         
-        // Set checkbox state
+        // Show all elements for edit mode
         if (checkbox) {
+            checkbox.style.display = 'block';
             checkbox.checked = taskData.status === 'done';
         }
-        
-        // Update title header styling
-        if (titleHeader) {
-            titleHeader.classList.toggle('completed', taskData.status === 'done');
-        }
-
-        // Update progress button
         if (progressBtn) {
+            progressBtn.style.display = 'block';
             const isInProgress = taskData.status === 'in_progress';
             progressBtn.classList.toggle('in-progress', isInProgress);
             progressBtn.innerHTML = isInProgress 
                 ? '<i class="fas fa-pause"></i><span>pause</span>'
                 : '<i class="fas fa-play"></i><span>start</span>';
+        }
+        if (deleteBtn) {
+            deleteBtn.style.display = 'block';
+        }
+        if (saveBtn) {
+            saveBtn.textContent = 'Save';
+            saveBtn.classList.remove('add-btn');
+            saveBtn.classList.add('save-btn');
+        }
+        
+        // Update title header styling
+        if (titleHeader) {
+            titleHeader.classList.toggle('completed', taskData.status === 'done');
         }
 
         // Update keyboard shortcut display
@@ -365,18 +378,6 @@ class PageManager {
         }
     }
 
-    /**
-     * Clear add task form
-     */
-    clearAddTaskForm() {
-        const titleInput = document.getElementById('page-task-name');
-        const descriptionInput = document.getElementById('page-task-description');
-        const addBtn = document.getElementById('page-add-btn');
-
-        if (titleInput) titleInput.value = '';
-        if (descriptionInput) descriptionInput.value = '';
-        if (addBtn) addBtn.disabled = true;
-    }
 }
 
 export default PageManager;

@@ -65,10 +65,15 @@ def get_tasks():
         # Calculate counts for sidebar
         today_count = len(in_progress_tasks) + len(open_tasks)
         
+        # Count completed tasks for today
+        today_date = datetime.now().strftime('%Y-%m-%d')
+        completed_today_count = sum(1 for task in done_tasks if task.completion_date == today_date)
+        
         return jsonify({
             'tasks': ui_tasks,
             'counts': {
-                'today': today_count
+                'today': today_count,
+                'completed_today': completed_today_count
             },
             'today_date': datetime.now().strftime('Today - %A %b %d')
         })

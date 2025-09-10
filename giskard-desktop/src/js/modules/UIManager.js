@@ -5,7 +5,8 @@ class UIManager {
     constructor() {
         this.currentView = 'task-list';
         this.counts = {
-            today: 0
+            today: 0,
+            completed_today: 0
         };
         
         this._bindNavigation();
@@ -103,7 +104,7 @@ class UIManager {
     updateTaskCount() {
         const taskCountElements = {
             giskard: document.getElementById('giskard-task-count'),
-            today: document.getElementById('task-count')
+            'task-list': document.getElementById('task-count')
         };
         
         const taskCountEl = taskCountElements[this.currentView];
@@ -111,9 +112,10 @@ class UIManager {
         if (taskCountEl) {
             if (this.currentView === 'giskard') {
                 taskCountEl.textContent = 'AI Productivity Coach • llama3.1:8b';
-            } else {
-                // Hide task count since it's not helpful
-                taskCountEl.style.display = 'none';
+            } else if (this.currentView === 'task-list') {
+                const completedCount = this.counts.completed_today || 0;
+                taskCountEl.textContent = `${completedCount} task${completedCount !== 1 ? 's' : ''} completed today`;
+                taskCountEl.style.display = 'block';
             }
         }
     }

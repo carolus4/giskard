@@ -1,6 +1,6 @@
 x 2025-09-02 Test mini_todo.md functionality |  | 1
 x 2025-09-02 Make task order draggable | Re prioritise; especially for new tasks with high pri | 3
-[AI Personal Assistant] Add activity log |  | 1
+[AI Personal Assistant] Add activity log |  | 3
 x 2025-09-03 LLM integration | Integrate Ollama for coaching and review of tasks. | 2
 x 2025-09-02 Refactor (>500 line app.py) | > analyse this code base and identify opportunities to refactor and simplify. Keep functionality as-is. Present a plan and ask questions as needed before making changes\n\n[x] back-end restructure\n[x] test restructure\n[x] front-end modularisation\n[x] Code Quality Improvements | 2
 [AI Skills] Evals | Create comprehensive test suite for the todo system | 6
@@ -17,12 +17,17 @@ x 2025-09-02 test |  | 3
 x 2025-09-03 run 5k |  | 15
 x 2025-09-02 Add add task button at the bottom of the page. |  | 16
 [Giskard] Projects |  | 7
-[Giskard] Priorities |  | 8
-[Networking] Organise out in tech local chapter | [x] messaged the Out in Tech #vancouver slack to check interest for a networking event. | 9
+[Giskard] Intentions |  | 8
+[Networking] Organise out in tech local event | [x] messaged the Out in Tech #vancouver slack to check interest for a networking event. | 9
 [Consulting] Follow up on lookpro notes |  | 10
 Investigate ‘small models’ white paper |  | 4
-[Learning] 5 Day GenAI Course | https://www.kaggle.com/learn-guide/5-day-genai | 3
+x 2025-09-10 [Learning] Review 5 Day GenAI Course | Should I do this? Yes.\n https://www.kaggle.com/learn-guide/5-day-genai | 1
 x 2025-09-05 [Simplify] Remove independent web UI from scope |  | 1
 x 2025-09-05 [Todoist] Clean up UI | [x] remove web only view\n[x] remove inbox/upcoming (keep only today)\n[x] fix play / pause bug\n[x] test bugfix\n[x] fix header in task list\n[x] fix header in giskard\n[x] update ‘+ task’ ‘+ chat | 1
 [giskard] Think about history (past chats/tasks) | ???\n[Todoist] Add completed dates | 11
 x 2025-09-06 [giskard] Create page based nav | Simplifying the logical flow of operations should help avoid the local maximum that got me stuck yesterday | 2
+x 2025-09-10 [Giskard] Bug fixes | [x] update task_page.subtitle to include X tasks completed today\n[x] add consistency with Add & Edit pages | 2
+x 2025-09-09 [AI Course] Set Up | | 2 | 17
+x 2025-09-09 [AI Course] Intro Unit - Foundational Large Language Models & Text Generation | | 2 | 18
+[AI Course] Intro Unit - “Prompt Engineering” | | | 2
+[Giskard] Add categories | Let’s list only 3 types of productive time I want to track and improve:\n- health: including mental health or physical activity\n- career: including networking, interviews, interview prep, applications etc\n- learning: including any activity to do with prototyping, building, online courses, or blog post writing | 19
