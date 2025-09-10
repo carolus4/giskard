@@ -98,7 +98,10 @@ class PageManager {
         }
 
         if (detailProgressBtn) {
-            detailProgressBtn.addEventListener('click', () => {
+            detailProgressBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Progress button clicked, currentTaskId:', this.currentTaskId);
                 this._handleToggleProgressFromPage();
             });
         }
@@ -213,6 +216,7 @@ class PageManager {
     _setupAddTaskMode() {
         const titleInput = document.getElementById('detail-title');
         const descriptionInput = document.getElementById('detail-description');
+        const categoriesContainer = document.getElementById('task-categories-detail');
         const checkbox = document.getElementById('detail-checkbox');
         const progressBtn = document.getElementById('detail-progress-btn');
         const deleteBtn = document.getElementById('detail-delete-btn');
@@ -222,6 +226,7 @@ class PageManager {
         // Clear all fields
         if (titleInput) titleInput.value = '';
         if (descriptionInput) descriptionInput.value = '';
+        if (categoriesContainer) categoriesContainer.innerHTML = '';
         if (checkbox) checkbox.checked = false;
 
         // Hide elements not needed for add mode
@@ -301,8 +306,13 @@ class PageManager {
      * Handle toggling progress from page
      */
     async _handleToggleProgressFromPage() {
-        if (!this.currentTaskId) return;
+        console.log('_handleToggleProgressFromPage called, currentTaskId:', this.currentTaskId);
+        if (!this.currentTaskId) {
+            console.log('No currentTaskId, returning');
+            return;
+        }
 
+        console.log('Dispatching task:toggle-progress-from-page event');
         // Dispatch event to TaskManager
         document.dispatchEvent(new CustomEvent('task:toggle-progress-from-page', {
             detail: { taskId: this.currentTaskId }
@@ -327,6 +337,7 @@ class PageManager {
     loadTaskIntoDetailPage(taskData) {
         const titleInput = document.getElementById('detail-title');
         const descriptionInput = document.getElementById('detail-description');
+        const categoriesContainer = document.getElementById('task-categories-detail');
         const checkbox = document.getElementById('detail-checkbox');
         const titleHeader = document.querySelector('.task-title-header');
         const progressBtn = document.getElementById('detail-progress-btn');
@@ -334,7 +345,38 @@ class PageManager {
         const saveBtn = document.getElementById('save-task-btn');
 
         if (titleInput) titleInput.value = taskData.title || '';
-        if (descriptionInput) descriptionInput.value = taskData.description || '';
+        
+        // Load categories
+        if (categoriesContainer) {
+            this._renderCategoriesInDetail(categoriesContainer, taskData.categories || []);
+        }
+        
+        if (descriptionInput) {
+            // Unescape newlines for display in textarea
+            const description = taskData.description || '';
+            descriptionInput.value = description.replace(/\\n/g, '\n');
+            
+            // Add click handler to ensure textarea stays expanded
+            descriptionInput.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Ensure textarea is focused and expanded
+                descriptionInput.focus();
+                descriptionInput.style.minHeight = '250px';
+            });
+            
+            // Add focus handler to maintain expansion
+            descriptionInput.addEventListener('focus', () => {
+                descriptionInput.style.minHeight = '250px';
+            });
+            
+            // Add blur handler to maintain expansion if there's content
+            descriptionInput.addEventListener('blur', () => {
+                // Only collapse if textarea is empty
+                if (!descriptionInput.value.trim()) {
+                    descriptionInput.style.minHeight = '200px';
+                }
+            });
+        }
         
         // Show all elements for edit mode
         if (checkbox) {
@@ -376,6 +418,27 @@ class PageManager {
             const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
             shortcutSpan.textContent = isMac ? '⌘↵' : 'Ctrl+↵';
         }
+    }
+
+    /**
+     * Render category badges in task detail page
+     */
+    _renderCategoriesInDetail(container, categories) {
+        if (!container) return;
+        
+        // Clear existing categories
+        container.innerHTML = '';
+        
+        if (!categories || categories.length === 0) {
+            return;
+        }
+        
+        categories.forEach(category => {
+            const badge = document.createElement('span');
+            badge.className = `category-badge-detail category-${category}`;
+            badge.textContent = category;
+            container.appendChild(badge);
+        });
     }
 
 }

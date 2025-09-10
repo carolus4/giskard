@@ -45,6 +45,9 @@ class TaskManager {
         
         // Smart auto-refresh every 30 seconds - only if data changed
         setInterval(() => this._smartRefresh(), 30000);
+        
+        // Check for category updates every 5 seconds
+        setInterval(() => this._checkCategoryUpdates(), 5000);
     }
 
     /**
@@ -78,6 +81,7 @@ class TaskManager {
 
         // Toggle progress from page
         document.addEventListener('task:toggle-progress-from-page', (e) => {
+            console.log('TaskManager received task:toggle-progress-from-page event:', e.detail);
             this._handleToggleProgressFromPage(e.detail);
         });
 
@@ -208,6 +212,49 @@ class TaskManager {
      */
     async _smartRefresh() {
         await this.loadTasks(false);
+    }
+
+    /**
+     * Check for category updates and show notifications
+     */
+    async _checkCategoryUpdates() {
+        try {
+            const result = await this.api.getCategoryUpdates();
+            if (result.success && result.data.updated_tasks.length > 0) {
+                this._showCategoryUpdateNotifications(result.data.updated_tasks);
+            }
+        } catch (error) {
+            // Silently fail - this is a background check
+            console.debug('Category update check failed:', error);
+        }
+    }
+
+    /**
+     * Show toast notifications for updated categories
+     */
+    _showCategoryUpdateNotifications(updatedTasks) {
+        updatedTasks.forEach(task => {
+            const { title, old_categories, new_categories } = task;
+            
+            // Create a friendly message
+            const oldText = old_categories.length > 0 ? old_categories.join(', ') : 'no categories';
+            const newText = new_categories.length > 0 ? new_categories.join(', ') : 'no categories';
+            
+            let message;
+            if (old_categories.length === 0 && new_categories.length > 0) {
+                // New categories added
+                message = `📝 "${title}" categorized as: ${newText}`;
+            } else if (old_categories.length > 0 && new_categories.length === 0) {
+                // Categories removed
+                message = `📝 "${title}" categories removed`;
+            } else {
+                // Categories changed
+                message = `📝 "${title}" updated: ${oldText} → ${newText}`;
+            }
+            
+            // Show notification
+            Notification.info(message);
+        });
     }
 
     /**
@@ -473,6 +520,11 @@ class TaskManager {
         } else {
             await this._handleStartTask(task);
         }
+        
+        // Update the progress button state in the detail page after data refresh
+        setTimeout(() => {
+            this._updateDetailPageProgressButton(taskId);
+        }, 100);
     }
 
     /**
@@ -525,6 +577,26 @@ class TaskManager {
                 window.app.chatManager._handleNewChat();
             }
         }, 100);
+    }
+
+    /**
+     * Update progress button state in detail page
+     */
+    _updateDetailPageProgressButton(taskId) {
+        // Get updated task data
+        const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
+        const task = allTasks.find(t => t.file_idx === taskId);
+        
+        if (!task) return;
+        
+        const progressBtn = document.getElementById('detail-progress-btn');
+        if (!progressBtn) return;
+        
+        const isInProgress = task.status === 'in_progress';
+        progressBtn.classList.toggle('in-progress', isInProgress);
+        progressBtn.innerHTML = isInProgress 
+            ? '<i class="fas fa-pause"></i><span>pause</span>'
+            : '<i class="fas fa-play"></i><span>start</span>';
     }
 
     /**

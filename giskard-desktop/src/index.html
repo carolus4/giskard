@@ -66,7 +66,10 @@
                                 <input type="checkbox" class="task-check-large" id="detail-checkbox">
                                 <span class="checkmark-large"></span>
                             </div>
-                            <input type="text" class="task-title-h1" id="detail-title" placeholder="Task title...">
+                            <div class="task-title-section">
+                                <input type="text" class="task-title-h1" id="detail-title" placeholder="Task title...">
+                                <div class="task-categories-detail" id="task-categories-detail"></div>
+                            </div>
                             <div class="task-title-actions">
                                 <button class="progress-btn-inline" id="detail-progress-btn">
                                     <i class="fas fa-play"></i>
@@ -195,7 +198,10 @@
                 <span class="checkmark"></span>
             </div>
             <div class="task-content">
-                <span class="task-title"></span>
+                <div class="task-main">
+                    <span class="task-title"></span>
+                    <div class="task-categories" id="task-categories"></div>
+                </div>
                 <div class="task-actions">
                     <button class="task-action start-btn" title="Start task">
                         <i class="fas fa-play"></i>

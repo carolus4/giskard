@@ -9,13 +9,15 @@ import json
 
 from models.task import Task, TaskCollection
 from utils.file_manager import TodoFileManager
+from utils.classification_manager import ClassificationManager
 
 
 # Create Blueprint
 api = Blueprint('api', __name__, url_prefix='/api')
 
-# Initialize file manager
+# Initialize file manager and classification manager
 file_manager = TodoFileManager()
+classification_manager = ClassificationManager(file_manager)
 
 
 class APIResponse:
@@ -96,6 +98,9 @@ def add_task():
         collection = file_manager.load_tasks()
         task = collection.add_task(title, description)
         file_manager.save_tasks(collection)
+        
+        # Enqueue for classification
+        classification_manager.enqueue_classification(task)
         
         return jsonify(APIResponse.success(f'Added: {title}'))
     
@@ -252,6 +257,9 @@ def update_task(file_idx):
         task.update_content(new_title, new_description)
         file_manager.save_tasks(collection)
         
+        # Enqueue for re-classification
+        classification_manager.enqueue_classification(task)
+        
         return jsonify(APIResponse.success('Task updated'))
     
     except Exception as e:
@@ -360,6 +368,46 @@ def reorder_task():
         
         return jsonify(APIResponse.success('Task reordered successfully'))
     
+    except Exception as e:
+        return APIResponse.error(str(e), 500)
+
+
+@api.route('/classification/startup', methods=['POST'])
+def classify_on_startup():
+    """Trigger classification of all uncategorized tasks on startup"""
+    try:
+        classified_count = classification_manager.classify_on_startup()
+        return jsonify(APIResponse.success(f'Classified {classified_count} tasks'))
+    except Exception as e:
+        return APIResponse.error(str(e), 500)
+
+
+@api.route('/classification/status')
+def get_classification_status():
+    """Get classification queue status"""
+    try:
+        status = classification_manager.get_queue_status()
+        return jsonify(APIResponse.success(data=status))
+    except Exception as e:
+        return APIResponse.error(str(e), 500)
+
+
+@api.route('/classification/start', methods=['POST'])
+def start_classification_processing():
+    """Start background classification processing"""
+    try:
+        classification_manager.start_background_processing()
+        return jsonify(APIResponse.success('Classification processing started'))
+    except Exception as e:
+        return APIResponse.error(str(e), 500)
+
+
+@api.route('/classification/updates')
+def get_category_updates():
+    """Get recently updated task categories for notifications"""
+    try:
+        updated_tasks = classification_manager.get_last_updated_tasks()
+        return jsonify(APIResponse.success(data={'updated_tasks': updated_tasks}))
     except Exception as e:
         return APIResponse.error(str(e), 500)
 

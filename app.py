@@ -5,7 +5,7 @@ Giskard API - Backend API for Tauri desktop app
 
 from flask import Flask
 from flask_cors import CORS
-from api.routes import api
+from api.routes import api, classification_manager
 from utils.file_manager import TodoFileManager
 
 # Create Flask app
@@ -24,6 +24,9 @@ app.register_blueprint(api)
 
 # Initialize file manager to ensure todo.txt exists
 file_manager = TodoFileManager()
+
+# Start classification processing on startup
+classification_manager.start_background_processing()
 
 if __name__ == '__main__':
     # File manager already initialized above

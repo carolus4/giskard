@@ -9,13 +9,15 @@ class Task:
     """Represents a todo task with parsing and formatting capabilities"""
     
     def __init__(self, title: str, description: str = "", order: Optional[int] = None, 
-                 status: str = 'open', completion_date: Optional[str] = None, file_idx: Optional[int] = None):
+                 status: str = 'open', completion_date: Optional[str] = None, file_idx: Optional[int] = None,
+                 categories: Optional[List[str]] = None):
         self.title = title
         self.description = description
         self.order = order
         self.status = status  # 'open', 'in_progress', 'done'
         self.completion_date = completion_date
         self.file_idx = file_idx
+        self.categories = categories or []  # List of categories: health, career, learning
 
     @classmethod
     def from_line(cls, line: str, file_idx: int) -> 'Task':
@@ -32,8 +34,8 @@ class Task:
             return cls._parse_in_progress_task(line, file_idx)
         else:
             # Open task
-            title, description, order = cls._parse_task_text(line)
-            return cls(title, description, order, 'open', file_idx=file_idx)
+            title, description, order, categories = cls._parse_task_text(line)
+            return cls(title, description, order, 'open', file_idx=file_idx, categories=categories)
 
     @classmethod
     def _parse_completed_task(cls, line: str, file_idx: int) -> 'Task':
@@ -48,19 +50,19 @@ class Task:
             completion_date = None
             task_text = line[2:].strip()
         
-        title, description, order = cls._parse_task_text(task_text)
-        return cls(title, description, order, 'done', completion_date, file_idx)
+        title, description, order, categories = cls._parse_task_text(task_text)
+        return cls(title, description, order, 'done', completion_date, file_idx, categories)
 
     @classmethod
     def _parse_in_progress_task(cls, line: str, file_idx: int) -> 'Task':
         """Parse an in-progress task line"""
         task_text = line.replace("status:in_progress", "").strip()
-        title, description, order = cls._parse_task_text(task_text)
-        return cls(title, description, order, 'in_progress', file_idx=file_idx)
+        title, description, order, categories = cls._parse_task_text(task_text)
+        return cls(title, description, order, 'in_progress', file_idx=file_idx, categories=categories)
 
     @classmethod
-    def _parse_task_text(cls, text: str) -> Tuple[str, str, Optional[int]]:
-        """Parse task text to extract title, description, and order from new canonical format"""
+    def _parse_task_text(cls, text: str) -> Tuple[str, str, Optional[int], List[str]]:
+        """Parse task text to extract title, description, order, and categories from new canonical format"""
         import re
         
         # Check if this is the new canonical format (has project: tag)
@@ -76,12 +78,12 @@ class Task:
             order = None
             if len(parts) >= 3 and parts[2].strip().isdigit():
                 order = int(parts[2].strip())
-            return title, description, order
-        return text.strip(), "", None
+            return title, description, order, []
+        return text.strip(), "", None, []
     
     @classmethod
-    def _parse_canonical_format(cls, text: str) -> Tuple[str, str, Optional[int]]:
-        """Parse the new canonical format: project:"name" title note:"description" status:in_progress"""
+    def _parse_canonical_format(cls, text: str) -> Tuple[str, str, Optional[int], List[str]]:
+        """Parse the new canonical format: project:"name" title note:"description" categories:"health,career" status:in_progress"""
         import re
         
         # Extract project name
@@ -100,6 +102,16 @@ class Task:
             # Remove note tag from text
             text = re.sub(r'note:"[^"]*"|note:\S+', '', text).strip()
         
+        # Extract categories
+        categories_match = re.search(r'categories:"([^"]*)"|categories:(\S+)', text)
+        categories = []
+        if categories_match:
+            categories_str = categories_match.group(1) or categories_match.group(2)
+            if categories_str and categories_str != '""':
+                categories = [cat.strip() for cat in categories_str.split(',') if cat.strip()]
+            # Remove categories tag from text
+            text = re.sub(r'categories:"[^"]*"|categories:\S+', '', text).strip()
+        
         # Extract other tags (status, time_minutes, etc.) and remove them
         text = re.sub(r'\s+(?:status|time_minutes|created):[^\s]+', '', text).strip()
         
@@ -110,7 +122,7 @@ class Task:
         if project and project != '""':
             title = f"[{project}] {title}"
         
-        return title, description, None
+        return title, description, None, categories
 
     def to_line(self) -> str:
         """Format task back to todo.txt line format"""
@@ -161,6 +173,14 @@ class Task:
             else:
                 parts.append(f'note:{escaped_description}')
         
+        # Add categories tag if categories exist
+        if self.categories:
+            categories_str = ','.join(self.categories)
+            if ' ' in categories_str:
+                parts.append(f'categories:"{categories_str}"')
+            else:
+                parts.append(f'categories:{categories_str}')
+        
         return ' '.join(parts)
 
     def mark_done(self, completion_date: Optional[str] = None) -> None:
@@ -190,7 +210,8 @@ class Task:
             'title': self.title,
             'description': self.description,
             'order': self.order,
-            'status': self.status
+            'status': self.status,
+            'categories': self.categories
         }
         
         if ui_id is not None:

@@ -296,6 +296,13 @@ class APIClient {
             body: JSON.stringify({ task_order: taskOrder, target_order: targetOrder })
         });
     }
+
+    /**
+     * Get recently updated task categories for notifications
+     */
+    async getCategoryUpdates() {
+        return await this._fetch(`${this.baseURL}/classification/updates`);
+    }
 }
 
 export default APIClient;

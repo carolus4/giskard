@@ -617,12 +617,94 @@ body.dragging .insertion-line {
     min-width: 0;
 }
 
+.task-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
 .task-title {
     font-size: 14px;
     color: #202020;
     line-height: 1.4;
     word-break: break-word;
     font-weight: 500;
+}
+
+.task-categories {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.category-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+}
+
+.category-health {
+    background-color: #e8f5e8;
+    color: #2d5a2d;
+}
+
+.category-career {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.category-learning {
+    background-color: #fff3e0;
+    color: #ef6c00;
+}
+
+/* Task Detail Page Categories */
+.task-title-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.task-categories-detail {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.category-badge-detail {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+}
+
+.category-badge-detail.category-health {
+    background-color: #e8f5e8;
+    color: #2d5a2d;
+}
+
+.category-badge-detail.category-career {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.category-badge-detail.category-learning {
+    background-color: #fff3e0;
+    color: #ef6c00;
 }
 
 .task-description {
@@ -1165,14 +1247,16 @@ body.dragging .insertion-line {
     max-height: 400px;
     resize: vertical;
     font-family: inherit;
-    transition: border-color 0.2s ease;
+    transition: border-color 0.2s ease, min-height 0.2s ease;
     width: 100%;
+    overflow-y: auto;
 }
 
 .description-input:focus {
     outline: none;
     border-color: #dc4c3e;
     box-shadow: 0 0 0 2px rgba(220, 76, 62, 0.1);
+    min-height: 250px;
 }
 
 .description-input::placeholder {

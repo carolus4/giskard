@@ -44,6 +44,7 @@ class TaskList {
         const taskItem = taskEl.querySelector('.task-item');
         const checkbox = taskEl.querySelector('.task-check');
         const title = taskEl.querySelector('.task-title');
+        const categoriesContainer = taskEl.querySelector('.task-categories');
         const startBtn = taskEl.querySelector('.start-btn');
         const stopBtn = taskEl.querySelector('.stop-btn');
         
@@ -61,6 +62,11 @@ class TaskList {
         // Set task content
         if (title) {
             title.textContent = task.title || 'Untitled Task';
+        }
+        
+        // Set categories
+        if (categoriesContainer) {
+            this._renderCategories(categoriesContainer, task.categories || []);
         }
         
         // Add status classes
@@ -101,6 +107,27 @@ class TaskList {
             startBtn.style.display = 'inline-block';
             stopBtn.style.display = 'none';
         }
+    }
+
+    /**
+     * Render category badges for a task
+     */
+    _renderCategories(container, categories) {
+        if (!container) return;
+        
+        // Clear existing categories
+        container.innerHTML = '';
+        
+        if (!categories || categories.length === 0) {
+            return;
+        }
+        
+        categories.forEach(category => {
+            const badge = document.createElement('span');
+            badge.className = `category-badge category-${category}`;
+            badge.textContent = category;
+            container.appendChild(badge);
+        });
     }
 
     /**
@@ -200,6 +227,7 @@ class TaskList {
         if (!taskItem) return;
 
         const title = taskItem.querySelector('.task-title');
+        const categoriesContainer = taskItem.querySelector('.task-categories');
         const checkbox = taskItem.querySelector('.task-check');
         const startBtn = taskItem.querySelector('.start-btn');
         const stopBtn = taskItem.querySelector('.stop-btn');
@@ -207,6 +235,11 @@ class TaskList {
         // Update title
         if (title && updatedTask.title) {
             title.textContent = updatedTask.title;
+        }
+        
+        // Update categories
+        if (categoriesContainer) {
+            this._renderCategories(categoriesContainer, updatedTask.categories || []);
         }
 
         // Update status

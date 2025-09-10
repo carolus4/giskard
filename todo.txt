@@ -1,33 +1,34 @@
-project:"AI Course" Intro Unit - “Prompt Engineering”
-project:Giskard Intentions
-project:giskard Think about history (past chats/tasks) note:"???\n[Todoist] Add completed dates"
-project:Giskard Add categories note:"Let’s list only 3 types of productive time I want to track and improve:\n- health: including mental health or physical activity\n- career: including networking, interviews, interview prep, applications etc\n- learning: including any activity to do with prototyping, building, online courses, or blog post writing"
-project:"AI Skills" Evals note:"Create comprehensive test suite for the todo system"
-project:Giskard Projects
-project:Giskard Notifications note:"Set up push notifications for due tasks and daily reminders"
-project:"AI Personal Assistant" Add activity log
-project:"" Investigate ‘small models’ white paper
-project:Networking Organise out in tech local event note:"[x] messaged the Out in Tech #vancouver slack to check interest for a networking event."
-project:Consulting Follow up on lookpro notes
-x 2025-09-10 project:Learning Review 5 Day GenAI Course note:"Should I do this? Yes.\n https://www.kaggle.com/learn-guide/5-day-genai"
-x 2025-09-10 project:Giskard Bug fixes note:"[x] update task_page.subtitle to include X tasks completed today\n[x] add consistency with Add & Edit pages"
-x 2025-09-09 project:"AI Course" Set Up
-x 2025-09-09 project:"AI Course" Intro Unit - Foundational Large Language Models & Text Generation
-x 2025-09-06 project:giskard Create page based nav note:"Simplifying the logical flow of operations should help avoid the local maximum that got me stuck yesterday"
+x 2025-09-10 project:Giskard Add categories note:"This task is ONLY for the purpose of defining scope on ‘Giskard’ my personal project. this is NOT a health or career task. \n\n\nLet’s list only 3 types of productive time I want to track and improve:\n- health: including mental health or physical activity\n- career: including networking, interviews, interview prep, applications etc\n- learning: including any activity to do with prototyping, building, online courses, or blog post writing" categories:learning
+project:"AI Course" Intro Unit - “Prompt Engineering” categories:learning
+project:giskard How should we display past chats and/or completed tasks? note:"Implement a comprehensive history tracking system for past conversations and completed tasks. \n\nThis will provide valuable insights into productivity patterns and help users understand their work habits better." categories:career,learning
+project:"AI Skills" Evals note:"Create comprehensive test suite for the todo system" categories:career,learning
+project:Giskard Projects categories:learning
+project:Giskard Notifications note:"Test toast notification: Set up push notifications for due tasks and daily reminders. This will help users stay on track with their productivity goals." categories:learning
+project:"AI Personal Assistant" Add activity log categories:learning
+project:"" Investigate ‘small models’ white paper categories:learning
+project:Networking Organise out in tech local event note:"[x] messaged the Out in Tech #vancouver slack to check interest for a networking event." categories:career
+project:Consulting Follow up on lookpro notes categories:career
+x 2025-09-10 project:Learning Review 5 Day GenAI Course note:"Should I do this? Yes.\n https://www.kaggle.com/learn-guide/5-day-genai" categories:learning
+x 2025-09-10 project:Giskard Bug fixes note:"[x] update task_page.subtitle to include X tasks completed today\n[x] add consistency with Add & Edit pages" categories:learning
+x 2025-09-09 project:"AI Course" Set Up categories:learning
+x 2025-09-09 project:"AI Course" Intro Unit - Foundational Large Language Models & Text Generation categories:learning
+x 2025-09-06 project:giskard Create page based nav note:"Simplifying the logical flow of operations should help avoid the local maximum that got me stuck yesterday" categories:learning
 x 2025-09-05 project:Simplify Remove independent web UI from scope
-x 2025-09-05 project:Todoist Clean up UI note:"[x] remove web only view\n[x] remove inbox/upcoming (keep only today)\n[x] fix play / pause bug\n[x] test bugfix\n[x] fix header in task list\n[x] fix header in giskard\n[x] update ‘+ task’ ‘+ chat"
-x 2025-09-03 project:"" LLM integration note:"Integrate Ollama for coaching and review of tasks."
+x 2025-09-05 project:Todoist Clean up UI note:"[x] remove web only view\n[x] remove inbox/upcoming (keep only today)\n[x] fix play / pause bug\n[x] test bugfix\n[x] fix header in task list\n[x] fix header in giskard\n[x] update ‘+ task’ ‘+ chat" categories:career,learning
+x 2025-09-03 project:"" LLM integration note:"Integrate Ollama for coaching and review of tasks." categories:career,learning
 x 2025-09-03 project:"" Todoist → mini_todo
 x 2025-09-03 project:"" Test task from curl note:"Testing API"
-x 2025-09-03 project:"" run 5k
+x 2025-09-03 project:"" run 5k categories:health
 x 2025-09-02 project:"" Test mini_todo.md functionality
 x 2025-09-02 project:"" Make task order draggable note:"Re prioritise; especially for new tasks with high pri"
-x 2025-09-02 project:"" Refactor (>500 line app.py) note:"> analyse this code base and identify opportunities to refactor and simplify. Keep functionality as-is. Present a plan and ask questions as needed before making changes\n\n[x] back-end restructure\n[x] test restructure\n[x] front-end modularisation\n[x] Code Quality Improvements"
+x 2025-09-02 project:"" Refactor (>500 line app.py) note:"> analyse this code base and identify opportunities to refactor and simplify. Keep functionality as-is. Present a plan and ask questions as needed before making changes\n\n[x] back-end restructure\n[x] test restructure\n[x] front-end modularisation\n[x] Code Quality Improvements" categories:career,learning
 x 2025-09-02 project:"" Test todo.txt format conversion
 x 2025-09-02 project:"" Add descriptions note:"Actually, this required creating a whole task pop-out. \nIt's not quite the same as todoist, but it works cleanly for now"
-x 2025-09-02 project:"" create a local app version note:"Let's use this for notifications!"
+x 2025-09-02 project:"" create a local app version note:"Let's use this for notifications!" categories:career
 x 2025-09-02 project:"" Test note:"This was a first test"
 x 2025-09-02 project:"" Test adding a task
 x 2025-09-02 project:"" test
 x 2025-09-02 project:"" Add add task button at the bottom of the page.
-x 2025-01-03 project:"" Coaching Layer
+x 2025-01-03 project:"" Coaching Layer categories:career,learning
+x 2025-09-10 project:"" Refactor - Clean up reordering categories:learning
+x 2025-09-10 project:Swimming 18 Laps note:"Went with James, was nice, if a bit tiring\n4 fc\n4 bs\n2 fc\n8 fc" categories:health
