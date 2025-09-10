@@ -158,7 +158,6 @@ class ClassificationManager:
             # Update tasks in the file
             collection = self.file_manager.load_tasks()
             updated_count = 0
-            updated_tasks = []
             
             for task_data in batch:
                 file_idx = task_data['file_idx']
@@ -170,11 +169,6 @@ class ClassificationManager:
                     
                     if task.categories != old_categories:
                         updated_count += 1
-                        updated_tasks.append({
-                            'title': task.title,
-                            'old_categories': old_categories,
-                            'new_categories': task.categories
-                        })
                         logger.debug(f"Updated task '{task.title}' with categories: {task.categories}")
             
             # Save if any tasks were updated
@@ -182,8 +176,6 @@ class ClassificationManager:
                 self.file_manager.save_tasks(collection)
                 logger.info(f"Updated {updated_count} tasks with new categories")
                 
-                # Store updated tasks info for potential frontend notification
-                self._last_updated_tasks = updated_tasks
             
         except Exception as e:
             logger.error(f"Error processing classification batch: {str(e)}")
@@ -198,12 +190,6 @@ class ClassificationManager:
             'ollama_available': self.classification_service.is_ollama_available()
         }
     
-    def get_last_updated_tasks(self) -> List[Dict[str, Any]]:
-        """Get the last batch of updated tasks for notifications"""
-        tasks = getattr(self, '_last_updated_tasks', [])
-        # Clear after reading to avoid duplicate notifications
-        self._last_updated_tasks = []
-        return tasks
     
     def clear_queue(self):
         """Clear the classification queue"""

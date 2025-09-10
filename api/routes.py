@@ -402,14 +402,6 @@ def start_classification_processing():
         return APIResponse.error(str(e), 500)
 
 
-@api.route('/classification/updates')
-def get_category_updates():
-    """Get recently updated task categories for notifications"""
-    try:
-        updated_tasks = classification_manager.get_last_updated_tasks()
-        return jsonify(APIResponse.success(data={'updated_tasks': updated_tasks}))
-    except Exception as e:
-        return APIResponse.error(str(e), 500)
 
 
 @api.route('/chat', methods=['POST'])

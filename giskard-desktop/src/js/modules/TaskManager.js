@@ -45,9 +45,6 @@ class TaskManager {
         
         // Smart auto-refresh every 30 seconds - only if data changed
         setInterval(() => this._smartRefresh(), 30000);
-        
-        // Check for category updates every 5 seconds
-        setInterval(() => this._checkCategoryUpdates(), 5000);
     }
 
     /**
@@ -214,48 +211,6 @@ class TaskManager {
         await this.loadTasks(false);
     }
 
-    /**
-     * Check for category updates and show notifications
-     */
-    async _checkCategoryUpdates() {
-        try {
-            const result = await this.api.getCategoryUpdates();
-            if (result.success && result.data.updated_tasks.length > 0) {
-                this._showCategoryUpdateNotifications(result.data.updated_tasks);
-            }
-        } catch (error) {
-            // Silently fail - this is a background check
-            console.debug('Category update check failed:', error);
-        }
-    }
-
-    /**
-     * Show toast notifications for updated categories
-     */
-    _showCategoryUpdateNotifications(updatedTasks) {
-        updatedTasks.forEach(task => {
-            const { title, old_categories, new_categories } = task;
-            
-            // Create a friendly message
-            const oldText = old_categories.length > 0 ? old_categories.join(', ') : 'no categories';
-            const newText = new_categories.length > 0 ? new_categories.join(', ') : 'no categories';
-            
-            let message;
-            if (old_categories.length === 0 && new_categories.length > 0) {
-                // New categories added
-                message = `📝 "${title}" categorized as: ${newText}`;
-            } else if (old_categories.length > 0 && new_categories.length === 0) {
-                // Categories removed
-                message = `📝 "${title}" categories removed`;
-            } else {
-                // Categories changed
-                message = `📝 "${title}" updated: ${oldText} → ${newText}`;
-            }
-            
-            // Show notification
-            Notification.info(message);
-        });
-    }
 
     /**
      * Render tasks for the current view
