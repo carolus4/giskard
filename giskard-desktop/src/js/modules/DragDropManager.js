@@ -10,6 +10,8 @@ class DragDropManager {
         this.isDropping = false;
         this.dragOverHandler = null;
         this.dropHandler = null;
+        this.lastReorderTime = 0;
+        this.reorderDebounceMs = 500; // Prevent rapid reorders
     }
 
     /**
@@ -17,6 +19,10 @@ class DragDropManager {
      */
     initializeDragDrop() {
         console.log('🔧 DragDropManager.initializeDragDrop() called');
+        
+        // Clean up existing event listeners first
+        this.cleanup();
+        
         const taskItems = document.querySelectorAll('.task-item');
         console.log(`📝 Found ${taskItems.length} task items to initialize`);
         
@@ -26,6 +32,38 @@ class DragDropManager {
         });
         
         console.log('🎯 DragDropManager initialization complete');
+    }
+    
+    /**
+     * Clean up existing event listeners
+     */
+    cleanup() {
+        console.log('🧹 Cleaning up existing drag-drop listeners');
+        
+        // Remove existing dragover and drop listeners
+        if (this.dragOverHandler && this.dropHandler) {
+            const elements = [
+                document.querySelector('.content-body'),
+                document.querySelector('.task-list'),
+                document.querySelector('.view-container'),
+                document.body
+            ];
+            
+            elements.forEach(element => {
+                if (element) {
+                    element.removeEventListener('dragover', this.dragOverHandler);
+                    element.removeEventListener('drop', this.dropHandler);
+                }
+            });
+        }
+        
+        // Reset state
+        this.draggedTask = null;
+        this.insertionIndex = -1;
+        this.isDropping = false;
+        this.isDragging = false;
+        this.dragOverHandler = null;
+        this.dropHandler = null;
     }
 
     /**
@@ -357,12 +395,31 @@ class DragDropManager {
             console.log('Drop already in progress, ignoring');
             return;
         }
+        
+        // Debounce rapid reorders
+        const now = Date.now();
+        if (now - this.lastReorderTime < this.reorderDebounceMs) {
+            console.log('Reorder debounced, too soon since last reorder');
+            return;
+        }
+        this.lastReorderTime = now;
+        
         this.isDropping = true;
         
         console.log('DROP: Moving task', this.draggedTask.file_idx, 'to visual position', this.insertionIndex);
         
         // Calculate the new file index sequence
         const newFileIdxSequence = this._calculateReorderSequence();
+        
+        // Check if the order actually changed
+        const allVisibleTasks = Array.from(document.querySelectorAll('.task-item'));
+        const currentFileIndices = allVisibleTasks.map(task => parseInt(task.dataset.fileIdx));
+        
+        if (JSON.stringify(currentFileIndices) === JSON.stringify(newFileIdxSequence)) {
+            console.log('No change in order, skipping reorder');
+            this.isDropping = false;
+            return;
+        }
         
         console.log('📝 REORDER: Complete new file index sequence:', newFileIdxSequence);
         
@@ -383,12 +440,20 @@ class DragDropManager {
         // Get all visible tasks in current order (including dragged one)
         const allVisibleTasks = Array.from(document.querySelectorAll('.task-item'));
         
-        // Extract the file indices in their current visual positions
-        const fileIndices = allVisibleTasks.map(task => parseInt(task.dataset.fileIdx));
+        // Extract the file indices in their current visual positions, filtering out invalid ones
+        const fileIndices = allVisibleTasks
+            .map(task => {
+                const fileIdx = task.dataset.fileIdx;
+                return fileIdx && fileIdx !== '' ? parseInt(fileIdx) : null;
+            })
+            .filter(fileIdx => fileIdx !== null);
         
         // Find dragged task position
         const draggedVisualPos = allVisibleTasks.findIndex(
-            item => parseInt(item.dataset.fileIdx) === this.draggedTask.file_idx
+            item => {
+                const fileIdx = item.dataset.fileIdx;
+                return fileIdx && fileIdx !== '' && parseInt(fileIdx) === this.draggedTask.file_idx;
+            }
         );
         
         // Get the file index of the task being dragged
@@ -411,8 +476,14 @@ class DragDropManager {
      * CUSTOM drag start handler for Tauri compatibility
      */
     _customDragStart(event, taskItem) {
-        const fileIdx = parseInt(taskItem.dataset.fileIdx);
+        const fileIdxStr = taskItem.dataset.fileIdx;
+        const fileIdx = fileIdxStr && fileIdxStr !== '' ? parseInt(fileIdxStr) : null;
         const taskTitle = taskItem.querySelector('.task-title')?.textContent || 'Unknown';
+        
+        if (fileIdx === null || isNaN(fileIdx)) {
+            console.error(`❌ Invalid fileIdx for task: "${taskTitle}" - fileIdx: "${fileIdxStr}"`);
+            return;
+        }
         
         console.log(`🎯 CUSTOM DRAG START: "${taskTitle}" - file_idx: ${fileIdx}`);
         
@@ -464,7 +535,7 @@ class DragDropManager {
         console.log(`🔚 CUSTOM DRAG END: ${this.draggedTask?.file_idx} at index ${this.insertionIndex}`);
         
         // Handle drop if valid
-        if (this.isDragging && this.insertionIndex !== -1 && this.draggedTask) {
+        if (this.isDragging && this.insertionIndex !== -1 && this.draggedTask && !this.isDropping) {
             console.log('✅ CUSTOM DROP: Performing reorder');
             this._handleDrop(event);
         }

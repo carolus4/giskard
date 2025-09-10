@@ -54,9 +54,9 @@ class TaskList {
 
         // Set task data attributes
         taskItem.dataset.taskId = task.id || '';
-        taskItem.dataset.fileIdx = task.file_idx || '';
+        taskItem.dataset.fileIdx = task.file_idx !== undefined ? task.file_idx : '';
         taskItem.dataset.status = task.status || 'open';
-        taskItem.dataset.order = task.order || task.file_idx || 0;
+        taskItem.dataset.order = task.order !== undefined ? task.order : (task.file_idx !== undefined ? task.file_idx : 0);
         
         // Set task content
         if (title) {
@@ -284,9 +284,9 @@ class TaskList {
     getTaskDataFromElement(element) {
         return {
             id: element.dataset.taskId,
-            file_idx: parseInt(element.dataset.fileIdx),
+            file_idx: element.dataset.fileIdx ? parseInt(element.dataset.fileIdx) : null,
             status: element.dataset.status,
-            order: parseInt(element.dataset.order),
+            order: element.dataset.order ? parseInt(element.dataset.order) : null,
             title: element.querySelector('.task-title')?.textContent || ''
         };
     }

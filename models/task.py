@@ -60,7 +60,14 @@ class Task:
 
     @classmethod
     def _parse_task_text(cls, text: str) -> Tuple[str, str, Optional[int]]:
-        """Parse task text to extract title, description, and order"""
+        """Parse task text to extract title, description, and order from new canonical format"""
+        import re
+        
+        # Check if this is the new canonical format (has project: tag)
+        if "project:" in text:
+            return cls._parse_canonical_format(text)
+        
+        # Fallback to old format for backward compatibility
         if " | " in text:
             parts = text.split(" | ")
             title = parts[0].strip()
@@ -71,6 +78,39 @@ class Task:
                 order = int(parts[2].strip())
             return title, description, order
         return text.strip(), "", None
+    
+    @classmethod
+    def _parse_canonical_format(cls, text: str) -> Tuple[str, str, Optional[int]]:
+        """Parse the new canonical format: project:"name" title note:"description" status:in_progress"""
+        import re
+        
+        # Extract project name
+        project_match = re.search(r'project:"([^"]*)"|project:(\S+)', text)
+        project = ""
+        if project_match:
+            project = project_match.group(1) or project_match.group(2)
+            # Remove project tag from text
+            text = re.sub(r'project:"[^"]*"|project:\S+', '', text).strip()
+        
+        # Extract note/description
+        note_match = re.search(r'note:"([^"]*)"|note:(\S+)', text)
+        description = ""
+        if note_match:
+            description = note_match.group(1) or note_match.group(2)
+            # Remove note tag from text
+            text = re.sub(r'note:"[^"]*"|note:\S+', '', text).strip()
+        
+        # Extract other tags (status, time_minutes, etc.) and remove them
+        text = re.sub(r'\s+(?:status|time_minutes|created):[^\s]+', '', text).strip()
+        
+        # What's left is the title
+        title = text.strip()
+        
+        # Format title as [Project] Title if project exists
+        if project and project != '""':
+            title = f"[{project}] {title}"
+        
+        return title, description, None
 
     def to_line(self) -> str:
         """Format task back to todo.txt line format"""
@@ -87,20 +127,41 @@ class Task:
             return task_text
 
     def _format_task_text(self) -> str:
-        """Format task title, description, and order for storage"""
-        result = self.title
+        """Format task title, description, and order for storage in new canonical format"""
+        import re
+        
+        # Extract project from title if it's in [Project] format
+        project = ""
+        title = self.title
+        project_match = re.match(r'^\[([^\]]+)\]\s*(.+)$', self.title)
+        if project_match:
+            project = project_match.group(1)
+            title = project_match.group(2)
+        
+        # Build canonical format
+        parts = []
+        
+        # Add project tag
+        if project:
+            if ' ' in project:
+                parts.append(f'project:"{project}"')
+            else:
+                parts.append(f'project:{project}')
+        else:
+            parts.append('project:""')
+        
+        # Add title
+        parts.append(title)
+        
+        # Add note tag if description exists
         if self.description:
-            # Escape newlines in description to keep todo.txt single-line per task
             escaped_description = self.description.replace("\n", "\\n")
-            result += f" | {escaped_description}"
-        elif self.order is not None:
-            # If we have an order but no description, add empty description with space
-            result += " | "
+            if ' ' in escaped_description:
+                parts.append(f'note:"{escaped_description}"')
+            else:
+                parts.append(f'note:{escaped_description}')
         
-        if self.order is not None:
-            result += f" | {self.order}"
-        
-        return result
+        return ' '.join(parts)
 
     def mark_done(self, completion_date: Optional[str] = None) -> None:
         """Mark task as done with optional completion date"""
@@ -179,18 +240,22 @@ class TaskCollection:
         return lines
 
     def get_by_status(self) -> Tuple[List[Task], List[Task], List[Task]]:
-        """Get tasks grouped by status: (open, in_progress, done)"""
+        """Get tasks grouped by status: (open, in_progress, done) - File-Order-First approach"""
         open_tasks = [t for t in self.tasks if t.status == 'open']
         in_progress_tasks = [t for t in self.tasks if t.status == 'in_progress']
         done_tasks = [t for t in self.tasks if t.status == 'done']
         
-        # Sort by order (None orders go to end)
-        def sort_by_order(tasks):
-            return sorted(tasks, key=lambda x: x.order if x.order is not None else float('inf'))
+        # For File-Order-First, sort by file_idx (file position)
+        def sort_by_file_position(tasks):
+            return sorted(tasks, key=lambda x: x.file_idx if x.file_idx is not None else float('inf'))
         
-        return (sort_by_order(open_tasks), 
-                sort_by_order(in_progress_tasks), 
-                sort_by_order(done_tasks))
+        # Sort completed tasks by completion date descending, then by file position
+        def sort_completed_tasks(tasks):
+            return sorted(tasks, key=lambda x: (x.completion_date or '', x.file_idx if x.file_idx is not None else float('inf')), reverse=True)
+        
+        return (sort_by_file_position(open_tasks), 
+                sort_by_file_position(in_progress_tasks), 
+                sort_completed_tasks(done_tasks))
 
     def assign_missing_orders(self) -> int:
         """Auto-assign order numbers to tasks that don't have them"""
@@ -245,16 +310,27 @@ class TaskCollection:
                 task.order = order_mapping[task.order]
 
     def reorder_by_file_indices(self, file_idx_sequence: List[int]) -> None:
-        """Reorder tasks using file indices in desired order"""
-        # Create a mapping of file_idx -> new_order
-        file_idx_to_order = {}
+        """Reorder tasks using file indices in desired order - File-Order-First approach"""
+        # For File-Order-First, we need to reorder the tasks list itself
+        # Create a mapping of file_idx -> new position
+        file_idx_to_position = {}
         for new_position, file_idx in enumerate(file_idx_sequence):
-            file_idx_to_order[file_idx] = new_position + 1
+            file_idx_to_position[file_idx] = new_position
         
-        # Update orders based on file indices
-        for task in self.tasks:
-            if task.file_idx in file_idx_to_order:
-                task.order = file_idx_to_order[task.file_idx]
+        # Sort tasks by their new position in the file
+        def get_sort_key(task):
+            if task.file_idx in file_idx_to_position:
+                return file_idx_to_position[task.file_idx]
+            else:
+                # Keep tasks not in the sequence at the end
+                return float('inf')
+        
+        # Sort tasks by their new file position
+        self.tasks.sort(key=get_sort_key)
+        
+        # Update file_idx to match new positions
+        for new_position, task in enumerate(self.tasks):
+            task.file_idx = new_position
 
     def __len__(self) -> int:
         return len(self.tasks)
