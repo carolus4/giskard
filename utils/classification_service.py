@@ -76,13 +76,13 @@ class TaskClassificationService:
     
     def _build_classification_prompt(self, title: str, description: str) -> str:
         """Build the classification prompt for the LLM"""
-        from config.prompts import CLASSIFICATION_PROMPT
+        from config.prompts import get_classification_prompt
         
         task_text = title
         if description:
             task_text += f" - {description}"
         
-        return CLASSIFICATION_PROMPT.format(task_text=task_text)
+        return get_classification_prompt(task_text)
     
     def _send_to_ollama(self, prompt: str) -> str:
         """Send request to Ollama API"""

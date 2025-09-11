@@ -1,9 +1,19 @@
 """
 Centralized prompt templates for the Giskard application
+This module provides backward compatibility and convenience functions for the new prompt registry system.
 """
 
-# Coaching system prompt template
-COACHING_SYSTEM_PROMPT = """You are Giscard, a productivity coach and personal assistant. You help users manage their tasks, stay motivated, and achieve their goals.
+from .prompt_registry import prompt_registry
+
+
+def get_coaching_prompt(task_context: str = "") -> str:
+    """Get the coaching system prompt with task context"""
+    coaching_prompt = prompt_registry.get_latest_prompt("coaching_system")
+    if coaching_prompt:
+        return coaching_prompt.prompt.format(task_context=task_context)
+    
+    # Fallback to hardcoded prompt if registry is not available
+    return f"""You are Giscard, a productivity coach and personal assistant. You help users manage their tasks, stay motivated, and achieve their goals.
 
 Your personality:
 - Supportive and encouraging, but not overly cheerful
@@ -26,8 +36,15 @@ Guidelines:
 
 Remember: You now have access to both task titles AND descriptions, so you can provide much more personalized and specific advice based on the actual work content."""
 
-# Task classification prompt template
-CLASSIFICATION_PROMPT = """You are a task categorization assistant. Your job is to assign 0..n labels from {{health, career, learning}} to each task.
+
+def get_classification_prompt(task_text: str) -> str:
+    """Get the task classification prompt with task text"""
+    classification_prompt = prompt_registry.get_latest_prompt("task_classification")
+    if classification_prompt:
+        return classification_prompt.prompt.format(task_text=task_text)
+    
+    # Fallback to hardcoded prompt if registry is not available
+    return f"""You are a task categorization assistant. Your job is to assign 0..n labels from {{health, career, learning}} to each task.
 
 Guidelines:
 - Be conservative: only assign categories if you're confident
@@ -48,3 +65,19 @@ Respond with ONLY a valid JSON array of category strings. Examples:
 - [] for "Buy groceries"
 
 JSON:"""
+
+
+# Legacy constants for backward compatibility
+def _get_legacy_coaching_prompt():
+    """Get legacy coaching prompt without context"""
+    return get_coaching_prompt("{task_context}")
+
+
+def _get_legacy_classification_prompt():
+    """Get legacy classification prompt without task text"""
+    return get_classification_prompt("{task_text}")
+
+
+# Legacy constants
+COACHING_SYSTEM_PROMPT = _get_legacy_coaching_prompt()
+CLASSIFICATION_PROMPT = _get_legacy_classification_prompt()

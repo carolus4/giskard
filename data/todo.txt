@@ -1,13 +1,17 @@
-x 2025-09-10 project:Giskard Add categories note:"This task is ONLY for the purpose of defining scope on ‘Giskard’ my personal project. this is NOT a health or career task. \n\n\nLet’s list only 3 types of productive time I want to track and improve:\n- health: including mental health or physical activity\n- career: including networking, interviews, interview prep, applications etc\n- learning: including any activity to do with prototyping, building, online courses, or blog post writing" categories:learning
-project:"AI Course" Intro Unit - “Prompt Engineering” categories:learning
+project:"Interview Prep" 2025-09-11 Session note:"With Peter and Nikki\nend-to-end project" categories:career,learning status:in_progress
+project:"AI Course" Intro Unit - “Prompt Engineering” - Workings note:"[ ] Complete these codelabs on Kaggle:\n[ ] Prompting fundamentals\n[ ] Evaluation and structured data\n[x] Make sure you phone verify your account before starting, it's necessary for the codelabs\n[ ] Want to have an interactive conversation? Try adding the whitepapers to NotebookLM" categories:learning
+project:"" Look for next 3 jobs to apply to categories:career
+project:Networking Organise out in tech local event note:"[x] messaged the Out in Tech #vancouver slack to check interest for a networking event." categories:career
 project:giskard How should we display past chats and/or completed tasks? note:"This is ONLY a learning project; NOT a career project.\n\nImplement a comprehensive history tracking system for past conversations and completed tasks. \n\nThis will provide valuable insights into productivity patterns and help users understand their work habits better." categories:learning
 project:"AI Skills" Evals note:"Create comprehensive test suite for the todo system" categories:career,learning
 project:Giskard Projects categories:learning
 project:Giskard Notifications note:"Test toast notification: Set up push notifications for due tasks and daily reminders. This will help users stay on track with their productivity goals." categories:learning
 project:"AI Personal Assistant" Add activity log categories:learning
 project:"" Investigate ‘small models’ white paper categories:learning
-project:Networking Organise out in tech local event note:"[x] messaged the Out in Tech #vancouver slack to check interest for a networking event." categories:career
 project:Consulting Follow up on lookpro notes categories:career
+project:Networking Follow up with Ian at Stanford (tree of thought) note:"See if I can get good content for blog post.\n\nhttps://www.linkedin.com/in/ian--huang/\n\nhttps://arxiv.org/pdf/2305.10601" categories:career,learning
+x 2025-09-11 project:"AI Course" Intro Unit - “Prompt Engineering” - Readings note:"Link to notes: https://docs.google.com/document/d/1SV8yb9ykEr3g7jpun6Q5zsAy_myeiosjRI_2s-bo0K8/edit?tab=t.1w4h07w1ke9t\n\n[x] Listen to the summary podcast episode for this unit.\n[x] read the “Prompt Engineering” whitepaper." categories:learning
+x 2025-09-10 project:Giskard Add categories note:"This task is ONLY for the purpose of defining scope on ‘Giskard’ my personal project. this is NOT a health or career task. \n\n\nLet’s list only 3 types of productive time I want to track and improve:\n- health: including mental health or physical activity\n- career: including networking, interviews, interview prep, applications etc\n- learning: including any activity to do with prototyping, building, online courses, or blog post writing" categories:learning
 x 2025-09-10 project:Learning Review 5 Day GenAI Course note:"Should I do this? Yes.\n https://www.kaggle.com/learn-guide/5-day-genai" categories:learning
 x 2025-09-10 project:Giskard Bug fixes note:"[x] update task_page.subtitle to include X tasks completed today\n[x] add consistency with Add & Edit pages" categories:learning
 x 2025-09-09 project:"AI Course" Set Up categories:learning
