@@ -78,7 +78,6 @@ class TaskManager {
 
         // Toggle progress from page
         document.addEventListener('task:toggle-progress-from-page', (e) => {
-            console.log('TaskManager received task:toggle-progress-from-page event:', e.detail);
             this._handleToggleProgressFromPage(e.detail);
         });
 
@@ -342,8 +341,10 @@ class TaskManager {
         if (result.success) {
             await this.loadTasks();
             Notification.success('Task completed!');
+            return true;
         } else {
             Notification.error(result.error || 'Failed to complete task');
+            return false;
         }
     }
 
@@ -356,8 +357,10 @@ class TaskManager {
         if (result.success) {
             await this.loadTasks();
             Notification.success('Task uncompleted!');
+            return true;
         } else {
             Notification.error(result.error || 'Failed to uncomplete task');
+            return false;
         }
     }
 
@@ -509,12 +512,18 @@ class TaskManager {
         }
         
         // Then toggle the completion state
+        let success = false;
         if (task.status === 'done') {
             // Uncomplete the task
-            await this._handleUncompleteTask(task);
+            success = await this._handleUncompleteTask(task);
         } else if (checked) {
             // Complete the task
-            await this._handleCompleteTask(task);
+            success = await this._handleCompleteTask(task);
+        }
+        
+        // Close the detail page after successful completion/uncompletion
+        if (success) {
+            this.pageManager.showPage('task-list');
         }
     }
 

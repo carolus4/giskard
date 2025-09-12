@@ -78,6 +78,16 @@ class PageManager {
      * Bind form events for page-specific functionality
      */
     _bindPageFormEvents() {
+        // This method is now mainly for general page events
+        // Detail page events are bound in _bindDetailPageEvents()
+    }
+
+    /**
+     * Bind detail page events when the detail page is loaded
+     */
+    _bindDetailPageEvents() {
+        // Remove existing event listeners to avoid duplicates
+        this._unbindDetailPageEvents();
 
         // Task detail page form
         const saveTaskBtn = document.getElementById('save-task-btn');
@@ -86,34 +96,38 @@ class PageManager {
         const detailCheckbox = document.getElementById('detail-checkbox');
 
         if (saveTaskBtn) {
-            saveTaskBtn.addEventListener('click', () => {
+            this._saveTaskHandler = () => {
                 this._handleSaveTaskFromPage();
-            });
+            };
+            saveTaskBtn.addEventListener('click', this._saveTaskHandler);
         }
 
         if (detailDeleteBtn) {
-            detailDeleteBtn.addEventListener('click', () => {
+            this._deleteTaskHandler = () => {
                 this._handleDeleteTaskFromPage();
-            });
+            };
+            detailDeleteBtn.addEventListener('click', this._deleteTaskHandler);
         }
 
         if (detailProgressBtn) {
-            detailProgressBtn.addEventListener('click', (e) => {
+            this._progressHandler = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 console.log('Progress button clicked, currentTaskId:', this.currentTaskId);
                 this._handleToggleProgressFromPage();
-            });
+            };
+            detailProgressBtn.addEventListener('click', this._progressHandler);
         }
 
         if (detailCheckbox) {
-            detailCheckbox.addEventListener('change', (e) => {
+            this._checkboxHandler = (e) => {
                 this._handleToggleCompletionFromPage(e.target.checked);
-            });
+            };
+            detailCheckbox.addEventListener('change', this._checkboxHandler);
         }
 
         // Keyboard shortcuts for task detail page
-        document.addEventListener('keydown', (e) => {
+        this._keyboardHandler = (e) => {
             if (this.currentPage === 'task-detail') {
                 // Cmd+Enter or Ctrl+Enter to save
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -128,7 +142,38 @@ class PageManager {
                     }
                 }
             }
-        });
+        };
+        document.addEventListener('keydown', this._keyboardHandler);
+    }
+
+    /**
+     * Unbind detail page events to prevent duplicates
+     */
+    _unbindDetailPageEvents() {
+        const saveTaskBtn = document.getElementById('save-task-btn');
+        const detailDeleteBtn = document.getElementById('detail-delete-btn');
+        const detailProgressBtn = document.getElementById('detail-progress-btn');
+        const detailCheckbox = document.getElementById('detail-checkbox');
+
+        if (saveTaskBtn && this._saveTaskHandler) {
+            saveTaskBtn.removeEventListener('click', this._saveTaskHandler);
+        }
+
+        if (detailDeleteBtn && this._deleteTaskHandler) {
+            detailDeleteBtn.removeEventListener('click', this._deleteTaskHandler);
+        }
+
+        if (detailProgressBtn && this._progressHandler) {
+            detailProgressBtn.removeEventListener('click', this._progressHandler);
+        }
+
+        if (detailCheckbox && this._checkboxHandler) {
+            detailCheckbox.removeEventListener('change', this._checkboxHandler);
+        }
+
+        if (this._keyboardHandler) {
+            document.removeEventListener('keydown', this._keyboardHandler);
+        }
     }
 
     /**
@@ -294,7 +339,7 @@ class PageManager {
      * Handle deleting task from page
      */
     async _handleDeleteTaskFromPage() {
-        if (!this.currentTaskId) return;
+        if (this.currentTaskId === null || this.currentTaskId === undefined) return;
 
         // Dispatch event to TaskManager
         document.dispatchEvent(new CustomEvent('task:delete-from-page', {
@@ -306,13 +351,10 @@ class PageManager {
      * Handle toggling progress from page
      */
     async _handleToggleProgressFromPage() {
-        console.log('_handleToggleProgressFromPage called, currentTaskId:', this.currentTaskId);
-        if (!this.currentTaskId) {
-            console.log('No currentTaskId, returning');
+        if (this.currentTaskId === null || this.currentTaskId === undefined) {
             return;
         }
 
-        console.log('Dispatching task:toggle-progress-from-page event');
         // Dispatch event to TaskManager
         document.dispatchEvent(new CustomEvent('task:toggle-progress-from-page', {
             detail: { taskId: this.currentTaskId }
@@ -323,7 +365,9 @@ class PageManager {
      * Handle toggling completion from page
      */
     async _handleToggleCompletionFromPage(checked) {
-        if (!this.currentTaskId) return;
+        if (this.currentTaskId === null || this.currentTaskId === undefined) {
+            return;
+        }
 
         // Dispatch event to TaskManager
         document.dispatchEvent(new CustomEvent('task:toggle-completion-from-page', {
@@ -350,6 +394,9 @@ class PageManager {
         if (categoriesContainer) {
             this._renderCategoriesInDetail(categoriesContainer, taskData.categories || []);
         }
+        
+        // Bind detail page events when elements are available
+        this._bindDetailPageEvents();
         
         if (descriptionInput) {
             // Unescape newlines for display in textarea
