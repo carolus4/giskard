@@ -67,15 +67,20 @@ def get_tasks():
         # Calculate counts for sidebar
         today_count = len(in_progress_tasks) + len(open_tasks)
         
-        # Count completed tasks for today
+        # Count completed tasks for today and yesterday
+        from datetime import timedelta
         today_date = datetime.now().strftime('%Y-%m-%d')
+        yesterday_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        
         completed_today_count = sum(1 for task in done_tasks if task.completion_date == today_date)
+        completed_yesterday_count = sum(1 for task in done_tasks if task.completion_date == yesterday_date)
         
         return jsonify({
             'tasks': ui_tasks,
             'counts': {
                 'today': today_count,
-                'completed_today': completed_today_count
+                'completed_today': completed_today_count,
+                'completed_yesterday': completed_yesterday_count
             },
             'today_date': datetime.now().strftime('Today - %A %b %d')
         })
@@ -442,6 +447,8 @@ def chat():
 
 def _build_task_context(open_tasks, in_progress_tasks, done_tasks):
     """Build context about current tasks with descriptions"""
+    from datetime import datetime, timedelta
+    
     context = []
     
     if in_progress_tasks:
@@ -460,10 +467,24 @@ def _build_task_context(open_tasks, in_progress_tasks, done_tasks):
             else:
                 context.append(f"- {task.title}")
     
-    completed_today = [t for t in done_tasks if t.completion_date == datetime.now().strftime("%Y-%m-%d")]
+    # Calculate completed today and yesterday
+    today_date = datetime.now().strftime("%Y-%m-%d")
+    yesterday_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    completed_today = [t for t in done_tasks if t.completion_date == today_date]
+    completed_yesterday = [t for t in done_tasks if t.completion_date == yesterday_date]
+    
     if completed_today:
         context.append(f"\nCompleted today ({len(completed_today)} tasks):")
         for task in completed_today[:5]:
+            if task.description and task.description.strip():
+                context.append(f"- {task.title}: {task.description}")
+            else:
+                context.append(f"- {task.title}")
+    
+    if completed_yesterday:
+        context.append(f"\nCompleted yesterday ({len(completed_yesterday)} tasks):")
+        for task in completed_yesterday[:5]:
             if task.description and task.description.strip():
                 context.append(f"- {task.title}: {task.description}")
             else:
