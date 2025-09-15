@@ -151,12 +151,10 @@ class TaskManager {
      */
     async loadTasks(allowAnimation = false, retryCount = 0) {
         try {
-            console.log(`🔄 Loading tasks (attempt ${retryCount + 1})...`);
             const result = await this.api.getTasks();
             
             if (!result.success) {
                 if (retryCount < 2) {
-                    console.log(`⏳ Retrying in ${(retryCount + 1) * 2}s...`);
                     setTimeout(() => {
                         this.loadTasks(allowAnimation, retryCount + 1);
                     }, (retryCount + 1) * 2000);
@@ -186,11 +184,9 @@ class TaskManager {
                 // Reinitialize drag drop after rendering
                 setTimeout(() => {
                     const taskItems = document.querySelectorAll('.task-item');
-                    console.log(`🔧 Reinitializing drag-drop for ${taskItems.length} tasks`);
                     
                     try {
                         this.dragDrop.initializeDragDrop();
-                        console.log('✅ Drag-drop setup complete');
                     } catch (error) {
                         console.error('❌ Drag-drop failed:', error);
                     }
@@ -433,12 +429,9 @@ class TaskManager {
      * Handle task reordering
      */
     async _handleReorderTasks(fileIdxSequence) {
-        console.log('🔄 REORDERING with file index sequence:', fileIdxSequence);
-        
         const result = await this.api.reorderTasks(fileIdxSequence);
         
         if (result.success) {
-            console.log('✅ Tasks reordered successfully');
             await this.loadTasks();
         } else {
             console.error('❌ Reorder failed:', result.error);

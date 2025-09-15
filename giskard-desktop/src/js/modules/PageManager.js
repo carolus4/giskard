@@ -43,6 +43,7 @@ class PageManager {
         const addTaskSimpleBtn = document.getElementById('add-task-simple-btn');
         if (addTaskSimpleBtn) {
             addTaskSimpleBtn.addEventListener('click', () => {
+                console.log('Add task simple button clicked');
                 this.showAddTask();
             });
         }
@@ -50,6 +51,7 @@ class PageManager {
         const addTaskPlusBtn = document.getElementById('add-task-plus-btn');
         if (addTaskPlusBtn) {
             addTaskPlusBtn.addEventListener('click', (e) => {
+                console.log('Add task plus button clicked');
                 e.stopPropagation();
                 this.showAddTask();
             });
@@ -224,8 +226,11 @@ class PageManager {
      * Show add task page (using task detail page)
      */
     showAddTask() {
+        console.log('showAddTask called');
         this.showPage('task-detail', 'new');
+        console.log('After showPage, currentTaskId:', this.currentTaskId);
         this._setupAddTaskMode();
+        console.log('After _setupAddTaskMode');
     }
 
     /**
@@ -259,6 +264,8 @@ class PageManager {
      * Setup add task mode in task detail page
      */
     _setupAddTaskMode() {
+        console.log('_setupAddTaskMode called');
+        
         const titleInput = document.getElementById('detail-title');
         const descriptionInput = document.getElementById('detail-description');
         const categoriesContainer = document.getElementById('task-categories-detail');
@@ -267,6 +274,13 @@ class PageManager {
         const deleteBtn = document.getElementById('detail-delete-btn');
         const saveBtn = document.getElementById('save-task-btn');
         const titleHeader = document.querySelector('.task-title-header');
+
+        console.log('Found elements:', {
+            titleInput: !!titleInput,
+            descriptionInput: !!descriptionInput,
+            saveBtn: !!saveBtn,
+            titleHeader: !!titleHeader
+        });
 
         // Clear all fields
         if (titleInput) titleInput.value = '';
@@ -284,6 +298,9 @@ class PageManager {
             saveBtn.textContent = 'Add task';
             saveBtn.classList.remove('save-btn');
             saveBtn.classList.add('add-btn');
+            console.log('Save button updated:', saveBtn.textContent);
+        } else {
+            console.log('Save button not found!');
         }
 
         // Update title header styling
@@ -293,8 +310,17 @@ class PageManager {
 
         // Focus on title input
         setTimeout(() => {
-            if (titleInput) titleInput.focus();
+            if (titleInput) {
+                titleInput.focus();
+                console.log('Focused on title input');
+            } else {
+                console.log('Title input not found for focus');
+            }
         }, 100);
+        
+        // Bind detail page events for add mode
+        console.log('Binding detail page events for add mode');
+        this._bindDetailPageEvents();
     }
 
     /**
@@ -304,7 +330,14 @@ class PageManager {
         const titleInput = document.getElementById('detail-title');
         const descriptionInput = document.getElementById('detail-description');
         
+        console.log('_handleSaveTaskFromPage called', { 
+            currentTaskId: this.currentTaskId, 
+            titleValue: titleInput?.value,
+            hasTitleInput: !!titleInput 
+        });
+        
         if (!titleInput || !titleInput.value.trim()) {
+            console.log('No title input or empty title, returning');
             return;
         }
 
@@ -316,6 +349,7 @@ class PageManager {
                 description: descriptionInput?.value.trim() || ''
             };
 
+            console.log('Dispatching task:add-from-page event with data:', taskData);
             // Dispatch event to TaskManager
             document.dispatchEvent(new CustomEvent('task:add-from-page', {
                 detail: taskData
@@ -328,6 +362,7 @@ class PageManager {
                 description: descriptionInput?.value.trim() || ''
             };
 
+            console.log('Dispatching task:save-from-page event with data:', taskData);
             // Dispatch event to TaskManager
             document.dispatchEvent(new CustomEvent('task:save-from-page', {
                 detail: taskData

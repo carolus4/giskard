@@ -88,3 +88,20 @@ window.checkChatStorage = () => {
     const stored = localStorage.getItem('giscard_chat_history');
     console.log('💾 Chat storage:', stored ? JSON.parse(stored) : 'empty');
 };
+
+// Drag and drop debug functions
+window.enableDragDebug = () => {
+    if (window.__giskardApp?.taskManager?.dragDrop) {
+        window.__giskardApp.taskManager.dragDrop.enableDebug();
+    } else {
+        console.log('❌ DragDropManager not found. App:', !!window.__giskardApp);
+    }
+};
+
+window.disableDragDebug = () => {
+    if (window.__giskardApp?.taskManager?.dragDrop) {
+        window.__giskardApp.taskManager.dragDrop.disableDebug();
+    } else {
+        console.log('❌ DragDropManager not found. App:', !!window.__giskardApp);
+    }
+};
