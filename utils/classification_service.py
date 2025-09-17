@@ -35,7 +35,7 @@ class TaskClassificationService:
         """Warm up the model by sending a simple request to keep it loaded"""
         try:
             warmup_prompt = "Classify this task: test"
-            warmup_response = self._send_to_ollama(warmup_prompt)
+            warmup_response, _ = self._send_to_ollama(warmup_prompt)
             logger.info("Model warmup successful")
             return True
         except Exception as e:
@@ -55,7 +55,7 @@ class TaskClassificationService:
             task_text = f"{title} - {description}" if description else title
             if len(task_text) > 1000:  # Skip tasks longer than 1000 characters
                 logger.warning(f"Skipping very long task (>{len(task_text)} chars): {title[:50]}...")
-                self._log_classification(title, description, [], "SKIPPED: Task too long")
+                self._log_classification(title, description, [], "SKIPPED: Task too long", None)
                 return []
             
             # Clean URLs from task text but don't skip the task
@@ -72,7 +72,7 @@ class TaskClassificationService:
             # If after cleaning we have very little content, skip
             if len(cleaned_text) < 10:
                 logger.warning(f"Skipping task with insufficient content after URL removal: {title[:50]}...")
-                self._log_classification(title, description, [], "SKIPPED: Insufficient content after URL removal")
+                self._log_classification(title, description, [], "SKIPPED: Insufficient content after URL removal", None)
                 return []
             
             # Use cleaned text for classification
@@ -89,13 +89,13 @@ class TaskClassificationService:
             prompt = self._build_classification_prompt(clean_title, clean_description)
             
             # Send to Ollama
-            response = self._send_to_ollama(prompt)
+            response, metrics = self._send_to_ollama(prompt)
             
             # Parse response
             categories = self._parse_classification_response(response)
             
             # Log the classification
-            self._log_classification(title, description, categories, response)
+            self._log_classification(title, description, categories, response, metrics)
             
             return categories
             
@@ -103,7 +103,7 @@ class TaskClassificationService:
             logger.error(f"Classification failed for task '{title}': {str(e)}")
             # Try simple keyword-based classification as fallback
             fallback_categories = self._simple_keyword_classification(title, description)
-            self._log_classification(title, description, fallback_categories, f"FALLBACK: {str(e)}")
+            self._log_classification(title, description, fallback_categories, f"FALLBACK: {str(e)}", None)
             return fallback_categories
     
     def _simple_keyword_classification(self, title: str, description: str) -> List[str]:
@@ -177,8 +177,15 @@ class TaskClassificationService:
         
         return get_classification_prompt(task_text)
     
-    def _send_to_ollama(self, prompt: str, max_retries: int = 1) -> str:
-        """Send request to Ollama API with retry logic"""
+    def _send_to_ollama(self, prompt: str, max_retries: int = 1) -> tuple[str, dict]:
+        """Send request to Ollama API with retry logic
+        
+        Returns:
+            tuple: (response_text, metrics_dict) where metrics contains:
+                - response_time_ms: int - time taken for response in milliseconds
+                - prompt_tokens: int - number of tokens in the prompt
+                - response_tokens: int - number of tokens in the response
+        """
         from config.ollama_config import CLASSIFICATION_CONFIG, REQUEST_TIMEOUT
         import time
         
@@ -187,16 +194,38 @@ class TaskClassificationService:
             "prompt": prompt
         }
         
+        # Count tokens in prompt (rough estimation)
+        prompt_tokens = len(prompt.split())  # Simple word-based token estimation
+        
         for attempt in range(max_retries):
             try:
                 # Use consistent timeout for all attempts
                 timeout = REQUEST_TIMEOUT
                 
+                # Record start time
+                start_time = time.time()
+                
                 response = requests.post(self.ollama_url, json=payload, timeout=timeout)
                 response.raise_for_status()
                 
+                # Record end time
+                end_time = time.time()
+                response_time_ms = int((end_time - start_time) * 1000)
+                
                 result = response.json()
-                return result.get('response', '').strip()
+                response_text = result.get('response', '').strip()
+                
+                # Count tokens in response (rough estimation)
+                response_tokens = len(response_text.split())
+                
+                # Create metrics dictionary
+                metrics = {
+                    'response_time_ms': response_time_ms,
+                    'prompt_tokens': prompt_tokens,
+                    'response_tokens': response_tokens
+                }
+                
+                return response_text, metrics
                 
             except requests.exceptions.Timeout as e:
                 if attempt < max_retries - 1:
@@ -249,7 +278,7 @@ class TaskClassificationService:
             logger.warning(f"Unexpected error parsing response '{response}': {str(e)}")
             return []
     
-    def _log_classification(self, title: str, description: str, categories: List[str], raw_response: str):
+    def _log_classification(self, title: str, description: str, categories: List[str], raw_response: str, metrics: dict = None):
         """Log the classification result to file"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         task_text = title
@@ -262,6 +291,14 @@ class TaskClassificationService:
             "categories": categories,
             "raw_response": raw_response
         }
+        
+        # Add metrics if provided
+        if metrics:
+            log_entry.update({
+                "response_time_ms": metrics.get('response_time_ms'),
+                "prompt_tokens": metrics.get('prompt_tokens'),
+                "response_tokens": metrics.get('response_tokens')
+            })
         
         try:
             with open(self.log_file, 'a', encoding='utf-8') as f:
