@@ -9,7 +9,7 @@ OLLAMA_BASE_URL = "http://localhost:11434/api/generate"
 DEFAULT_MODEL = "llama3.1:8b"
 
 # Request timeout in seconds
-REQUEST_TIMEOUT = 30
+REQUEST_TIMEOUT = 60  # Reduced back to 30 seconds with better handling
 
 
 def get_prompt_config(prompt_name: str, version: str = None):

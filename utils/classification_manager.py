@@ -142,11 +142,14 @@ class ClassificationManager:
             self.classification_queue.clear()
             return
         
+        # Warm up the model to ensure it's loaded and ready
+        self.classification_service.warmup_model()
+        
         self.is_processing = True
         
         try:
-            # Take up to 10 tasks from the queue
-            batch_size = min(10, len(self.classification_queue))
+            # Take up to 5 tasks from the queue (reduced from 10 to prevent timeouts)
+            batch_size = min(5, len(self.classification_queue))
             batch = self.classification_queue[:batch_size]
             self.classification_queue = self.classification_queue[batch_size:]
             
