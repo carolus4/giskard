@@ -6,6 +6,10 @@
 echo "🚀 Starting Giskard - AI-Powered Productivity Coach"
 echo "=================================================="
 
+# Set GPU acceleration for Ollama
+export OLLAMA_GPU_LAYERS=999
+echo "🔧 Configured Ollama for GPU acceleration (OLLAMA_GPU_LAYERS=999)"
+
 # Check if Ollama is installed
 if ! command -v ollama &> /dev/null; then
     echo "❌ Ollama is not installed. Please install it from https://ollama.ai"
@@ -26,6 +30,35 @@ fi
 
 echo "✅ All prerequisites found"
 
+# Function to check if a model is currently running
+check_model_running() {
+    local model_name="$1"
+    if ollama ps | grep -q "$model_name"; then
+        return 0  # Model is running
+    else
+        return 1  # Model is not running
+    fi
+}
+
+# Function to check if a model is using GPU
+check_model_gpu() {
+    local model_name="$1"
+    local ps_output=$(ollama ps)
+    if echo "$ps_output" | grep -q "$model_name.*gpu"; then
+        return 0  # Model is using GPU
+    else
+        return 1  # Model is not using GPU
+    fi
+}
+
+# Function to start a model with GPU acceleration
+start_model_gpu() {
+    local model_name="$1"
+    echo "🚀 Starting $model_name with GPU acceleration..."
+    ollama run "$model_name" &
+    sleep 2  # Give it a moment to start
+}
+
 # Start Ollama if not running
 echo "🤖 Starting Ollama server..."
 if ! pgrep -f "ollama serve" > /dev/null; then
@@ -41,7 +74,30 @@ if ! ollama list | grep -q "llama3.1:8b"; then
     ollama pull llama3.1:8b
 fi
 
-echo "✅ Ollama ready with llama3.1:8b"
+# Check if the model is running and using GPU
+TARGET_MODEL="llama3.1:8b"
+echo "🔍 Checking if $TARGET_MODEL is running..."
+
+if check_model_running "$TARGET_MODEL"; then
+    echo "✅ $TARGET_MODEL is running"
+    
+    # Check if it's using GPU
+    if check_model_gpu "$TARGET_MODEL"; then
+        echo "🚀 $TARGET_MODEL is running on GPU - Excellent!"
+    else
+        echo "⚠️  $TARGET_MODEL is running but NOT using GPU - Performance may be slow"
+        echo "🔄 Restarting model to ensure GPU usage..."
+        # Kill the current model process
+        pkill -f "ollama run $TARGET_MODEL" 2>/dev/null || true
+        sleep 1
+        start_model_gpu "$TARGET_MODEL"
+    fi
+else
+    echo "🚀 Starting $TARGET_MODEL with GPU acceleration..."
+    start_model_gpu "$TARGET_MODEL"
+fi
+
+echo "✅ Ollama ready with $TARGET_MODEL"
 
 # Start Flask backend
 echo "🌐 Starting Flask backend..."

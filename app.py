@@ -11,6 +11,7 @@ import subprocess
 import time
 import requests
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +33,17 @@ def _ensure_ollama_running():
             logger.warning("⚠️  Ollama not found in PATH, skipping auto-start")
             return
         
-        logger.info("🚀 Starting Ollama service...")
+        logger.info("🚀 Starting Ollama service with GPU acceleration...")
         
-        # Start Ollama in background
+        # Set GPU acceleration environment variable
+        env = os.environ.copy()
+        env['OLLAMA_GPU_LAYERS'] = '999'
+        
+        # Start Ollama in background with GPU configuration
         subprocess.Popen(['ollama', 'serve'], 
                         stdout=subprocess.DEVNULL, 
-                        stderr=subprocess.DEVNULL)
+                        stderr=subprocess.DEVNULL,
+                        env=env)
         
         # Wait for Ollama to start (up to 10 seconds)
         for i in range(20):  # 20 * 0.5s = 10s max
