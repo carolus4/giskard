@@ -7,6 +7,7 @@ console.log('🚀 app.js loading...');
 
 import TaskManager from './modules/TaskManager.js';
 import ChatManager from './modules/ChatManager.js';
+import ModelManager from './modules/ModelManager.js';
 
 console.log('✅ TaskManager and ChatManager imported');
 
@@ -32,6 +33,13 @@ class TodoApp {
                 });
             }
 
+            // Load model configuration first
+            console.log('🤖 Loading model configuration...');
+            await ModelManager.load();
+            
+            // Make ModelManager globally available
+            window.ModelManager = ModelManager;
+            
             // Initialize managers
             this.taskManager = new TaskManager();
             this.chatManager = new ChatManager();

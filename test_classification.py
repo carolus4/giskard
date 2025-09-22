@@ -19,7 +19,7 @@ def test_classification_service():
     
     # Test if Ollama is available
     if not service.is_ollama_available():
-        print("❌ Ollama not available. Please start Ollama with llama3.1:8b model.")
+        print("❌ Ollama not available. Please start Ollama with gemma3:4b model.")
         return False
     
     print("✅ Ollama is available")

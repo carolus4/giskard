@@ -146,7 +146,7 @@ def create_new_prompt():
         print("Goal is required.")
         return
     
-    model = input("Model (default: llama3.1:8b): ").strip() or "llama3.1:8b"
+    model = input("Model (default: gemma3:4b): ").strip() or "gemma3:4b"
     
     try:
         temperature = float(input("Temperature (0-1, default: 0.7): ").strip() or "0.7")

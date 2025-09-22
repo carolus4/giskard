@@ -407,6 +407,23 @@ def start_classification_processing():
         return APIResponse.error(str(e), 500)
 
 
+@api.route('/config/model')
+def get_model_config():
+    """Get current model configuration"""
+    try:
+        from config.ollama_config import get_chat_config, DEFAULT_MODEL
+        
+        # Get the current chat configuration
+        chat_config = get_chat_config()
+        current_model = chat_config.get('model', DEFAULT_MODEL)
+        
+        return jsonify({
+            'model': current_model,
+            'default_model': DEFAULT_MODEL
+        })
+        
+    except Exception as e:
+        return APIResponse.error(f"Failed to get model config: {str(e)}", 500)
 
 
 @api.route('/chat', methods=['POST'])

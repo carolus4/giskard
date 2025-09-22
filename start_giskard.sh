@@ -67,15 +67,15 @@ if ! pgrep -f "ollama serve" > /dev/null; then
     sleep 3
 fi
 
-# Check if llama3.1:8b model is available
-echo "🧠 Checking for llama3.1:8b model..."
-if ! ollama list | grep -q "llama3.1:8b"; then
-    echo "📥 Pulling llama3.1:8b model (this may take a while)..."
-    ollama pull llama3.1:8b
+# Check if gemma3:4b model is available
+echo "🧠 Checking for gemma3:4b model..."
+if ! ollama list | grep -q "gemma3:4b"; then
+    echo "📥 Pulling gemma3:4b model (this may take a while)..."
+    ollama pull gemma3:4b
 fi
 
 # Check if the model is running and using GPU
-TARGET_MODEL="llama3.1:8b"
+TARGET_MODEL="gemma3:4b"
 echo "🔍 Checking if $TARGET_MODEL is running..."
 
 if check_model_running "$TARGET_MODEL"; then

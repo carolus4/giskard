@@ -297,6 +297,13 @@ class APIClient {
         });
     }
 
+    /**
+     * Get current model configuration
+     */
+    async getModelConfig() {
+        return await this._fetch(`${this.baseURL}/config/model`);
+    }
+
 }
 
 export default APIClient;

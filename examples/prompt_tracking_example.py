@@ -151,7 +151,7 @@ def create_custom_prompt_example():
         name="creative_writing",
         version="1.0",
         goal="Generate creative and engaging story ideas and writing prompts",
-        model="llama3.1:8b",
+        model="gemma3:4b",
         temperature=0.9,  # Higher temperature for creativity
         token_limit=300,
         top_p=0.95,

@@ -8,8 +8,42 @@ class UIManager {
             today: 0,
             completed_today: 0
         };
+        this.modelName = 'gemma3:4b'; // Default fallback
         
         this._bindNavigation();
+        this._subscribeToModelUpdates();
+    }
+
+    /**
+     * Subscribe to model updates from ModelManager
+     */
+    _subscribeToModelUpdates() {
+        // Get current model name if already loaded
+        this.modelName = window.ModelManager?.getModelName() || 'gemma3:4b';
+        
+        // Subscribe to updates
+        if (window.ModelManager) {
+            window.ModelManager.subscribe((modelName) => {
+                this.modelName = modelName;
+                this._updateModelDisplay();
+            });
+        }
+    }
+
+    /**
+     * Update model display in the UI
+     */
+    _updateModelDisplay() {
+        // Update chat page subtitle
+        const chatSubtitle = document.getElementById('chat-page-subtitle');
+        if (chatSubtitle) {
+            chatSubtitle.textContent = `AI Productivity Coach • ${this.modelName}`;
+        }
+        
+        // Update current view if it's the chat view
+        if (this.currentView === 'chat' || this.currentView === 'giskard') {
+            this._updateTaskCount();
+        }
     }
 
     /**
@@ -52,7 +86,7 @@ class UIManager {
         };
         
         const subtitles = {
-            chat: 'AI Productivity Coach • llama3.1:8b',
+            chat: `AI Productivity Coach • ${this.modelName}`,
             'task-list': '0 tasks' // Will be updated with actual count
         };
         
@@ -111,7 +145,7 @@ class UIManager {
         
         if (taskCountEl) {
             if (this.currentView === 'giskard') {
-                taskCountEl.textContent = 'AI Productivity Coach • llama3.1:8b';
+                taskCountEl.textContent = `AI Productivity Coach • ${this.modelName}`;
             } else if (this.currentView === 'task-list') {
                 const completedCount = this.counts.completed_today || 0;
                 taskCountEl.textContent = `${completedCount} task${completedCount !== 1 ? 's' : ''} completed today`;

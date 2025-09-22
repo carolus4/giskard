@@ -6,6 +6,7 @@ class ChatManager {
         this.chatMessages = [];
         this.isTyping = false;
         this.currentConversation = null;
+        this.modelName = 'gemma3:4b'; // Default fallback
         
         // Set up API base URL (same logic as APIClient)
         this.isTauri = window.__TAURI__ !== undefined;
@@ -15,6 +16,22 @@ class ChatManager {
         
         this._bindEvents();
         this._initializeChat();
+        this._subscribeToModelUpdates();
+    }
+
+    /**
+     * Subscribe to model updates from ModelManager
+     */
+    _subscribeToModelUpdates() {
+        // Get current model name if already loaded
+        this.modelName = window.ModelManager?.getModelName() || 'gemma3:4b';
+        
+        // Subscribe to updates
+        if (window.ModelManager) {
+            window.ModelManager.subscribe((modelName) => {
+                this.modelName = modelName;
+            });
+        }
     }
 
     /**
@@ -121,7 +138,7 @@ class ChatManager {
             this._addMessage('bot', response);
         } catch (error) {
             console.error('Failed to get response from Ollama:', error);
-            this._addMessage('bot', "I'm having trouble connecting right now. Please check if Ollama is running with llama3.1:8b and try again.");
+            this._addMessage('bot', `I'm having trouble connecting right now. Please check if Ollama is running with ${this.modelName} and try again.`);
         } finally {
             this._hideTyping();
         }

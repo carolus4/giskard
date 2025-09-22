@@ -6,7 +6,7 @@ from .prompt_registry import prompt_registry
 
 # Default Ollama settings
 OLLAMA_BASE_URL = "http://localhost:11434/api/generate"
-DEFAULT_MODEL = "llama3.1:8b"
+DEFAULT_MODEL = "gemma3:4b"
 
 # Request timeout in seconds
 REQUEST_TIMEOUT = 100  # Reduced back to 30 seconds with better handling

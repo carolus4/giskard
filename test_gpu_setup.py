@@ -45,7 +45,7 @@ def test_gpu_setup():
         return False
     
     # Check target model
-    target_model = "llama3.1:8b"
+    target_model = "gemma3:4b"
     print(f"\n🔍 Checking {target_model}:")
     
     if check_model_running(target_model):
