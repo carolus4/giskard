@@ -51,12 +51,14 @@ class TaskClassificationService:
             Empty list if uncertain or no categories apply
         """
         try:
-            # Skip very long tasks that are likely to timeout
+            # Handle very long tasks by truncating intelligently
             task_text = f"{title} - {description}" if description else title
-            if len(task_text) > 1000:  # Skip tasks longer than 1000 characters
-                logger.warning(f"Skipping very long task (>{len(task_text)} chars): {title[:50]}...")
-                self._log_classification(title, description, [], "SKIPPED: Task too long", None)
-                return []
+            original_length = len(task_text)
+            
+            if original_length > 2000:  # Truncate tasks longer than 2000 characters
+                logger.info(f"Truncating long task ({original_length} chars): {title[:50]}...")
+                task_text = self._intelligent_truncate(task_text, 2000)
+                logger.info(f"Truncated to {len(task_text)} chars")
             
             # Clean URLs from task text but don't skip the task
             import re
@@ -105,6 +107,39 @@ class TaskClassificationService:
             fallback_categories = self._simple_keyword_classification(title, description)
             self._log_classification(title, description, fallback_categories, f"FALLBACK: {str(e)}", None)
             return fallback_categories
+    
+    def _intelligent_truncate(self, text: str, max_length: int) -> str:
+        """
+        Intelligently truncate text while preserving important information.
+        Prioritizes title and beginning of description.
+        """
+        if len(text) <= max_length:
+            return text
+        
+        # If there's a title-description split, try to preserve the title
+        if ' - ' in text:
+            title, description = text.split(' - ', 1)
+            # Keep the full title and truncate description
+            if len(title) < max_length - 10:  # Leave some room for "..." and description
+                remaining_space = max_length - len(title) - 3  # 3 for " - "
+                if remaining_space > 50:  # Only if we have reasonable space for description
+                    truncated_desc = description[:remaining_space]
+                    # Try to end at a word boundary
+                    last_space = truncated_desc.rfind(' ')
+                    if last_space > remaining_space * 0.8:  # If we can find a good break point
+                        truncated_desc = truncated_desc[:last_space]
+                    return f"{title} - {truncated_desc}..."
+                else:
+                    # Not enough space for description, just return title
+                    return f"{title}..."
+        
+        # No title-description split, just truncate from the beginning
+        truncated = text[:max_length-3]
+        # Try to end at a word boundary
+        last_space = truncated.rfind(' ')
+        if last_space > max_length * 0.8:  # If we can find a good break point
+            truncated = truncated[:last_space]
+        return f"{truncated}..."
     
     def _simple_keyword_classification(self, title: str, description: str) -> List[str]:
         """Simple keyword-based classification as fallback"""
