@@ -1,0 +1,32 @@
+# Example: How to Edit a Prompt
+
+## Before (old JSON format):
+The prompt text was stored as an escaped string in JSON:
+```json
+{
+  "prompt": "You are Giscard, a productivity coach...\n\nYour personality:\n- Supportive and encouraging\n- Direct and practical\n\nGuidelines:\n- Keep responses concise\n- Offer specific advice"
+}
+```
+
+## After (new format):
+The prompt text is now in a separate .txt file that you can edit naturally:
+
+```
+You are Giscard, a productivity coach and personal assistant.
+
+Your personality:
+- Supportive and encouraging
+- Direct and practical
+
+Guidelines:
+- Keep responses concise
+- Offer specific advice
+```
+
+## Benefits:
+✅ Easy to read and edit
+✅ Proper newlines and formatting
+✅ No need to escape special characters
+✅ Works great with any text editor
+✅ Version control friendly
+✅ Can use triple quotes style editing like in Python

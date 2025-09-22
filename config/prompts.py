@@ -1,16 +1,16 @@
 """
 Centralized prompt templates for the Giskard application
-This module provides backward compatibility and convenience functions for the new prompt registry system.
+Uses simplified prompt system that focuses on versioning prompt text only
 """
 
-from .prompt_registry import prompt_registry
+from .simple_prompt_registry import simple_prompt_registry
 
 
 def get_coaching_prompt(task_context: str = "") -> str:
     """Get the coaching system prompt with task context"""
-    coaching_prompt = prompt_registry.get_latest_prompt("coaching_system")
-    if coaching_prompt:
-        return coaching_prompt.prompt.format(task_context=task_context)
+    prompt_text = simple_prompt_registry.get_latest_prompt_text("coaching_system")
+    if prompt_text:
+        return prompt_text.format(task_context=task_context)
     
     # Fallback to hardcoded prompt if registry is not available
     return f"""You are Giscard, a productivity coach and personal assistant. You help users manage their tasks, stay motivated, and achieve their goals.
@@ -39,9 +39,9 @@ Remember: You now have access to both task titles AND descriptions, so you can p
 
 def get_classification_prompt(task_text: str) -> str:
     """Get the task classification prompt with task text"""
-    classification_prompt = prompt_registry.get_latest_prompt("task_classification")
-    if classification_prompt:
-        return classification_prompt.prompt.format(task_text=task_text)
+    prompt_text = simple_prompt_registry.get_latest_prompt_text("task_classification")
+    if prompt_text:
+        return prompt_text.format(task_text=task_text)
     
     # Fallback to hardcoded prompt if registry is not available
     return f"""You are a task categorization assistant. Your job is to assign 0..n labels from {{health, career, learning}} to each task.
