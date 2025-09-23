@@ -100,3 +100,4 @@ def remove_old_category_column():
 
 if __name__ == '__main__':
     remove_old_category_column()
+

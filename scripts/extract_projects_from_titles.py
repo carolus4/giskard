@@ -89,3 +89,4 @@ if __name__ == '__main__':
         print("\\n🎉 Migration completed successfully!")
     else:
         print("\\n⚠️  Migration completed with some issues - please review the output above")
+
