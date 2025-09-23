@@ -8,8 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from utils.classification_service import TaskClassificationService
 from utils.classification_manager import ClassificationManager
-from utils.file_manager import TodoFileManager
-from models.task import Task
+from models.task_db import TaskDB
 
 def test_classification_service():
     """Test the classification service directly"""
@@ -43,8 +42,7 @@ def test_classification_manager():
     """Test the classification manager"""
     print("\n🧪 Testing Classification Manager...")
     
-    file_manager = TodoFileManager()
-    manager = ClassificationManager(file_manager)
+    manager = ClassificationManager()
     
     # Test startup classification
     print("📊 Running startup classification...")
@@ -52,28 +50,39 @@ def test_classification_manager():
     print(f"✅ Classified {classified_count} tasks on startup")
     
     # Test queue status
-    status = manager.get_queue_status()
-    print(f"📈 Queue status: {status}")
+    print(f"📈 Queue length: {len(manager.classification_queue)}")
+    print(f"📈 Is processing: {manager.is_processing}")
 
 def test_task_model():
-    """Test the updated Task model with categories"""
-    print("\n🧪 Testing Task Model with Categories...")
+    """Test the updated TaskDB model with categories"""
+    print("\n🧪 Testing TaskDB Model with Categories...")
     
     # Test creating task with categories
-    task = Task("Test task", "Test description", categories=["health", "career"])
+    task = TaskDB(title="Test task", description="Test description", categories=["health", "career"])
     print(f"✅ Created task with categories: {task.categories}")
     
-    # Test to_line format
-    line = task.to_line()
-    print(f"✅ Task line format: {line}")
+    # Test saving to database
+    task.save()
+    print(f"✅ Saved task to database with ID: {task.id}")
     
-    # Test parsing back
-    parsed_task = Task.from_line(line, 0)
-    print(f"✅ Parsed task categories: {parsed_task.categories}")
+    # Test retrieving from database
+    retrieved_task = TaskDB.get_by_id(task.id)
+    if retrieved_task:
+        print(f"✅ Retrieved task categories: {retrieved_task.categories}")
     
     # Test task detail page data format
-    task_dict = task.to_dict(ui_id=1)
+    task_dict = task.to_dict()
     print(f"✅ Task dict for UI: {task_dict}")
+    
+    # Clean up test task
+    if task.id:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM tasks WHERE id = ?', (task.id,))
+        conn.commit()
+        conn.close()
+        print("✅ Cleaned up test task")
 
 def test_frontend_categories():
     """Test frontend category display"""

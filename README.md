@@ -42,11 +42,12 @@ This will start the Tauri desktop app with the Flask API backend!
 ```
 app.py (30 lines)              # API-only entry point
 ├── models/
-│   └── task.py               # Task model with parsing logic
+│   └── task_db.py            # Database task model
 ├── api/
-│   └── routes.py             # All Flask API endpoints
+│   └── routes_v2.py          # Clean REST API endpoints
 └── utils/
-    └── file_manager.py       # File operations
+    ├── classification_manager.py  # Task classification system
+    └── classification_service.py  # LLM classification service
 ```
 
 ### **Frontend (Tauri Desktop App)**
@@ -79,9 +80,9 @@ giskard-desktop/src/
 
 ### **Adding New Features**
 
-1. **New API Endpoint**: Add to `api/routes.py`
+1. **New API Endpoint**: Add to `api/routes_v2.py`
 2. **New UI Component**: Create in `static/js/modules/`
-3. **New Task Property**: Extend `models/task.py`
+3. **New Task Property**: Extend `models/task_db.py`
 
 ### **Module Communication**
 The application uses event-driven communication between modules:
@@ -128,7 +129,7 @@ giskard/
 │   └── src-tauri/           # Rust backend
 ├── start_giskard.sh         # Single startup script
 └── data/
-    ├── todo.txt                    # Task data storage
+    ├── giskard.db                  # SQLite database
     └── classification_predictions_log.txt  # AI classification logs
 ```
 

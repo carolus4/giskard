@@ -341,12 +341,16 @@ class PageManager {
             return;
         }
 
+        // Parse the formatted title to extract project and title
+        const parsedTitle = this._parseTaskTitle(titleInput.value.trim());
+        
         // Check if we're in add mode or edit mode
         if (this.currentTaskId === 'new') {
             // Add mode
             const taskData = {
-                title: titleInput.value.trim(),
-                description: descriptionInput?.value.trim() || ''
+                title: parsedTitle.title,
+                description: descriptionInput?.value.trim() || '',
+                project: parsedTitle.project
             };
 
             console.log('Dispatching task:add-from-page event with data:', taskData);
@@ -358,8 +362,9 @@ class PageManager {
             // Edit mode
             const taskData = {
                 fileIdx: this.currentTaskId,
-                title: titleInput.value.trim(),
-                description: descriptionInput?.value.trim() || ''
+                title: parsedTitle.title,
+                description: descriptionInput?.value.trim() || '',
+                project: parsedTitle.project
             };
 
             console.log('Dispatching task:save-from-page event with data:', taskData);
@@ -423,7 +428,11 @@ class PageManager {
         const deleteBtn = document.getElementById('detail-delete-btn');
         const saveBtn = document.getElementById('save-task-btn');
 
-        if (titleInput) titleInput.value = taskData.title || '';
+        if (titleInput) {
+            // Show formatted title with project prefix
+            const displayTitle = this._formatTaskTitle(taskData);
+            titleInput.value = displayTitle;
+        }
         
         // Load categories
         if (categoriesContainer) {
@@ -521,6 +530,44 @@ class PageManager {
             badge.textContent = category;
             container.appendChild(badge);
         });
+    }
+
+    /**
+     * Format task title with project prefix
+     * @param {Object} task - Task object with title and project
+     * @returns {string} Formatted title like "[Project] Title" or just "Title"
+     */
+    _formatTaskTitle(task) {
+        const title = task.title || 'Untitled Task';
+        const project = task.project;
+        
+        if (project && project.trim()) {
+            return `[${project}] ${title}`;
+        }
+        
+        return title;
+    }
+
+    /**
+     * Parse formatted title back into project and title
+     * @param {string} formattedTitle - Title in format "[Project] Title" or just "Title"
+     * @returns {Object} Object with project and title properties
+     */
+    _parseTaskTitle(formattedTitle) {
+        const projectPattern = /^\[([^\]]+)\]\s+(.+)$/;
+        const match = formattedTitle.match(projectPattern);
+        
+        if (match) {
+            return {
+                project: match[1].trim(),
+                title: match[2].trim()
+            };
+        }
+        
+        return {
+            project: null,
+            title: formattedTitle.trim()
+        };
     }
 
 }

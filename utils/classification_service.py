@@ -169,16 +169,16 @@ class TaskClassificationService:
         Classify multiple tasks in batch
         
         Args:
-            tasks: List of task dictionaries with 'title', 'description', 'file_idx'
+            tasks: List of task dictionaries with 'title', 'description', 'id'
             
         Returns:
-            Dictionary mapping file_idx to list of categories
+            Dictionary mapping id to list of categories
         """
         results = {}
         
         # Process tasks one by one with small delays to prevent overwhelming the model
         for i, task in enumerate(tasks):
-            file_idx = task.get('file_idx')
+            task_id = task.get('id')
             title = task.get('title', '')
             description = task.get('description', '')
             
@@ -187,7 +187,7 @@ class TaskClassificationService:
             
             try:
                 categories = self.classify_task(title, description)
-                results[file_idx] = categories
+                results[task_id] = categories
                 
                 # Add small delay between requests to prevent overwhelming the model
                 if i < len(tasks) - 1:  # Don't delay after the last task
@@ -197,7 +197,7 @@ class TaskClassificationService:
             except Exception as e:
                 logger.error(f"Failed to classify task '{title}': {str(e)}")
                 # Skip this task and continue with the next one
-                results[file_idx] = []  # Default to empty categories on error
+                results[task_id] = []  # Default to empty categories on error
                 continue
                 
         return results

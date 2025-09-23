@@ -17,7 +17,7 @@ class ModelManager {
     }
 
     /**
-     * Load model configuration from backend
+     * Load model configuration (using default for now)
      */
     async load() {
         if (this.loaded || this.loading) {
@@ -27,14 +27,11 @@ class ModelManager {
         this.loading = true;
         
         try {
-            const response = await window.apiClient.getModelConfig();
-            if (response.success && response.data) {
-                this.modelName = response.data.model;
-                console.log('🤖 ModelManager: Loaded model config:', this.modelName);
-            }
+            // For now, just use the default model name
+            // TODO: Add model config endpoint to V2 API if needed
+            console.log('🤖 ModelManager: Using default model config:', this.modelName);
         } catch (error) {
-            console.warn('⚠️ ModelManager: Failed to load model config, using default:', error);
-            // Keep the default fallback
+            console.warn('⚠️ ModelManager: Error loading model config, using default:', error);
         } finally {
             this.loaded = true;
             this.loading = false;

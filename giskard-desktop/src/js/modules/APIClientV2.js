@@ -1,23 +1,23 @@
 /**
- * APIClient - Centralized HTTP requests for the todo application
+ * APIClientV2 - Clean REST API client for the new database-backed system
  * 
  * Provides a clean interface for all backend API interactions with
- * consistent error handling, request formatting, and response processing.
+ * the new SQLite-based task system using proper REST endpoints.
  * 
- * @class APIClient
- * @version 1.0.0
- * @author Mini Todo App
+ * @class APIClientV2
+ * @version 2.0.0
+ * @author Giskard
  * 
  * @example
- * const api = new APIClient();
+ * const api = new APIClientV2();
  * const result = await api.getTasks();
  * if (result.success) {
  *   console.log(result.data.tasks);
  * }
  */
-class APIClient {
+class APIClientV2 {
     /**
-     * Create an APIClient instance
+     * Create an APIClientV2 instance
      * @constructor
      */
     constructor() {
@@ -27,7 +27,7 @@ class APIClient {
         this.baseURL = this.isTauri ? 'http://localhost:5001/api' : '/api';
         
         // Debug Tauri detection
-        console.log('🔍 Tauri detection:', {
+        console.log('🔍 APIClientV2 Tauri detection:', {
             isTauri: this.isTauri,
             hasTauri: !!window.__TAURI__,
             hasInvoke: !!(window.__TAURI__?.invoke),
@@ -66,48 +66,50 @@ class APIClient {
      */
     async _fetch(url, options = {}) {
         try {
-            console.log('🚀 API Request:', { url, options, isTauri: this.isTauri });
+            console.log('🚀 API V2 Request:', { url, options, isTauri: this.isTauri });
             
             // If running in Tauri, use Tauri commands (much more reliable!)
             if (this.isTauri && window.__TAURI__?.invoke) {
                 const { invoke } = window.__TAURI__;
                 
-                console.log('🦀 Using Tauri commands for:', url, options);
+                console.log('🦀 Using Tauri commands for V2 API:', url, options);
                 
                 // Route to appropriate Tauri command  
                 if (url.includes('/api/tasks') && (!options.method || options.method === 'GET')) {
                     try {
-                        const result = await invoke('api_get_tasks');
+                        const result = await invoke('api_v2_get_tasks');
                         const data = JSON.parse(result);
-                        console.log('✅ Tauri getTasks success:', Object.keys(data));
+                        console.log('✅ Tauri V2 getTasks success:', Object.keys(data));
                         return { success: true, data };
                     } catch (error) {
-                        console.error('❌ Tauri getTasks failed:', error);
+                        console.error('❌ Tauri V2 getTasks failed:', error);
                         throw error; // Fall back to regular fetch
                     }
                     
-                } else if (url.includes('/api/tasks/add') && options.method === 'POST') {
+                } else if (url.includes('/api/tasks') && options.method === 'POST' && !url.includes('/')) {
                     try {
                         const body = JSON.parse(options.body);
-                        const result = await invoke('api_add_task', {
+                        const result = await invoke('api_v2_create_task', {
                             title: body.title,
-                            description: body.description || ''
+                            description: body.description || '',
+                            project: body.project || null,
+                            categories: body.categories ? body.categories.join(',') : null
                         });
                         const data = JSON.parse(result);
-                        console.log('✅ Tauri addTask success:', data);
+                        console.log('✅ Tauri V2 createTask success:', data);
                         return { success: true, data };
                     } catch (error) {
-                        console.error('❌ Tauri addTask failed:', error);
+                        console.error('❌ Tauri V2 createTask failed:', error);
                         throw error; // Fall back to regular fetch
                     }
                 }
                 
                 // For other endpoints, fall back to browser fetch for now
-                console.log('⚠️  Endpoint not implemented in Tauri, using browser fetch');
+                console.log('⚠️  V2 Endpoint not implemented in Tauri, using browser fetch');
             }
 
             // Fallback to regular fetch for browser or non-implemented endpoints
-            console.log('🌐 Using browser fetch:', url);
+            console.log('🌐 Using browser fetch for V2 API:', url);
             
             const config = {
                 headers: {
@@ -126,7 +128,7 @@ class APIClient {
 
             return { success: true, data };
         } catch (error) {
-            console.error(`🔥 API Error (${url}):`, error);
+            console.error(`🔥 V2 API Error (${url}):`, error);
             return { success: false, error: error.message };
         }
     }
@@ -153,16 +155,18 @@ class APIClient {
      * 
      * @param {string} title - Task title (required)
      * @param {string} [description=''] - Task description (optional)
+     * @param {string} [project=null] - Project name (optional)
+     * @param {string[]} [categories=[]] - Categories array (optional)
      * @returns {Promise<{success: boolean, data?: any, error?: string}>} Creation result
      * @throws {Error} When title is invalid or too long
      * 
      * @example
-     * const result = await api.addTask('Buy groceries', 'Milk, eggs, bread');
+     * const result = await api.createTask('Buy groceries', 'Milk, eggs, bread', 'Shopping', ['personal', 'shopping']);
      * if (result.success) {
      *   console.log('Task created successfully');
      * }
      */
-    async addTask(title, description = '') {
+    async createTask(title, description = '', project = null, categories = []) {
         // Input validation and sanitization
         if (typeof title !== 'string' || !title.trim()) {
             return { success: false, error: 'Task title is required and must be a non-empty string' };
@@ -180,130 +184,128 @@ class APIClient {
             return { success: false, error: 'Task title cannot be empty after trimming' };
         }
         
-        return await this._fetch(`${this.baseURL}/tasks/add`, {
+        return await this._fetch(`${this.baseURL}/tasks`, {
             method: 'POST',
             body: JSON.stringify({ 
                 title: sanitizedTitle, 
-                description: sanitizedDescription 
+                description: sanitizedDescription,
+                project: project,
+                categories: categories
             })
         });
     }
 
     /**
-     * Mark a task as completed
+     * Get a specific task by ID
      * 
-     * @param {number} taskId - The UI task ID (sequential numbering)
-     * @returns {Promise<{success: boolean, data?: any, error?: string}>} Completion result
-     * 
-     * @example
-     * const result = await api.markTaskDone(3);
-     * if (result.success) {
-     *   console.log('Task marked as done');
-     * }
+     * @param {number} taskId - The task ID
+     * @returns {Promise<{success: boolean, data?: any, error?: string}>} Task data
      */
-    async markTaskDone(taskId) {
-        // Validate task ID
+    async getTask(taskId) {
         const validation = this._validateId(taskId, 'Task ID');
         if (!validation.isValid) {
             return { success: false, error: validation.error };
         }
         
-        return await this._fetch(`${this.baseURL}/tasks/${taskId}/done`, {
-            method: 'POST'
+        return await this._fetch(`${this.baseURL}/tasks/${taskId}`);
+    }
+
+    /**
+     * Update a specific task
+     * 
+     * @param {number} taskId - The task ID
+     * @param {Object} updates - Fields to update
+     * @param {string} [updates.title] - New title
+     * @param {string} [updates.description] - New description
+     * @param {string} [updates.project] - New project
+     * @param {string[]} [updates.categories] - New categories array
+     * @returns {Promise<{success: boolean, data?: any, error?: string}>} Update result
+     */
+    async updateTask(taskId, updates) {
+        const validation = this._validateId(taskId, 'Task ID');
+        if (!validation.isValid) {
+            return { success: false, error: validation.error };
+        }
+        
+        return await this._fetch(`${this.baseURL}/tasks/${taskId}`, {
+            method: 'PUT',
+            body: JSON.stringify(updates)
         });
     }
 
     /**
-     * Start a task (mark as in progress)
+     * Delete a specific task
+     * 
+     * @param {number} taskId - The task ID
+     * @returns {Promise<{success: boolean, data?: any, error?: string}>} Deletion result
      */
-    async startTask(taskId) {
-        return await this._fetch(`${this.baseURL}/tasks/${taskId}/start`, {
-            method: 'POST'
-        });
-    }
-
-    /**
-     * Stop a task (remove in progress status)
-     */
-    async stopTask(taskId) {
-        return await this._fetch(`${this.baseURL}/tasks/${taskId}/stop`, {
-            method: 'POST'
-        });
-    }
-
-    /**
-     * Uncomplete a completed task
-     */
-    async uncompleteTask(fileIdx) {
-        return await this._fetch(`${this.baseURL}/tasks/uncomplete`, {
-            method: 'POST',
-            body: JSON.stringify({ file_idx: fileIdx })
-        });
-    }
-
-    /**
-     * Get detailed information for a specific task
-     */
-    async getTaskDetails(fileIdx) {
-        return await this._fetch(`${this.baseURL}/tasks/${fileIdx}/details`);
-    }
-
-    /**
-     * Update task title and description
-     */
-    async updateTask(fileIdx, title, description) {
-        return await this._fetch(`${this.baseURL}/tasks/${fileIdx}/update`, {
-            method: 'POST',
-            body: JSON.stringify({ title, description })
-        });
-    }
-
-    /**
-     * Delete a task permanently
-     */
-    async deleteTask(fileIdx) {
-        return await this._fetch(`${this.baseURL}/tasks/${fileIdx}/delete`, {
+    async deleteTask(taskId) {
+        const validation = this._validateId(taskId, 'Task ID');
+        if (!validation.isValid) {
+            return { success: false, error: validation.error };
+        }
+        
+        return await this._fetch(`${this.baseURL}/tasks/${taskId}`, {
             method: 'DELETE'
         });
     }
 
     /**
-     * Update task description only (deprecated)
+     * Update task status
+     * 
+     * @param {number} taskId - The task ID
+     * @param {string} status - New status ('open', 'in_progress', 'done')
+     * @returns {Promise<{success: boolean, data?: any, error?: string}>} Status update result
      */
-    async updateTaskDescription(fileIdx, description) {
-        return await this._fetch(`${this.baseURL}/tasks/${fileIdx}/update_description`, {
-            method: 'POST',
-            body: JSON.stringify({ description })
+    async updateTaskStatus(taskId, status) {
+        const validation = this._validateId(taskId, 'Task ID');
+        if (!validation.isValid) {
+            return { success: false, error: validation.error };
+        }
+        
+        if (!['open', 'in_progress', 'done'].includes(status)) {
+            return { success: false, error: 'Status must be: open, in_progress, or done' };
+        }
+        
+        return await this._fetch(`${this.baseURL}/tasks/${taskId}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status })
         });
     }
 
     /**
-     * Reorder tasks using file index sequence
+     * Reorder tasks by providing a list of task IDs in desired order
+     * 
+     * @param {number[]} taskIds - Array of task IDs in desired order
+     * @returns {Promise<{success: boolean, data?: any, error?: string}>} Reorder result
      */
-    async reorderTasks(fileIdxSequence) {
-        return await this._fetch(`${this.baseURL}/tasks/reorder-simple`, {
-            method: 'POST',
-            body: JSON.stringify({ file_idx_sequence: fileIdxSequence })
-        });
-    }
-
-    /**
-     * Legacy reorder method
-     */
-    async reorderTaskLegacy(taskOrder, targetOrder) {
+    async reorderTasks(taskIds) {
+        if (!Array.isArray(taskIds)) {
+            return { success: false, error: 'taskIds must be an array' };
+        }
+        
         return await this._fetch(`${this.baseURL}/tasks/reorder`, {
             method: 'POST',
-            body: JSON.stringify({ task_order: taskOrder, target_order: targetOrder })
+            body: JSON.stringify({ task_ids: taskIds })
         });
     }
 
-    /**
-     * Get current model configuration
-     */
-    async getModelConfig() {
-        return await this._fetch(`${this.baseURL}/config/model`);
+    // Legacy method aliases for backward compatibility during transition
+    async addTask(title, description = '') {
+        return this.createTask(title, description);
     }
 
+    async markTaskDone(taskId) {
+        return this.updateTaskStatus(taskId, 'done');
+    }
+
+    async startTask(taskId) {
+        return this.updateTaskStatus(taskId, 'in_progress');
+    }
+
+    async stopTask(taskId) {
+        return this.updateTaskStatus(taskId, 'open');
+    }
 }
 
-export default APIClient;
+export default APIClientV2;

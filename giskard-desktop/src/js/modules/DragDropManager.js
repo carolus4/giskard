@@ -171,16 +171,16 @@ class DragDropManager {
      * Handle drag start
      */
     _handleDragStart(event, taskItem) {
-        const fileIdxStr = taskItem.dataset.fileIdx;
-        const fileIdx = fileIdxStr && fileIdxStr !== '' ? parseInt(fileIdxStr) : null;
+        const taskIdStr = taskItem.dataset.taskId;
+        const taskId = taskIdStr && taskIdStr !== '' ? parseInt(taskIdStr) : null;
         const taskTitle = taskItem.querySelector('.task-title')?.textContent || 'Unknown';
         
-        if (fileIdx === null || isNaN(fileIdx)) {
-            if (this.DEBUG) console.error(`❌ Invalid fileIdx for task: "${taskTitle}" - fileIdx: "${fileIdxStr}"`);
+        if (taskId === null || isNaN(taskId)) {
+            if (this.DEBUG) console.error(`❌ Invalid taskId for task: "${taskTitle}" - taskId: "${taskIdStr}"`);
             return;
         }
         
-        if (this.DEBUG) console.log(`🎯 DRAG START: "${taskTitle}" - file_idx: ${fileIdx}`);
+        if (this.DEBUG) console.log(`🎯 DRAG START: "${taskTitle}" - taskId: ${taskId}`);
         
         // Visual feedback
         document.body.classList.add('dragging');
@@ -188,7 +188,7 @@ class DragDropManager {
         
         // Store drag state
         this.draggedTask = {
-            file_idx: fileIdx,
+            id: taskId,
             title: taskTitle,
             element: taskItem
         };
@@ -224,7 +224,7 @@ class DragDropManager {
      * Handle drag end
      */
     _handleDragEnd(event, taskItem) {
-        if (this.DEBUG) console.log(`🔚 DRAG END: ${this.draggedTask?.file_idx} at index ${this.insertionIndex}`);
+        if (this.DEBUG) console.log(`🔚 DRAG END: ${this.draggedTask?.id} at index ${this.insertionIndex}`);
         
         // Handle drop if valid
         if (this.isDragging && this.insertionIndex !== -1 && this.draggedTask && !this.isDropping) {
@@ -447,26 +447,26 @@ class DragDropManager {
         
         this.isDropping = true;
         
-        if (this.DEBUG) console.log('DROP: Moving task', this.draggedTask.file_idx, 'to visual position', this.insertionIndex);
+        if (this.DEBUG) console.log('DROP: Moving task', this.draggedTask.id, 'to visual position', this.insertionIndex);
         
-        // Calculate the new file index sequence
-        const newFileIdxSequence = this._calculateReorderSequence();
+        // Calculate the new task ID sequence
+        const newTaskIdSequence = this._calculateReorderSequence();
         
         // Check if the order actually changed
         const allVisibleTasks = Array.from(document.querySelectorAll('.task-item'));
-        const currentFileIndices = allVisibleTasks.map(task => parseInt(task.dataset.fileIdx));
+        const currentTaskIds = allVisibleTasks.map(task => parseInt(task.dataset.taskId));
         
-        if (JSON.stringify(currentFileIndices) === JSON.stringify(newFileIdxSequence)) {
+        if (JSON.stringify(currentTaskIds) === JSON.stringify(newTaskIdSequence)) {
             if (this.DEBUG) console.log('No change in order, skipping reorder');
             this.isDropping = false;
             return;
         }
         
-        if (this.DEBUG) console.log('📝 REORDER: Complete new file index sequence:', newFileIdxSequence);
+        if (this.DEBUG) console.log('📝 REORDER: Complete new task ID sequence:', newTaskIdSequence);
         
         // Emit reorder event
         const event_detail = {
-            detail: { fileIdxSequence: newFileIdxSequence }
+            detail: { taskIdSequence: newTaskIdSequence }
         };
         
         document.dispatchEvent(new CustomEvent('task:reorder', event_detail));
@@ -481,38 +481,38 @@ class DragDropManager {
         // Get all visible tasks in current order (including dragged one)
         const allVisibleTasks = Array.from(document.querySelectorAll('.task-item'));
         
-        // Extract the file indices in their current visual positions, filtering out invalid ones
-        const fileIndices = allVisibleTasks
+        // Extract the task IDs in their current visual positions, filtering out invalid ones
+        const taskIds = allVisibleTasks
             .map(task => {
-                const fileIdx = task.dataset.fileIdx;
-                return fileIdx && fileIdx !== '' ? parseInt(fileIdx) : null;
+                const taskId = task.dataset.taskId;
+                return taskId && taskId !== '' ? parseInt(taskId) : null;
             })
-            .filter(fileIdx => fileIdx !== null);
+            .filter(taskId => taskId !== null);
         
         // Find dragged task position
         const draggedVisualPos = allVisibleTasks.findIndex(
             item => {
-                const fileIdx = item.dataset.fileIdx;
-                return fileIdx && fileIdx !== '' && parseInt(fileIdx) === this.draggedTask.file_idx;
+                const taskId = item.dataset.taskId;
+                return taskId && taskId !== '' && parseInt(taskId) === this.draggedTask.id;
             }
         );
         
-        // Get the file index of the task being dragged
-        const draggedTaskFileIdx = this.draggedTask.file_idx;
+        // Get the task ID of the task being dragged
+        const draggedTaskId = this.draggedTask.id;
         
         // Create a new array without the dragged task
-        const reorderedFileIndices = [...fileIndices];
-        reorderedFileIndices.splice(draggedVisualPos, 1);  // Remove dragged task
-        reorderedFileIndices.splice(this.insertionIndex, 0, draggedTaskFileIdx);  // Insert at new position
+        const reorderedTaskIds = [...taskIds];
+        reorderedTaskIds.splice(draggedVisualPos, 1);  // Remove dragged task
+        reorderedTaskIds.splice(this.insertionIndex, 0, draggedTaskId);  // Insert at new position
         
         if (this.DEBUG) {
             console.log('Simple reorder: moving visual index', draggedVisualPos, '→', this.insertionIndex);
-            console.log('  Original file indices:', fileIndices);
-            console.log('  Dragged task file index:', draggedTaskFileIdx);
-            console.log('  New file index sequence:', reorderedFileIndices);
+            console.log('  Original task IDs:', taskIds);
+            console.log('  Dragged task ID:', draggedTaskId);
+            console.log('  New task ID sequence:', reorderedTaskIds);
         }
         
-        return reorderedFileIndices;
+        return reorderedTaskIds;
     }
 
     /**
@@ -546,11 +546,10 @@ class DragDropManager {
      */
     _getTaskDataFromElement(element) {
         return {
-            file_idx: parseInt(element.dataset.fileIdx),
+            id: parseInt(element.dataset.taskId),
             title: element.querySelector('.task-title')?.textContent || '',
-            id: element.dataset.taskId,
             status: element.dataset.status,
-            order: parseInt(element.dataset.order)
+            sort_key: parseInt(element.dataset.sortKey)
         };
     }
 

@@ -55,18 +55,20 @@ class TaskList {
 
         // Set task data attributes
         taskItem.dataset.taskId = task.id || '';
-        taskItem.dataset.fileIdx = task.file_idx !== undefined ? task.file_idx : '';
         taskItem.dataset.status = task.status || 'open';
-        taskItem.dataset.order = task.order !== undefined ? task.order : (task.file_idx !== undefined ? task.file_idx : 0);
+        taskItem.dataset.sortKey = task.sort_key !== undefined ? task.sort_key : 0;
         
-        // Set task content
+        // Set task content with project prefix
         if (title) {
-            title.textContent = task.title || 'Untitled Task';
+            const displayTitle = this._formatTaskTitle(task);
+            title.textContent = displayTitle;
         }
         
         // Set categories
         if (categoriesContainer) {
-            this._renderCategories(categoriesContainer, task.categories || []);
+            // Categories should now always be an array
+            const categories = task.categories || [];
+            this._renderCategories(categoriesContainer, categories);
         }
         
         // Add status classes
@@ -222,8 +224,8 @@ class TaskList {
     /**
      * Update a specific task element
      */
-    updateTaskElement(fileIdx, updatedTask) {
-        const taskItem = document.querySelector(`[data-file-idx="${fileIdx}"]`);
+    updateTaskElement(taskId, updatedTask) {
+        const taskItem = document.querySelector(`[data-task-id="${taskId}"]`);
         if (!taskItem) return;
 
         const title = taskItem.querySelector('.task-title');
@@ -232,9 +234,10 @@ class TaskList {
         const startBtn = taskItem.querySelector('.start-btn');
         const stopBtn = taskItem.querySelector('.stop-btn');
 
-        // Update title
+        // Update title with project prefix
         if (title && updatedTask.title) {
-            title.textContent = updatedTask.title;
+            const displayTitle = this._formatTaskTitle(updatedTask);
+            title.textContent = displayTitle;
         }
         
         // Update categories
@@ -317,11 +320,26 @@ class TaskList {
     getTaskDataFromElement(element) {
         return {
             id: element.dataset.taskId,
-            file_idx: element.dataset.fileIdx ? parseInt(element.dataset.fileIdx) : null,
             status: element.dataset.status,
-            order: element.dataset.order ? parseInt(element.dataset.order) : null,
+            sort_key: element.dataset.sortKey ? parseInt(element.dataset.sortKey) : null,
             title: element.querySelector('.task-title')?.textContent || ''
         };
+    }
+
+    /**
+     * Format task title with project prefix
+     * @param {Object} task - Task object with title and project
+     * @returns {string} Formatted title like "[Project] Title" or just "Title"
+     */
+    _formatTaskTitle(task) {
+        const title = task.title || 'Untitled Task';
+        const project = task.project;
+        
+        if (project && project.trim()) {
+            return `[${project}] ${title}`;
+        }
+        
+        return title;
     }
 }
 

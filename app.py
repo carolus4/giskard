@@ -5,8 +5,9 @@ Giskard API - Backend API for Tauri desktop app
 
 from flask import Flask
 from flask_cors import CORS
-from api.routes import api, classification_manager
-from utils.file_manager import TodoFileManager
+from api.routes_v2 import api_v2
+from database import init_database
+from utils.classification_manager import ClassificationManager
 import subprocess
 import time
 import requests
@@ -73,17 +74,17 @@ CORS(app, origins=[
 ], supports_credentials=True)
 
 # Register API blueprint
-app.register_blueprint(api)
+app.register_blueprint(api_v2)  # Clean API
 
-# Initialize file manager to ensure data/todo.txt exists
-file_manager = TodoFileManager()
+# Initialize database
+init_database()
 
 # Start Ollama service if available
 _ensure_ollama_running()
 
-# Start classification processing on startup
+# Initialize classification manager
+classification_manager = ClassificationManager()
 classification_manager.start_background_processing()
 
 if __name__ == '__main__':
-    # File manager already initialized above
     app.run(debug=True, port=5001)

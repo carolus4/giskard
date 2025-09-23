@@ -8,17 +8,15 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import logging
 
-from models.task import Task, TaskCollection
+from models.task_db import TaskDB
 from utils.classification_service import TaskClassificationService
-from utils.file_manager import TodoFileManager
 
 logger = logging.getLogger(__name__)
 
 class ClassificationManager:
     """Manages task classification queue and background processing"""
     
-    def __init__(self, file_manager: TodoFileManager):
-        self.file_manager = file_manager
+    def __init__(self):
         self.classification_service = TaskClassificationService()
         self.classification_queue = []
         self.is_processing = False
@@ -53,8 +51,9 @@ class ClassificationManager:
                 logger.warning("Ollama not available, skipping startup classification")
                 return 0
             
-            collection = self.file_manager.load_tasks()
-            uncategorized_tasks = [task for task in collection.tasks if not task.categories]
+            # Get all tasks from database
+            all_tasks = TaskDB.get_all()
+            uncategorized_tasks = [task for task in all_tasks if not task.categories or len(task.categories) == 0]
             
             if not uncategorized_tasks:
                 logger.info("No uncategorized tasks found")
@@ -66,7 +65,7 @@ class ClassificationManager:
             task_data = []
             for task in uncategorized_tasks:
                 task_data.append({
-                    'file_idx': task.file_idx,
+                    'id': task.id,
                     'title': task.title,
                     'description': task.description
                 })
@@ -77,14 +76,13 @@ class ClassificationManager:
             # Update tasks with categories
             updated_count = 0
             for task in uncategorized_tasks:
-                if task.file_idx in results:
-                    task.categories = results[task.file_idx]
+                if task.id in results:
+                    task.categories = results[task.id]
                     if task.categories:  # Only count if categories were assigned
+                        task.save()  # Save to database
                         updated_count += 1
             
-            # Save updated tasks
             if updated_count > 0:
-                self.file_manager.save_tasks(collection)
                 logger.info(f"Classified {updated_count} tasks on startup")
             
             return updated_count
@@ -93,29 +91,29 @@ class ClassificationManager:
             logger.error(f"Startup classification failed: {str(e)}")
             return 0
     
-    def enqueue_classification(self, task: Task):
+    def enqueue_classification(self, task: TaskDB):
         """
         Add a task to the classification queue
         
         Args:
-            task: Task object to classify
+            task: TaskDB object to classify
         """
         # Always enqueue for classification - even if task already has categories
         # This allows re-classification when task content is updated
         self.classification_queue.append({
-            'file_idx': task.file_idx,
+            'id': task.id,
             'title': task.title,
             'description': task.description,
             'timestamp': datetime.now()
         })
         logger.debug(f"Enqueued task for classification: {task.title}")
     
-    def enqueue_tasks_batch(self, tasks: List[Task]):
+    def enqueue_tasks_batch(self, tasks: List[TaskDB]):
         """
         Add multiple tasks to the classification queue
         
         Args:
-            tasks: List of Task objects to classify
+            tasks: List of TaskDB objects to classify
         """
         for task in tasks:
             self.enqueue_classification(task)
@@ -158,25 +156,23 @@ class ClassificationManager:
             # Classify the batch
             results = self.classification_service.classify_tasks_batch(batch)
             
-            # Update tasks in the file
-            collection = self.file_manager.load_tasks()
+            # Update tasks in the database
             updated_count = 0
             
             for task_data in batch:
-                file_idx = task_data['file_idx']
-                task = collection.get_task_by_file_idx(file_idx)
+                task_id = task_data['id']
+                task = TaskDB.get_by_id(task_id)
                 
-                if task and file_idx in results:
-                    old_categories = task.categories.copy()
-                    task.categories = results[file_idx]
+                if task and task_id in results:
+                    old_categories = task.categories.copy() if task.categories else []
+                    task.categories = results[task_id]
                     
                     if task.categories != old_categories:
+                        task.save()  # Save to database
                         updated_count += 1
                         logger.debug(f"Updated task '{task.title}' with categories: {task.categories}")
             
-            # Save if any tasks were updated
             if updated_count > 0:
-                self.file_manager.save_tasks(collection)
                 logger.info(f"Updated {updated_count} tasks with new categories")
                 
             
@@ -199,12 +195,12 @@ class ClassificationManager:
         self.classification_queue.clear()
         logger.info("Classification queue cleared")
     
-    def force_classify_task(self, task: Task) -> List[str]:
+    def force_classify_task(self, task: TaskDB) -> List[str]:
         """
         Force immediate classification of a single task (synchronous)
         
         Args:
-            task: Task to classify
+            task: TaskDB object to classify
             
         Returns:
             List of assigned categories
@@ -216,15 +212,9 @@ class ClassificationManager:
             
             categories = self.classification_service.classify_task(task.title, task.description)
             
-            # Update the task
+            # Update the task in database
             task.categories = categories
-            
-            # Save to file
-            collection = self.file_manager.load_tasks()
-            file_task = collection.get_task_by_file_idx(task.file_idx)
-            if file_task:
-                file_task.categories = categories
-                self.file_manager.save_tasks(collection)
+            task.save()
             
             logger.info(f"Force classified task '{task.title}' with categories: {categories}")
             return categories

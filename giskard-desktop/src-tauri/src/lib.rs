@@ -27,18 +27,56 @@ async fn api_get_tasks() -> Result<String, String> {
     }
 }
 
+// V2 API Commands
 #[tauri::command]
-async fn api_add_task(title: String, description: String) -> Result<String, String> {
-    println!("🦀 Rust: Adding task - title: {}, desc: {}", title, description);
+async fn api_v2_get_tasks() -> Result<String, String> {
+    println!("🦀 Rust: Getting tasks from V2 API");
     
-    let json_body = format!(r#"{{"title": "{}", "description": "{}"}}"#, 
-                           title.replace("\"", "\\\""), 
-                           description.replace("\"", "\\\""));
+    match std::process::Command::new("curl")
+        .args(["-s", "http://localhost:5001/api/tasks"])
+        .output()
+    {
+        Ok(output) => {
+            if output.status.success() {
+                let response = String::from_utf8_lossy(&output.stdout);
+                println!("✅ Got V2 tasks: {}", response.len());
+                Ok(response.to_string())
+            } else {
+                let error = String::from_utf8_lossy(&output.stderr);
+                Err(format!("V2 API request failed: {}", error))
+            }
+        }
+        Err(e) => Err(format!("Failed to call V2 API: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn api_v2_create_task(title: String, description: String, project: Option<String>, categories: Option<String>) -> Result<String, String> {
+    println!("🦀 Rust: Creating V2 task - title: {}, desc: {}, project: {:?}, categories: {:?}", title, description, project, categories);
+    
+    let mut json_body = format!(r#"{{"title": "{}", "description": "{}""#, 
+                               title.replace("\"", "\\\""), 
+                               description.replace("\"", "\\\""));
+    
+    if let Some(proj) = project {
+        json_body.push_str(&format!(r#", "project": "{}""#, proj.replace("\"", "\\\"")));
+    }
+    
+    if let Some(cats) = categories {
+        // Parse categories from comma-separated string to array
+        let categories_array: Vec<&str> = cats.split(',').map(|s| s.trim()).collect();
+        let categories_json = serde_json::to_string(&categories_array).unwrap_or_else(|_| "[]".to_string());
+        json_body.push_str(&format!(r#", "categories": {}"#, categories_json));
+    } else {
+        json_body.push_str(r#", "categories": []"#);
+    }
+    
+    json_body.push('}');
     
     match std::process::Command::new("curl")
         .args([
             "-X", "POST",
-            "http://localhost:5001/api/tasks/add",
+            "http://localhost:5001/api/tasks",
             "-H", "Content-Type: application/json",
             "-d", &json_body,
             "-s"
@@ -48,14 +86,14 @@ async fn api_add_task(title: String, description: String) -> Result<String, Stri
         Ok(output) => {
             if output.status.success() {
                 let response = String::from_utf8_lossy(&output.stdout);
-                println!("✅ Task added: {}", response);
+                println!("✅ V2 Task created: {}", response);
                 Ok(response.to_string())
             } else {
                 let error = String::from_utf8_lossy(&output.stderr);
-                Err(format!("Add task failed: {}", error))
+                Err(format!("V2 Create task failed: {}", error))
             }
         }
-        Err(e) => Err(format!("Failed to add task: {}", e)),
+        Err(e) => Err(format!("Failed to create V2 task: {}", e)),
     }
 }
 
@@ -139,7 +177,8 @@ pub fn run() {
             check_backend_status, 
             start_python_backend,
             api_get_tasks,
-            api_add_task
+            api_v2_get_tasks,
+            api_v2_create_task
         ])
         .setup(|_app| {
             // Start the Python backend when the app launches in a separate thread

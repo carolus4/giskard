@@ -1,4 +1,4 @@
-import APIClient from './APIClient.js';
+import APIClientV2 from './APIClientV2.js';
 import UIManager from './UIManager.js';
 import TaskList from './TaskList.js';
 import DragDropManager from './DragDropManager.js';
@@ -12,7 +12,7 @@ import Notification from './Notification.js';
 class TaskManager {
     constructor() {
         // Initialize core components
-        this.api = new APIClient();
+        this.api = new APIClientV2();
         this.ui = new UIManager();
         this.taskList = new TaskList();
         this.dragDrop = new DragDropManager();
@@ -117,7 +117,7 @@ class TaskManager {
         });
 
         document.addEventListener('task:reorder', (e) => {
-            this._handleReorderTasks(e.detail.fileIdxSequence);
+            this._handleReorderTasks(e.detail.taskIdSequence);
         });
     }
 
@@ -251,7 +251,7 @@ class TaskManager {
             return;
         }
         
-        const result = await this.api.addTask(taskData.title, taskData.description);
+        const result = await this.api.createTask(taskData.title, taskData.description, taskData.project, taskData.categories);
         
         if (result.success) {
             this.pageManager.showPage('task-list');
@@ -266,10 +266,10 @@ class TaskManager {
      * Handle opening task details
      */
     async _handleOpenTaskDetail(task) {
-        const result = await this.api.getTaskDetails(task.file_idx);
+        const result = await this.api.getTask(task.id);
         
         if (result.success) {
-            this.pageManager.showTaskDetail(task.file_idx);
+            this.pageManager.showTaskDetail(task.id);
             this.pageManager.loadTaskIntoDetailPage(result.data);
         } else {
             Notification.error(result.error || 'Failed to load task details');
@@ -287,8 +287,12 @@ class TaskManager {
         
         const result = await this.api.updateTask(
             taskData.fileIdx,
-            taskData.title,
-            taskData.description
+            {
+                title: taskData.title,
+                description: taskData.description,
+                project: taskData.project,
+                categories: taskData.categories
+            }
         );
         
         if (result.success) {
@@ -304,7 +308,7 @@ class TaskManager {
      * Handle starting a task
      */
     async _handleStartTask(task) {
-        const result = await this.api.startTask(task.id);
+        const result = await this.api.updateTaskStatus(task.id, 'in_progress');
         
         if (result.success) {
             await this.loadTasks();
@@ -318,7 +322,7 @@ class TaskManager {
      * Handle stopping a task
      */
     async _handleStopTask(task) {
-        const result = await this.api.stopTask(task.id);
+        const result = await this.api.updateTaskStatus(task.id, 'open');
         
         if (result.success) {
             await this.loadTasks();
@@ -332,7 +336,7 @@ class TaskManager {
      * Handle completing a task
      */
     async _handleCompleteTask(task) {
-        const result = await this.api.markTaskDone(task.id);
+        const result = await this.api.updateTaskStatus(task.id, 'done');
         
         if (result.success) {
             await this.loadTasks();
@@ -348,7 +352,7 @@ class TaskManager {
      * Handle uncompleting a task
      */
     async _handleUncompleteTask(task) {
-        const result = await this.api.uncompleteTask(task.file_idx);
+        const result = await this.api.updateTaskStatus(task.id, 'open');
         
         if (result.success) {
             await this.loadTasks();
@@ -378,7 +382,7 @@ class TaskManager {
             return;
         }
         
-        const result = await this.api.deleteTask(task.file_idx);
+        const result = await this.api.deleteTask(task.id);
         
         if (result.success) {
             // Navigate back to task list since the task no longer exists
@@ -396,7 +400,7 @@ class TaskManager {
     async _handleDeleteTaskFromPage({ taskId }) {
         // Get task data for confirmation
         const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
-        const task = allTasks.find(t => t.file_idx === taskId);
+        const task = allTasks.find(t => t.id === taskId);
         
         if (!task) {
             Notification.error('Task not found');
@@ -428,8 +432,8 @@ class TaskManager {
     /**
      * Handle task reordering
      */
-    async _handleReorderTasks(fileIdxSequence) {
-        const result = await this.api.reorderTasks(fileIdxSequence);
+    async _handleReorderTasks(taskIdSequence) {
+        const result = await this.api.reorderTasks(taskIdSequence);
         
         if (result.success) {
             await this.loadTasks();
@@ -445,7 +449,7 @@ class TaskManager {
     async _handleToggleProgressFromPage({ taskId }) {
         // Get task data
         const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
-        const task = allTasks.find(t => t.file_idx === taskId);
+        const task = allTasks.find(t => t.id === taskId);
         
         if (!task) {
             Notification.error('Task not found');
@@ -484,7 +488,7 @@ class TaskManager {
     async _handleToggleCompletionFromPage({ taskId, checked }) {
         // Get task data
         const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
-        const task = allTasks.find(t => t.file_idx === taskId);
+        const task = allTasks.find(t => t.id === taskId);
         
         if (!task) {
             Notification.error('Task not found');
@@ -542,7 +546,7 @@ class TaskManager {
     _updateDetailPageProgressButton(taskId) {
         // Get updated task data
         const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
-        const task = allTasks.find(t => t.file_idx === taskId);
+        const task = allTasks.find(t => t.id === taskId);
         
         if (!task) return;
         
