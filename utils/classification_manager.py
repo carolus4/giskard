@@ -104,6 +104,7 @@ class ClassificationManager:
             'id': task.id,
             'title': task.title,
             'description': task.description,
+            'project': task.project,
             'timestamp': datetime.now()
         })
         logger.debug(f"Enqueued task for classification: {task.title}")

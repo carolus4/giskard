@@ -42,7 +42,7 @@ class TaskClassificationService:
             logger.warning(f"Model warmup failed: {str(e)}")
             return False
         
-    def classify_task(self, title: str, description: str = "") -> List[str]:
+    def classify_task(self, title: str, description: str = "", project: str = "") -> List[str]:
         """
         Classify a task into categories: health, career, learning
         
@@ -53,6 +53,11 @@ class TaskClassificationService:
         try:
             # Handle very long tasks by truncating intelligently
             task_text = f"{title} - {description}" if description else title
+            
+            # Add project context if available
+            if project:
+                task_text = f"[{project}] {task_text}"
+            
             original_length = len(task_text)
             
             if original_length > 2000:  # Truncate tasks longer than 2000 characters
@@ -186,7 +191,8 @@ class TaskClassificationService:
                 continue
             
             try:
-                categories = self.classify_task(title, description)
+                project = task.get('project', '')
+                categories = self.classify_task(title, description, project)
                 results[task_id] = categories
                 
                 # Add small delay between requests to prevent overwhelming the model

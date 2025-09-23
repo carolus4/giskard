@@ -4,9 +4,12 @@ Clean REST API routes for the todo application
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from typing import Dict, Any
+import logging
 
 from models.task_db import TaskDB
 # from utils.classification_manager import ClassificationManager
+
+logger = logging.getLogger(__name__)
 
 
 # Create Blueprint
@@ -218,5 +221,115 @@ def reorder_tasks():
     
     except Exception as e:
         return APIResponse.error(str(e), 500)
+
+
+@api_v2.route('/chat', methods=['POST'])
+def chat():
+    """Handle chat messages with Ollama"""
+    try:
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        conversation_history = data.get('conversation_history', [])
+        
+        if not message:
+            return APIResponse.error('Message is required')
+        
+        # Import chat service
+        from utils.chat_service import ChatService
+        
+        # Create chat service instance
+        chat_service = ChatService()
+        
+        # Get response from Ollama
+        response = chat_service.send_message(message, conversation_history)
+        
+        return jsonify(APIResponse.success('Chat response generated', {'response': response}))
+    
+    except Exception as e:
+        return APIResponse.error(f"Chat failed: {str(e)}", 500)
+
+
+@api_v2.route('/agent/step', methods=['POST'])
+def agent_step():
+    """Handle agent orchestration step with tool execution"""
+    try:
+        data = request.get_json()
+        messages = data.get('messages', [])
+        ui_context = data.get('ui_context', {})
+        
+        if not messages:
+            return APIResponse.error('Messages array is required')
+        
+        # Import agent service
+        from utils.agent_service import AgentService
+        
+        # Create agent service instance
+        agent_service = AgentService()
+        
+        # Check if Ollama is available
+        if not agent_service.is_ollama_available():
+            return APIResponse.error('Ollama service is not available', 503)
+        
+        # Process the agent step
+        result = agent_service.process_step(messages, ui_context)
+        
+        # Log the request and response for observability
+        logger.info(f"Agent step processed: success={result.get('success')}, undo_token={result.get('undo_token')}")
+        
+        if result.get('success'):
+            return jsonify(APIResponse.success('Agent step completed', result))
+        else:
+            return jsonify(APIResponse.error(result.get('error', 'Agent step failed'), 500))
+    
+    except Exception as e:
+        logger.error(f"Agent step failed: {str(e)}")
+        return APIResponse.error(f"Agent step failed: {str(e)}", 500)
+
+
+@api_v2.route('/agent/undo', methods=['POST'])
+def agent_undo():
+    """Undo the last agent mutation"""
+    try:
+        data = request.get_json()
+        undo_token = data.get('undo_token')
+        
+        if not undo_token:
+            return APIResponse.error('undo_token is required')
+        
+        # Import agent service
+        from utils.agent_service import AgentService
+        
+        # Create agent service instance
+        agent_service = AgentService()
+        
+        # Execute undo operation
+        result = agent_service.undo_last_mutation(undo_token)
+        
+        # Log the undo operation
+        logger.info(f"Undo operation: token={undo_token}, success={result.get('success')}")
+        
+        if result.get('success'):
+            return jsonify(APIResponse.success('Undo completed', result))
+        else:
+            return jsonify(APIResponse.error(result.get('message', 'Undo failed'), 400))
+    
+    except Exception as e:
+        logger.error(f"Undo operation failed: {str(e)}")
+        return APIResponse.error(f"Undo failed: {str(e)}", 500)
+
+
+@api_v2.route('/agent/metrics', methods=['GET'])
+def get_agent_metrics():
+    """Get agent metrics and observability data"""
+    try:
+        from utils.agent_metrics import agent_metrics as metrics_collector
+        
+        metrics = metrics_collector.get_metrics()
+        
+        return jsonify(APIResponse.success('Metrics retrieved', {'metrics': metrics}))
+    
+    except Exception as e:
+        logger.error(f"Failed to get metrics: {str(e)}")
+        return APIResponse.error(f"Failed to get metrics: {str(e)}", 500)
 
 

@@ -137,8 +137,22 @@ class ChatManager {
             const response = await this._sendToOllama(message);
             this._addMessage('bot', response);
         } catch (error) {
-            console.error('Failed to get response from Ollama:', error);
-            this._addMessage('bot', `I'm having trouble connecting right now. Please check if Ollama is running with ${this.modelName} and try again.`);
+            console.error('Failed to get response from agent:', error);
+            
+            // Provide more specific error messages
+            let errorMessage = 'I encountered an error. Please try again.';
+            
+            if (error.message.includes('timeout') || error.message.includes('timed out')) {
+                errorMessage = 'The request timed out. The AI might be busy - please try again.';
+            } else if (error.message.includes('HTTP error')) {
+                errorMessage = 'Server error occurred. Please try again.';
+            } else if (error.message.includes('Failed to fetch')) {
+                errorMessage = 'Connection error. Please check if the server is running.';
+            } else if (error.message.includes('Agent step failed')) {
+                errorMessage = 'I had trouble processing your request. Please try again.';
+            }
+            
+            this._addMessage('bot', errorMessage);
         } finally {
             this._hideTyping();
         }
@@ -225,21 +239,36 @@ class ChatManager {
     }
 
     /**
-     * Send message to Ollama (with timeout and error handling)
+     * Send message to Ollama via agent orchestration (with timeout and error handling)
      */
     async _sendToOllama(message) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         
         try {
-            const response = await fetch(`${this.baseURL}/chat`, {
+            // Get current UI context (tasks, etc.)
+            const uiContext = await this._getUIContext();
+            
+            // Convert chat messages to agent format
+            const agentMessages = this.chatMessages.map(msg => ({
+                type: msg.type === 'user' ? 'user' : 'assistant',
+                content: msg.content
+            }));
+            
+            // Add current user message
+            agentMessages.push({
+                type: 'user',
+                content: message
+            });
+            
+            const response = await fetch(`${this.baseURL}/agent/step`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    message: message,
-                    conversation_history: this.chatMessages.slice(-6) // Reduced context for faster responses
+                    messages: agentMessages.slice(-6), // Keep last 6 messages for context
+                    ui_context: uiContext
                 }),
                 signal: controller.signal
             });
@@ -251,13 +280,102 @@ class ChatManager {
             }
 
             const data = await response.json();
-            return data.response;
+            
+            // Debug logging
+            console.log('🤖 Agent response:', data);
+            
+            if (data.success) {
+                // Handle side effects (task creation, etc.)
+                if (data.side_effects && data.side_effects.length > 0) {
+                    console.log('🔧 Side effects:', data.side_effects);
+                    this._handleSideEffects(data.side_effects);
+                }
+                
+                // Store undo token for potential undo operations
+                if (data.undo_token) {
+                    console.log('🔄 Undo token:', data.undo_token);
+                    this._storeUndoToken(data.undo_token);
+                }
+                
+                return data.assistant_text;
+            } else {
+                console.error('❌ Agent step failed:', data.error);
+                throw new Error(data.error || 'Agent step failed');
+            }
         } catch (error) {
             clearTimeout(timeoutId);
             if (error.name === 'AbortError') {
                 throw new Error('Request timed out. The AI might be busy - please try again.');
             }
             throw error;
+        }
+    }
+    
+    /**
+     * Get current UI context for the agent
+     */
+    async _getUIContext() {
+        try {
+            // Get current tasks from the API
+            const response = await fetch(`${this.baseURL}/tasks`);
+            if (response.ok) {
+                const data = await response.json();
+                return {
+                    current_tasks: data.tasks || {},
+                    task_counts: data.counts || {},
+                    today_date: data.today_date || ''
+                };
+            }
+        } catch (error) {
+            console.warn('Failed to get UI context:', error);
+        }
+        
+        return {
+            current_tasks: {},
+            task_counts: {},
+            today_date: ''
+        };
+    }
+    
+    /**
+     * Handle side effects from agent execution
+     */
+    _handleSideEffects(sideEffects) {
+        sideEffects.forEach(effect => {
+            if (effect.success && effect.action === 'create_task') {
+                // Show success notification
+                this._showNotification(`✅ ${effect.message}`, 'success');
+                
+                // Trigger task list refresh if TaskManager is available
+                if (window.TaskManager && window.TaskManager.loadTasks) {
+                    console.log('🔄 Refreshing task list after task creation');
+                    window.TaskManager.loadTasks(true); // Refresh with animation
+                } else {
+                    console.warn('⚠️ TaskManager not available for task list refresh');
+                }
+            } else if (!effect.success) {
+                // Show error notification
+                this._showNotification(`❌ ${effect.error}`, 'error');
+            }
+        });
+    }
+    
+    /**
+     * Store undo token for potential undo operations
+     */
+    _storeUndoToken(undoToken) {
+        // Store the most recent undo token
+        this.lastUndoToken = undoToken;
+        
+        // You could also store multiple tokens if needed
+        if (!this.undoTokens) {
+            this.undoTokens = [];
+        }
+        this.undoTokens.push(undoToken);
+        
+        // Keep only the last 5 undo tokens
+        if (this.undoTokens.length > 5) {
+            this.undoTokens.shift();
         }
     }
 
@@ -272,7 +390,13 @@ class ChatManager {
         };
         
         this.chatMessages.push(message);
-        this._renderMessage(message);
+        const messageElement = this._renderMessage(message);
+        
+        // Add undo button if this is an assistant message and we have an undo token
+        if (type === 'bot' && this.lastUndoToken) {
+            this._addUndoButton(messageElement);
+        }
+        
         this._scrollToBottom();
         this._saveChatHistory();
     }
@@ -329,7 +453,7 @@ class ChatManager {
      * Render single message
      */
     _renderMessage(message, animate = true) {
-        if (!this.chatMessagesContainer) return;
+        if (!this.chatMessagesContainer) return null;
 
         const messageEl = document.createElement('div');
         messageEl.className = `message ${message.type}-message ${animate ? 'fade-in' : ''}`;
@@ -350,6 +474,7 @@ class ChatManager {
         `;
 
         this.chatMessagesContainer.appendChild(messageEl);
+        return messageEl;
     }
 
     /**
@@ -536,6 +661,94 @@ class ChatManager {
     }
 
     /**
+     * Undo the last agent action
+     */
+    async _undoLastAction() {
+        if (!this.lastUndoToken) {
+            this._showNotification('No action to undo', 'info');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${this.baseURL}/agent/undo`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    undo_token: this.lastUndoToken
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    this._showNotification(data.data.message, 'success');
+                    
+                    // Trigger task list refresh
+                    if (window.TaskManager && window.TaskManager.loadTasks) {
+                        console.log('🔄 Refreshing task list after undo');
+                        window.TaskManager.loadTasks(true); // Refresh with animation
+                    } else {
+                        console.warn('⚠️ TaskManager not available for task list refresh');
+                    }
+                    
+                    // Clear the undo token
+                    this.lastUndoToken = null;
+                } else {
+                    this._showNotification(data.error || 'Undo failed', 'error');
+                }
+            } else {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Undo failed:', error);
+            this._showNotification('Failed to undo action', 'error');
+        }
+    }
+    
+    /**
+     * Add undo button to the last assistant message
+     */
+    _addUndoButton(messageElement) {
+        if (!this.lastUndoToken || !messageElement) return;
+        
+        const undoButton = document.createElement('button');
+        undoButton.className = 'undo-btn';
+        undoButton.innerHTML = '↶ Undo';
+        undoButton.style.cssText = `
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 8px;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        `;
+        
+        undoButton.addEventListener('mouseenter', () => {
+            undoButton.style.opacity = '1';
+        });
+        
+        undoButton.addEventListener('mouseleave', () => {
+            undoButton.style.opacity = '0.8';
+        });
+        
+        undoButton.addEventListener('click', () => {
+            this._undoLastAction();
+            undoButton.remove(); // Remove button after undo
+        });
+        
+        const messageContent = messageElement.querySelector('.message-content');
+        if (messageContent) {
+            messageContent.appendChild(undoButton);
+        }
+    }
+
+    /**
      * Debug function - inspect current chat state
      */
     debugChatState() {
@@ -545,6 +758,7 @@ class ChatManager {
         console.log('🎯 chatMessagesContainer:', !!this.chatMessagesContainer);
         console.log('💡 chatSuggestions:', !!this.chatSuggestions);
         console.log('⌨️ chatInput:', !!this.chatInput);
+        console.log('🔄 Last undo token:', this.lastUndoToken);
         console.log('========================');
     }
 }
