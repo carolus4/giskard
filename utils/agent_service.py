@@ -57,9 +57,18 @@ class AgentService:
                 # Execute validated tool calls
                 side_effects = []
                 create_task_count = 0
+                tool_call_details = []  # NEW: Track tool call details for UI
+                
                 for tool_call in tool_calls:
                     tool_name = tool_call['name']
                     arguments = tool_call['arguments']
+                    
+                    # Add tool call detail for UI display
+                    tool_call_details.append({
+                        'tool_name': tool_name,
+                        'arguments': arguments,
+                        'status': 'executing'
+                    })
                     
                     if tool_name == 'create_task':
                         result = self._execute_create_task(arguments, undo_token)
@@ -78,11 +87,16 @@ class AgentService:
                         result = self._execute_update_task_status(arguments, undo_token)
                         side_effects.append(result)
                     else:
-                        side_effects.append({
+                        result = {
                             'success': False,
                             'error': f'Unknown tool: {tool_name}',
                             'action': tool_name
-                        })
+                        }
+                        side_effects.append(result)
+                    
+                    # Update tool call detail with result
+                    tool_call_details[-1]['result'] = result
+                    tool_call_details[-1]['status'] = 'completed' if result.get('success') else 'failed'
                 
                 # Record metrics
                 response_time = time.time() - timer.start_time if timer.start_time else 0
@@ -94,7 +108,12 @@ class AgentService:
                 )
                 
                 # Generate assistant response text
-                assistant_text = self._generate_assistant_response(llm_response, tool_calls, side_effects, messages)
+                if tool_calls and side_effects:
+                    # Send tool results back to LLM for intelligent analysis while preserving conversational context
+                    assistant_text = self._generate_intelligent_response_with_context(llm_response, tool_calls, side_effects, messages)
+                else:
+                    # No tool calls, just filter the response
+                    assistant_text = self._generate_assistant_response(llm_response, tool_calls, side_effects, messages)
                 
                 # Log the final response
                 self._log_agent_interaction(messages, prompt, llm_response, tool_calls, side_effects, "final_response", assistant_text)
@@ -102,6 +121,7 @@ class AgentService:
                 return {
                     'assistant_text': assistant_text,
                     'side_effects': side_effects,
+                    'tool_calls': tool_call_details,  # NEW: Include tool call details
                     'undo_token': undo_token,
                     'success': True
                 }
@@ -117,6 +137,7 @@ class AgentService:
                 return {
                     'assistant_text': f"I encountered an error: {str(e)}",
                     'side_effects': [],
+                    'tool_calls': [],  # NEW: Empty tool calls on error
                     'undo_token': None,
                     'success': False,
                     'error': str(e)
@@ -469,59 +490,31 @@ Assistant:"""
                 'action': 'create_task'
             }
     
-    def _generate_assistant_response(self, llm_response: str, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]]) -> str:
-        """Generate the final assistant response text"""
-        
-        # If there were tool calls, create a response based on the results
-        if tool_calls and side_effects:
-            responses = []
-            for i, side_effect in enumerate(side_effects):
-                if side_effect.get('success'):
-                    if side_effect.get('action') == 'create_task':
-                        responses.append(f"✅ {side_effect.get('message', 'Task created successfully')}")
-                else:
-                    responses.append(f"❌ {side_effect.get('error', 'Action failed')}")
-            
-            return '\n'.join(responses)
-        
-        # If no tool calls, return the LLM response (cleaned up)
-        # Remove tool call markers from the response
-        cleaned_response = llm_response
-        lines = cleaned_response.split('\n')
-        filtered_lines = []
-        
-        for line in lines:
-            line = line.strip()
-            if not (line.startswith('TOOL_CALL:') or line.startswith('ARGUMENTS:')):
-                filtered_lines.append(line)
-        
-        return '\n'.join(filtered_lines).strip()
-    
     def _generate_assistant_response(self, llm_response: str, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]], original_messages: List[Dict[str, Any]] = None) -> str:
-        """Generate the final assistant response text"""
+        """Generate the final assistant response text with preserved conversational context"""
         
-        # If there were tool calls, send results back to LLM for intelligent analysis
-        if tool_calls and side_effects:
-            return self._generate_intelligent_response(tool_calls, side_effects, original_messages or [])
-        
-        # If no tool calls, return the LLM response (cleaned up)
-        # Remove tool call markers from the response
+        # Always preserve the original LLM response and just filter out technical tool call lines
+        # This ensures the user sees the valuable conversational context and reasoning
         cleaned_response = llm_response
         lines = cleaned_response.split('\n')
         filtered_lines = []
         
         for line in lines:
-            line = line.strip()
-            if not (line.startswith('TOOL_CALL:') or line.startswith('ARGUMENTS:')):
-                filtered_lines.append(line)
+            stripped_line = line.strip()
+            # Only filter out the technical tool call markers
+            if not (stripped_line.startswith('TOOL_CALL:') or stripped_line.startswith('ARGUMENTS:')):
+                filtered_lines.append(line)  # Preserve original spacing/indentation
         
         return '\n'.join(filtered_lines).strip()
     
-    def _generate_intelligent_response(self, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]], original_messages: List[Dict[str, Any]]) -> str:
-        """Send tool results back to LLM for intelligent analysis and response generation"""
+    def _generate_intelligent_response_with_context(self, original_llm_response: str, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]], original_messages: List[Dict[str, Any]]) -> str:
+        """Send tool results back to LLM for intelligent analysis while preserving conversational context"""
         try:
-            # Build analysis prompt with tool results and original context
-            analysis_prompt = self._build_analysis_prompt(tool_calls, side_effects, original_messages)
+            # Extract the conversational part from the original response
+            conversational_response = self._generate_assistant_response(original_llm_response, tool_calls, side_effects, original_messages)
+            
+            # Build a prompt that includes the original conversational context and tool results
+            analysis_prompt = self._build_analysis_prompt_with_context(conversational_response, tool_calls, side_effects, original_messages)
             
             # Call LLM with tool results for intelligent analysis
             llm_analysis_response = self._call_ollama_with_tools(analysis_prompt)
@@ -532,76 +525,46 @@ Assistant:"""
             filtered_lines = []
             
             for line in lines:
-                line = line.strip()
-                if not (line.startswith('TOOL_CALL:') or line.startswith('ARGUMENTS:')):
+                stripped_line = line.strip()
+                if not (stripped_line.startswith('TOOL_CALL:') or stripped_line.startswith('ARGUMENTS:')):
                     filtered_lines.append(line)
             
             return '\n'.join(filtered_lines).strip()
             
         except Exception as e:
             logger.error(f"Intelligent response generation failed: {str(e)}")
-            # Fallback to basic response if intelligent analysis fails
-            return self._generate_fallback_response(side_effects)
+            # Fallback to just the conversational response
+            return self._generate_assistant_response(original_llm_response, tool_calls, side_effects, original_messages)
     
-    def _build_analysis_prompt(self, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]], original_messages: List[Dict[str, Any]]) -> str:
-        """Build prompt for LLM to analyze tool results and generate intelligent response"""
+    def _build_analysis_prompt_with_context(self, conversational_response: str, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]], original_messages: List[Dict[str, Any]]) -> str:
+        """Build a prompt that includes conversational context and tool results for LLM analysis"""
         
-        # Get the coaching system prompt
-        from config.prompt_registry import prompt_registry
-        coaching_prompt = prompt_registry.get_latest_prompt("coaching_system")
+        # Start with the conversational response
+        prompt_parts = [
+            "You are a helpful productivity coach. You just provided this response to a user:",
+            "",
+            f'"{conversational_response}"',
+            "",
+            "You then executed these tools and got these results:",
+            ""
+        ]
         
-        if coaching_prompt:
-            system_prompt = coaching_prompt.content
-        else:
-            system_prompt = """You are a helpful productivity coach. You help users organize their tasks, set priorities, and stay motivated. Be encouraging, practical, and focused on productivity."""
-        
-        # Build tool results context
-        tool_results_context = "Tool execution results:\n"
+        # Add tool execution results
         for i, (tool_call, side_effect) in enumerate(zip(tool_calls, side_effects)):
-            tool_results_context += f"\nTool {i+1}: {tool_call.get('name', 'unknown')}\n"
-            tool_results_context += f"Success: {side_effect.get('success', False)}\n"
-            if side_effect.get('success'):
-                tool_results_context += f"Data: {json.dumps(side_effect, indent=2)}\n"
-            else:
-                tool_results_context += f"Error: {side_effect.get('error', 'Unknown error')}\n"
+            prompt_parts.append(f"Tool {i+1}: {tool_call['name']}")
+            prompt_parts.append(f"Arguments: {json.dumps(tool_call['arguments'], indent=2)}")
+            prompt_parts.append(f"Result: {json.dumps(side_effect, indent=2)}")
+            prompt_parts.append("")
         
-        # Build conversation context
-        conversation_context = ""
-        if original_messages:
-            for msg in original_messages[-6:]:  # Keep last 6 messages for context
-                role = "User" if msg.get('type') == 'user' else "Assistant"
-                content = msg.get('content', '')
-                conversation_context += f"{role}: {content}\n"
+        prompt_parts.extend([
+            "Now provide a natural, helpful response that incorporates the tool results into your original response.",
+            "Be conversational and explain what you found or what you did.",
+            "Don't just list the raw data - make it useful and engaging for the user.",
+            "",
+            "Response:"
+        ])
         
-        # Build the analysis prompt
-        analysis_prompt = f"""{system_prompt}
-
-You have just executed some tools and received results. Now analyze these results and provide an intelligent, helpful response to the user based on their original request.
-
-{tool_results_context}
-
-Previous conversation:
-{conversation_context}
-
-Based on the tool results above, provide a helpful, intelligent response to the user. Focus on:
-- Analyzing the data meaningfully
-- Providing specific, actionable advice
-- Being contextual and relevant to their request
-- Offering practical next steps or recommendations
-
-Response:"""
-        
-        return analysis_prompt
-    
-    def _generate_fallback_response(self, side_effects: List[Dict[str, Any]]) -> str:
-        """Generate a basic fallback response if intelligent analysis fails"""
-        responses = []
-        for side_effect in side_effects:
-            if side_effect.get('success'):
-                responses.append(f"✅ {side_effect.get('message', 'Action completed successfully')}")
-            else:
-                responses.append(f"❌ {side_effect.get('error', 'Action failed')}")
-        return '\n'.join(responses)
+        return '\n'.join(prompt_parts)
     
     def _execute_get_tasks(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute get_tasks tool"""

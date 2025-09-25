@@ -285,6 +285,12 @@ class ChatManager {
             console.log('🤖 Agent response:', data);
             
             if (data.success) {
+                // NEW: Display tool calls if they exist
+                if (data.tool_calls && data.tool_calls.length > 0) {
+                    console.log('🔧 Tool calls:', data.tool_calls);
+                    this._displayToolCalls(data.tool_calls);
+                }
+                
                 // Handle side effects (task creation, etc.)
                 if (data.side_effects && data.side_effects.length > 0) {
                     console.log('🔧 Side effects:', data.side_effects);
@@ -746,6 +752,87 @@ class ChatManager {
         if (messageContent) {
             messageContent.appendChild(undoButton);
         }
+    }
+
+    /**
+     * NEW: Display tool calls in the chat interface
+     */
+    _displayToolCalls(toolCalls) {
+        if (!this.chatMessagesContainer || !toolCalls.length) return;
+        
+        // Create a tool calls container
+        const toolCallsContainer = document.createElement('div');
+        toolCallsContainer.className = 'tool-calls-container';
+        toolCallsContainer.innerHTML = `
+            <div class="tool-calls-header">
+                <div class="tool-calls-avatar">🔧</div>
+                <div class="tool-calls-title">Executing ${toolCalls.length} action${toolCalls.length > 1 ? 's' : ''}...</div>
+            </div>
+            <div class="tool-calls-list">
+                ${toolCalls.map(toolCall => this._renderToolCall(toolCall)).join('')}
+            </div>
+        `;
+        
+        this.chatMessagesContainer.appendChild(toolCallsContainer);
+        this._scrollToBottom();
+    }
+
+    /**
+     * NEW: Render individual tool call
+     */
+    _renderToolCall(toolCall) {
+        const statusIcon = toolCall.status === 'completed' ? 
+            (toolCall.result?.success ? '✅' : '❌') : '⏳';
+        
+        const statusClass = toolCall.status === 'completed' ? 
+            (toolCall.result?.success ? 'success' : 'error') : 'executing';
+        
+        return `
+            <div class="tool-call-item ${statusClass}">
+                <div class="tool-call-header">
+                    <span class="tool-call-icon">${statusIcon}</span>
+                    <span class="tool-call-name">${this._formatToolName(toolCall.tool_name)}</span>
+                    <span class="tool-call-status">${toolCall.status}</span>
+                </div>
+                ${this._renderToolCallDetails(toolCall)}
+            </div>
+        `;
+    }
+
+    /**
+     * NEW: Format tool names for display
+     */
+    _formatToolName(toolName) {
+        const nameMap = {
+            'create_task': 'Create Task',
+            'get_tasks': 'Get Tasks',
+            'update_task': 'Update Task',
+            'delete_task': 'Delete Task',
+            'update_task_status': 'Update Status'
+        };
+        return nameMap[toolName] || toolName;
+    }
+
+    /**
+     * NEW: Render tool call details
+     */
+    _renderToolCallDetails(toolCall) {
+        let details = '';
+        
+        if (toolCall.tool_name === 'create_task' && toolCall.arguments.title) {
+            details = `<div class="tool-call-details">Creating: "${toolCall.arguments.title}"</div>`;
+        } else if (toolCall.tool_name === 'get_tasks') {
+            const status = toolCall.arguments.status || 'all';
+            details = `<div class="tool-call-details">Fetching ${status} tasks</div>`;
+        } else if (toolCall.tool_name === 'update_task' && toolCall.arguments.title) {
+            details = `<div class="tool-call-details">Updating: "${toolCall.arguments.title}"</div>`;
+        }
+        
+        if (toolCall.result && !toolCall.result.success) {
+            details += `<div class="tool-call-error">Error: ${toolCall.result.error}</div>`;
+        }
+        
+        return details;
     }
 
     /**
