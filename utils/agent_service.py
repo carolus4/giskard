@@ -94,7 +94,7 @@ class AgentService:
                 )
                 
                 # Generate assistant response text
-                assistant_text = self._generate_assistant_response(llm_response, tool_calls, side_effects)
+                assistant_text = self._generate_assistant_response(llm_response, tool_calls, side_effects, messages)
                 
                 # Log the final response
                 self._log_agent_interaction(messages, prompt, llm_response, tool_calls, side_effects, "final_response", assistant_text)
@@ -497,49 +497,12 @@ Assistant:"""
         
         return '\n'.join(filtered_lines).strip()
     
-    def _generate_assistant_response(self, llm_response: str, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]]) -> str:
+    def _generate_assistant_response(self, llm_response: str, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]], original_messages: List[Dict[str, Any]] = None) -> str:
         """Generate the final assistant response text"""
         
-        # If there were tool calls, create a response based on the results
+        # If there were tool calls, send results back to LLM for intelligent analysis
         if tool_calls and side_effects:
-            responses = []
-            for i, side_effect in enumerate(side_effects):
-                if side_effect.get('success'):
-                    if side_effect.get('action') == 'create_task':
-                        responses.append(f"✅ {side_effect.get('message', 'Task created successfully')}")
-                    elif side_effect.get('action') == 'get_tasks':
-                        tasks = side_effect.get('tasks', [])
-                        if isinstance(tasks, list):
-                            if tasks:
-                                task_list = []
-                                for task in tasks:
-                                    task_list.append(f"{task.get('title', 'Unknown')} (Task ID: {task.get('id')}) - Status: {task.get('status')}")
-                                responses.append(f"📋 Found {len(tasks)} task(s):\n" + "\n".join(task_list))
-                            else:
-                                responses.append("📋 No tasks found with that status")
-                        elif isinstance(tasks, dict):
-                            # Handle grouped tasks (open, in_progress, done)
-                            total_tasks = sum(len(task_list) for task_list in tasks.values())
-                            if total_tasks > 0:
-                                task_summary = []
-                                for status, task_list in tasks.items():
-                                    if task_list:
-                                        task_summary.append(f"{status}: {len(task_list)} task(s)")
-                                responses.append(f"📋 Found {total_tasks} total task(s):\n" + "\n".join(task_summary))
-                            else:
-                                responses.append("📋 No tasks found")
-                    elif side_effect.get('action') == 'update_task':
-                        responses.append(f"✅ {side_effect.get('message', 'Task updated successfully')}")
-                    elif side_effect.get('action') == 'delete_task':
-                        responses.append(f"🗑️ {side_effect.get('message', 'Task deleted successfully')}")
-                    elif side_effect.get('action') == 'update_task_status':
-                        responses.append(f"🔄 {side_effect.get('message', 'Task status updated successfully')}")
-                    else:
-                        responses.append(f"✅ {side_effect.get('message', 'Action completed successfully')}")
-                else:
-                    responses.append(f"❌ {side_effect.get('error', 'Action failed')}")
-            
-            return '\n'.join(responses)
+            return self._generate_intelligent_response(tool_calls, side_effects, original_messages or [])
         
         # If no tool calls, return the LLM response (cleaned up)
         # Remove tool call markers from the response
@@ -553,6 +516,92 @@ Assistant:"""
                 filtered_lines.append(line)
         
         return '\n'.join(filtered_lines).strip()
+    
+    def _generate_intelligent_response(self, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]], original_messages: List[Dict[str, Any]]) -> str:
+        """Send tool results back to LLM for intelligent analysis and response generation"""
+        try:
+            # Build analysis prompt with tool results and original context
+            analysis_prompt = self._build_analysis_prompt(tool_calls, side_effects, original_messages)
+            
+            # Call LLM with tool results for intelligent analysis
+            llm_analysis_response = self._call_ollama_with_tools(analysis_prompt)
+            
+            # Clean up the response (remove any tool call markers)
+            cleaned_response = llm_analysis_response
+            lines = cleaned_response.split('\n')
+            filtered_lines = []
+            
+            for line in lines:
+                line = line.strip()
+                if not (line.startswith('TOOL_CALL:') or line.startswith('ARGUMENTS:')):
+                    filtered_lines.append(line)
+            
+            return '\n'.join(filtered_lines).strip()
+            
+        except Exception as e:
+            logger.error(f"Intelligent response generation failed: {str(e)}")
+            # Fallback to basic response if intelligent analysis fails
+            return self._generate_fallback_response(side_effects)
+    
+    def _build_analysis_prompt(self, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]], original_messages: List[Dict[str, Any]]) -> str:
+        """Build prompt for LLM to analyze tool results and generate intelligent response"""
+        
+        # Get the coaching system prompt
+        from config.prompt_registry import prompt_registry
+        coaching_prompt = prompt_registry.get_latest_prompt("coaching_system")
+        
+        if coaching_prompt:
+            system_prompt = coaching_prompt.content
+        else:
+            system_prompt = """You are a helpful productivity coach. You help users organize their tasks, set priorities, and stay motivated. Be encouraging, practical, and focused on productivity."""
+        
+        # Build tool results context
+        tool_results_context = "Tool execution results:\n"
+        for i, (tool_call, side_effect) in enumerate(zip(tool_calls, side_effects)):
+            tool_results_context += f"\nTool {i+1}: {tool_call.get('name', 'unknown')}\n"
+            tool_results_context += f"Success: {side_effect.get('success', False)}\n"
+            if side_effect.get('success'):
+                tool_results_context += f"Data: {json.dumps(side_effect, indent=2)}\n"
+            else:
+                tool_results_context += f"Error: {side_effect.get('error', 'Unknown error')}\n"
+        
+        # Build conversation context
+        conversation_context = ""
+        if original_messages:
+            for msg in original_messages[-6:]:  # Keep last 6 messages for context
+                role = "User" if msg.get('type') == 'user' else "Assistant"
+                content = msg.get('content', '')
+                conversation_context += f"{role}: {content}\n"
+        
+        # Build the analysis prompt
+        analysis_prompt = f"""{system_prompt}
+
+You have just executed some tools and received results. Now analyze these results and provide an intelligent, helpful response to the user based on their original request.
+
+{tool_results_context}
+
+Previous conversation:
+{conversation_context}
+
+Based on the tool results above, provide a helpful, intelligent response to the user. Focus on:
+- Analyzing the data meaningfully
+- Providing specific, actionable advice
+- Being contextual and relevant to their request
+- Offering practical next steps or recommendations
+
+Response:"""
+        
+        return analysis_prompt
+    
+    def _generate_fallback_response(self, side_effects: List[Dict[str, Any]]) -> str:
+        """Generate a basic fallback response if intelligent analysis fails"""
+        responses = []
+        for side_effect in side_effects:
+            if side_effect.get('success'):
+                responses.append(f"✅ {side_effect.get('message', 'Action completed successfully')}")
+            else:
+                responses.append(f"❌ {side_effect.get('error', 'Action failed')}")
+        return '\n'.join(responses)
     
     def _execute_get_tasks(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute get_tasks tool"""

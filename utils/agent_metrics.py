@@ -53,7 +53,18 @@ class AgentMetrics:
     
     def get_metrics(self) -> Dict[str, Any]:
         """Get current metrics"""
-        return dict(self.metrics)
+        # Create a copy and convert non-serializable objects
+        metrics_copy = dict(self.metrics)
+        
+        # Convert deque to list for JSON serialization
+        if 'response_times' in metrics_copy:
+            metrics_copy['response_times'] = list(metrics_copy['response_times'])
+        
+        # Convert defaultdict to dict for JSON serialization
+        if 'error_counts' in metrics_copy:
+            metrics_copy['error_counts'] = dict(metrics_copy['error_counts'])
+        
+        return metrics_copy
     
     def reset_metrics(self):
         """Reset all metrics"""
