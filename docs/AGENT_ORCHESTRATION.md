@@ -122,15 +122,48 @@ You have access to the following tools:
    - project (string, optional): Project name
    - categories (array of strings, optional): Task categories
 
-When you want to create a task, respond with:
+2. get_tasks: Get all tasks (useful for checking current tasks)
+   - status (string, optional): Filter by status (open, in_progress, done)
+
+3. update_task: Update an existing task
+   - task_id (integer, required): The task ID to update
+   - title (string, optional): New task title
+   - description (string, optional): New task description
+   - project (string, optional): New project name
+   - categories (array of strings, optional): New task categories
+
+4. delete_task: Delete a task
+   - task_id (integer, required): The task ID to delete
+
+5. update_task_status: Change task status
+   - task_id (integer, required): The task ID to update
+   - status (string, required): New status (open, in_progress, done)
+
+Examples:
 TOOL_CALL: create_task
 ARGUMENTS: {"title": "Task title", "description": "Optional description", "project": "Optional project", "categories": ["category1", "category2"]}
+
+TOOL_CALL: get_tasks
+ARGUMENTS: {"status": "open"}
+
+TOOL_CALL: update_task
+ARGUMENTS: {"task_id": 123, "title": "Updated title", "description": "Updated description"}
+
+TOOL_CALL: delete_task
+ARGUMENTS: {"task_id": 123}
+
+TOOL_CALL: update_task_status
+ARGUMENTS: {"task_id": 123, "status": "done"}
 ```
 
 ## Features
 
 ### 1. Tool Execution
 - **create_task**: Creates new tasks with validation
+- **get_tasks**: Retrieves task lists with optional status filtering
+- **update_task**: Modifies existing tasks (title, description, project, categories)
+- **delete_task**: Removes tasks with undo support
+- **update_task_status**: Changes task status (open, in_progress, done)
 - Structured tool call parsing from Ollama responses
 - Server-side validation of tool arguments
 
@@ -142,7 +175,11 @@ ARGUMENTS: {"title": "Task title", "description": "Optional description", "proje
 ### 3. Undo Functionality
 - Server-owned undo tokens for each mutation
 - Simple in-memory undo storage (stateless per request)
-- Support for undoing task creation
+- Support for undoing all operations:
+  - **create_task**: Deletes the created task
+  - **update_task**: Restores original values
+  - **delete_task**: Recreates the deleted task
+  - **update_task_status**: Restores original status
 
 ### 4. Observability
 - Request/response logging
@@ -240,19 +277,20 @@ The agent uses the existing Ollama configuration from `config/ollama_config.py`:
 ## Limitations (MVP)
 
 1. **Stateless**: No persistent session storage
-2. **Single Tool**: Only `create_task` tool implemented
-3. **Simple Undo**: In-memory undo tokens only
-4. **No Streaming**: Synchronous requests only
-5. **No Multi-tool Planning**: Single tool call per request
+2. **Simple Undo**: In-memory undo tokens only (cleared on server restart)
+3. **No Streaming**: Synchronous requests only
+4. **No Multi-tool Planning**: Single tool call per request
+5. **Basic Error Recovery**: Limited retry mechanisms
 
 ## Future Enhancements
 
 1. **Persistent Sessions**: Thread-based conversation storage
-2. **Additional Tools**: Update, complete, reorder tasks
+2. **Additional Tools**: Task reordering, bulk operations
 3. **Streaming Support**: SSE for real-time responses
 4. **Multi-tool Planning**: ReAct-style tool chaining
-5. **Advanced Undo**: Persistent undo history
+5. **Advanced Undo**: Persistent undo history with transaction logs
 6. **Agent Memory**: Long-term conversation context
+7. **Enhanced Error Recovery**: Automatic retry with exponential backoff
 
 ## Troubleshooting
 

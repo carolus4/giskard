@@ -42,20 +42,47 @@ class AgentService:
                 # Build the agent prompt with tool schema
                 prompt = self._build_agent_prompt(messages, ui_context or {})
                 
+                # Log the user request and prompt
+                self._log_agent_interaction(messages, prompt, None, None, None, "prompt_sent")
+                
                 # Call Ollama with tool schema
                 llm_response = self._call_ollama_with_tools(prompt)
                 
                 # Parse and validate tool calls
                 tool_calls = self._parse_tool_calls(llm_response)
                 
+                # Log the LLM response and parsed tool calls
+                self._log_agent_interaction(messages, prompt, llm_response, tool_calls, None, "llm_response")
+                
                 # Execute validated tool calls
                 side_effects = []
                 create_task_count = 0
                 for tool_call in tool_calls:
-                    if tool_call['name'] == 'create_task':
-                        result = self._execute_create_task(tool_call['arguments'], undo_token)
+                    tool_name = tool_call['name']
+                    arguments = tool_call['arguments']
+                    
+                    if tool_name == 'create_task':
+                        result = self._execute_create_task(arguments, undo_token)
                         side_effects.append(result)
                         create_task_count += 1
+                    elif tool_name == 'get_tasks':
+                        result = self._execute_get_tasks(arguments)
+                        side_effects.append(result)
+                    elif tool_name == 'update_task':
+                        result = self._execute_update_task(arguments, undo_token)
+                        side_effects.append(result)
+                    elif tool_name == 'delete_task':
+                        result = self._execute_delete_task(arguments, undo_token)
+                        side_effects.append(result)
+                    elif tool_name == 'update_task_status':
+                        result = self._execute_update_task_status(arguments, undo_token)
+                        side_effects.append(result)
+                    else:
+                        side_effects.append({
+                            'success': False,
+                            'error': f'Unknown tool: {tool_name}',
+                            'action': tool_name
+                        })
                 
                 # Record metrics
                 response_time = time.time() - timer.start_time if timer.start_time else 0
@@ -68,6 +95,9 @@ class AgentService:
                 
                 # Generate assistant response text
                 assistant_text = self._generate_assistant_response(llm_response, tool_calls, side_effects)
+                
+                # Log the final response
+                self._log_agent_interaction(messages, prompt, llm_response, tool_calls, side_effects, "final_response", assistant_text)
                 
                 return {
                     'assistant_text': assistant_text,
@@ -107,8 +137,9 @@ class AgentService:
             # In a production system, this would be more sophisticated
             if undo_token in self._session_undo_tokens:
                 undo_data = self._session_undo_tokens[undo_token]
+                action = undo_data['action']
                 
-                if undo_data['action'] == 'create_task':
+                if action == 'create_task':
                     # Delete the created task
                     task_id = undo_data['task_id']
                     task = TaskDB.get_by_id(task_id)
@@ -122,9 +153,66 @@ class AgentService:
                             'undone_task_id': task_id
                         }
                 
+                elif action == 'update_task':
+                    # Restore original values
+                    task_id = undo_data['task_id']
+                    task = TaskDB.get_by_id(task_id)
+                    if task:
+                        original_values = undo_data['original_values']
+                        task.title = original_values['title']
+                        task.description = original_values['description']
+                        task.project = original_values['project']
+                        task.categories = original_values['categories']
+                        task.save()
+                        del self._session_undo_tokens[undo_token]
+                        agent_metrics.record_undo()
+                        return {
+                            'success': True,
+                            'message': f'Undid update of task: {task.title}',
+                            'undone_task_id': task_id
+                        }
+                
+                elif action == 'delete_task':
+                    # Recreate the deleted task
+                    task_data = undo_data['task_data']
+                    task = TaskDB(
+                        title=task_data['title'],
+                        description=task_data['description'],
+                        project=task_data['project'],
+                        categories=task_data['categories'],
+                        status=task_data['status'],
+                        sort_key=task_data['sort_key'],
+                        created_at=task_data['created_at']
+                    )
+                    task.save()
+                    del self._session_undo_tokens[undo_token]
+                    agent_metrics.record_undo()
+                    return {
+                        'success': True,
+                        'message': f'Undid deletion of task: {task.title}',
+                        'restored_task_id': task.id
+                    }
+                
+                elif action == 'update_task_status':
+                    # Restore original status
+                    task_id = undo_data['task_id']
+                    task = TaskDB.get_by_id(task_id)
+                    if task:
+                        task.status = undo_data['original_status']
+                        task.started_at = undo_data['original_started_at']
+                        task.completed_at = undo_data['original_completed_at']
+                        task.save()
+                        del self._session_undo_tokens[undo_token]
+                        agent_metrics.record_undo()
+                        return {
+                            'success': True,
+                            'message': f'Undid status change of task: {task.title}',
+                            'undone_task_id': task_id
+                        }
+                
                 return {
                     'success': False,
-                    'message': 'Undo operation not supported for this action'
+                    'message': f'Undo operation not supported for action: {action}'
                 }
             else:
                 return {
@@ -161,16 +249,64 @@ You have access to the following tools:
    - project (string, optional): Project name
    - categories (array of strings, optional): Task categories
 
-When you want to create a task, respond with:
+2. get_tasks: Get all tasks (useful for checking current tasks)
+   - status (string, optional): Filter by status (open, in_progress, done)
+
+3. update_task: Update an existing task
+   - task_id (integer, required): The task ID to update
+   - title (string, optional): New task title
+   - description (string, optional): New task description
+   - project (string, optional): New project name
+   - categories (array of strings, optional): New task categories
+
+4. delete_task: Delete a task
+   - task_id (integer, required): The task ID to delete
+
+5. update_task_status: Change task status
+   - task_id (integer, required): The task ID to update
+   - status (string, required): New status (open, in_progress, done)
+
+Examples:
 TOOL_CALL: create_task
 ARGUMENTS: {"title": "Task title", "description": "Optional description", "project": "Optional project", "categories": ["category1", "category2"]}
+
+TOOL_CALL: get_tasks
+ARGUMENTS: {"status": "open"}
+
+TOOL_CALL: update_task
+ARGUMENTS: {"task_id": 123, "title": "Updated title", "description": "Updated description"}
+
+TOOL_CALL: delete_task
+ARGUMENTS: {"task_id": 123}
+
+TOOL_CALL: update_task_status
+ARGUMENTS: {"task_id": 123, "status": "done"}
 
 Current UI Context:
 """
         
-        # Add UI context
+        # Add UI context (limit size to prevent timeouts)
         if ui_context:
-            context_str = json.dumps(ui_context, indent=2)
+            # Limit context to prevent massive prompts
+            limited_context = {}
+            if 'tasks' in ui_context:
+                # Only include task summaries, not full task data
+                tasks = ui_context['tasks']
+                if isinstance(tasks, dict):
+                    limited_context['task_counts'] = {
+                        'open': len(tasks.get('open', [])),
+                        'in_progress': len(tasks.get('in_progress', [])),
+                        'done': len(tasks.get('done', []))
+                    }
+                else:
+                    limited_context['task_count'] = len(tasks) if tasks else 0
+            
+            # Include other lightweight context
+            for key in ['current_date', 'user_preferences']:
+                if key in ui_context:
+                    limited_context[key] = ui_context[key]
+            
+            context_str = json.dumps(limited_context, indent=2)
         else:
             context_str = "No current context available"
         
@@ -361,6 +497,336 @@ Assistant:"""
         
         return '\n'.join(filtered_lines).strip()
     
+    def _generate_assistant_response(self, llm_response: str, tool_calls: List[Dict[str, Any]], side_effects: List[Dict[str, Any]]) -> str:
+        """Generate the final assistant response text"""
+        
+        # If there were tool calls, create a response based on the results
+        if tool_calls and side_effects:
+            responses = []
+            for i, side_effect in enumerate(side_effects):
+                if side_effect.get('success'):
+                    if side_effect.get('action') == 'create_task':
+                        responses.append(f"✅ {side_effect.get('message', 'Task created successfully')}")
+                    elif side_effect.get('action') == 'get_tasks':
+                        tasks = side_effect.get('tasks', [])
+                        if isinstance(tasks, list):
+                            if tasks:
+                                task_list = []
+                                for task in tasks:
+                                    task_list.append(f"{task.get('title', 'Unknown')} (Task ID: {task.get('id')}) - Status: {task.get('status')}")
+                                responses.append(f"📋 Found {len(tasks)} task(s):\n" + "\n".join(task_list))
+                            else:
+                                responses.append("📋 No tasks found with that status")
+                        elif isinstance(tasks, dict):
+                            # Handle grouped tasks (open, in_progress, done)
+                            total_tasks = sum(len(task_list) for task_list in tasks.values())
+                            if total_tasks > 0:
+                                task_summary = []
+                                for status, task_list in tasks.items():
+                                    if task_list:
+                                        task_summary.append(f"{status}: {len(task_list)} task(s)")
+                                responses.append(f"📋 Found {total_tasks} total task(s):\n" + "\n".join(task_summary))
+                            else:
+                                responses.append("📋 No tasks found")
+                    elif side_effect.get('action') == 'update_task':
+                        responses.append(f"✅ {side_effect.get('message', 'Task updated successfully')}")
+                    elif side_effect.get('action') == 'delete_task':
+                        responses.append(f"🗑️ {side_effect.get('message', 'Task deleted successfully')}")
+                    elif side_effect.get('action') == 'update_task_status':
+                        responses.append(f"🔄 {side_effect.get('message', 'Task status updated successfully')}")
+                    else:
+                        responses.append(f"✅ {side_effect.get('message', 'Action completed successfully')}")
+                else:
+                    responses.append(f"❌ {side_effect.get('error', 'Action failed')}")
+            
+            return '\n'.join(responses)
+        
+        # If no tool calls, return the LLM response (cleaned up)
+        # Remove tool call markers from the response
+        cleaned_response = llm_response
+        lines = cleaned_response.split('\n')
+        filtered_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if not (line.startswith('TOOL_CALL:') or line.startswith('ARGUMENTS:')):
+                filtered_lines.append(line)
+        
+        return '\n'.join(filtered_lines).strip()
+    
+    def _execute_get_tasks(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute get_tasks tool"""
+        try:
+            status_filter = arguments.get('status')
+            
+            if status_filter:
+                tasks = TaskDB.get_all(status_filter)
+                task_list = [task.to_dict() for task in tasks]
+            else:
+                open_tasks, in_progress_tasks, done_tasks = TaskDB.get_by_status()
+                task_list = {
+                    'open': [task.to_dict() for task in open_tasks],
+                    'in_progress': [task.to_dict() for task in in_progress_tasks],
+                    'done': [task.to_dict() for task in done_tasks]
+                }
+            
+            return {
+                'success': True,
+                'action': 'get_tasks',
+                'tasks': task_list,
+                'message': f'Retrieved tasks{" with status " + status_filter if status_filter else ""}'
+            }
+            
+        except Exception as e:
+            logger.error(f"Get tasks execution failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'action': 'get_tasks'
+            }
+    
+    def _execute_update_task(self, arguments: Dict[str, Any], undo_token: str) -> Dict[str, Any]:
+        """Execute update_task tool with validation and undo support"""
+        try:
+            task_id = arguments.get('task_id')
+            if not task_id:
+                return {
+                    'success': False,
+                    'error': 'Task ID is required',
+                    'action': 'update_task'
+                }
+            
+            task = TaskDB.get_by_id(task_id)
+            if not task:
+                return {
+                    'success': False,
+                    'error': f'Task {task_id} not found',
+                    'action': 'update_task'
+                }
+            
+            # Store original values for undo
+            original_values = {
+                'title': task.title,
+                'description': task.description,
+                'project': task.project,
+                'categories': task.categories.copy() if task.categories else []
+            }
+            
+            # Update fields if provided
+            updated_fields = []
+            if 'title' in arguments:
+                task.title = arguments['title'].strip()
+                updated_fields.append('title')
+            if 'description' in arguments:
+                task.description = arguments['description'].strip()
+                updated_fields.append('description')
+            if 'project' in arguments:
+                task.project = arguments['project']
+                updated_fields.append('project')
+            if 'categories' in arguments:
+                task.categories = arguments['categories']
+                updated_fields.append('categories')
+            
+            if not updated_fields:
+                return {
+                    'success': False,
+                    'error': 'No fields to update',
+                    'action': 'update_task'
+                }
+            
+            if not task.title:
+                return {
+                    'success': False,
+                    'error': 'Task title cannot be empty',
+                    'action': 'update_task'
+                }
+            
+            task.save()
+            
+            # Store undo information
+            self._session_undo_tokens[undo_token] = {
+                'action': 'update_task',
+                'task_id': task_id,
+                'original_values': original_values,
+                'updated_fields': updated_fields,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Enqueue for re-classification
+            from app import classification_manager
+            classification_manager.enqueue_classification(task)
+            
+            return {
+                'success': True,
+                'action': 'update_task',
+                'task_id': task_id,
+                'updated_fields': updated_fields,
+                'message': f'Updated task: {task.title}'
+            }
+            
+        except Exception as e:
+            logger.error(f"Update task execution failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'action': 'update_task'
+            }
+    
+    def _execute_delete_task(self, arguments: Dict[str, Any], undo_token: str) -> Dict[str, Any]:
+        """Execute delete_task tool with undo support"""
+        try:
+            task_id = arguments.get('task_id')
+            if not task_id:
+                return {
+                    'success': False,
+                    'error': 'Task ID is required',
+                    'action': 'delete_task'
+                }
+            
+            task = TaskDB.get_by_id(task_id)
+            if not task:
+                return {
+                    'success': False,
+                    'error': f'Task {task_id} not found',
+                    'action': 'delete_task'
+                }
+            
+            # Store task data for undo
+            task_data = task.to_dict()
+            task_title = task.title
+            
+            task.delete()
+            
+            # Store undo information
+            self._session_undo_tokens[undo_token] = {
+                'action': 'delete_task',
+                'task_data': task_data,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            return {
+                'success': True,
+                'action': 'delete_task',
+                'task_id': task_id,
+                'message': f'Deleted task: {task_title}'
+            }
+            
+        except Exception as e:
+            logger.error(f"Delete task execution failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'action': 'delete_task'
+            }
+    
+    def _execute_update_task_status(self, arguments: Dict[str, Any], undo_token: str) -> Dict[str, Any]:
+        """Execute update_task_status tool with undo support"""
+        try:
+            task_id = arguments.get('task_id')
+            new_status = arguments.get('status')
+            
+            if not task_id:
+                return {
+                    'success': False,
+                    'error': 'Task ID is required',
+                    'action': 'update_task_status'
+                }
+            
+            if not new_status:
+                return {
+                    'success': False,
+                    'error': 'Status is required',
+                    'action': 'update_task_status'
+                }
+            
+            if new_status not in ['open', 'in_progress', 'done']:
+                return {
+                    'success': False,
+                    'error': 'Invalid status. Must be: open, in_progress, or done',
+                    'action': 'update_task_status'
+                }
+            
+            task = TaskDB.get_by_id(task_id)
+            if not task:
+                return {
+                    'success': False,
+                    'error': f'Task {task_id} not found',
+                    'action': 'update_task_status'
+                }
+            
+            # Store original status for undo
+            original_status = task.status
+            original_started_at = task.started_at
+            original_completed_at = task.completed_at
+            
+            # Update status using appropriate method
+            if new_status == 'done':
+                task.mark_done()
+            elif new_status == 'in_progress':
+                task.mark_in_progress()
+            elif new_status == 'open':
+                task.mark_open()
+            
+            # Store undo information
+            self._session_undo_tokens[undo_token] = {
+                'action': 'update_task_status',
+                'task_id': task_id,
+                'original_status': original_status,
+                'original_started_at': original_started_at,
+                'original_completed_at': original_completed_at,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            return {
+                'success': True,
+                'action': 'update_task_status',
+                'task_id': task_id,
+                'old_status': original_status,
+                'new_status': new_status,
+                'message': f'Changed task status from {original_status} to {new_status}: {task.title}'
+            }
+            
+        except Exception as e:
+            logger.error(f"Update task status execution failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'action': 'update_task_status'
+            }
+
+    def _log_agent_interaction(self, messages, prompt, llm_response, tool_calls, side_effects, stage, assistant_text=None):
+        """Log agent interactions for debugging (similar to classification_predictions_log.txt)"""
+        try:
+            from datetime import datetime
+            
+            log_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "stage": stage,
+                "user_message": messages[-1]['content'] if messages else "No message",
+                "model": "gemma3:4b"
+            }
+            
+            if stage == "prompt_sent":
+                log_entry["prompt_length"] = len(prompt) if prompt else 0
+                log_entry["prompt_preview"] = prompt[:200] + "..." if prompt and len(prompt) > 200 else prompt
+                
+            elif stage == "llm_response":
+                log_entry["llm_response"] = llm_response
+                log_entry["tool_calls_count"] = len(tool_calls) if tool_calls else 0
+                log_entry["tool_calls"] = tool_calls
+                
+            elif stage == "final_response":
+                log_entry["assistant_text"] = assistant_text
+                log_entry["side_effects_count"] = len(side_effects) if side_effects else 0
+                log_entry["side_effects"] = side_effects
+            
+            # Write to agent interactions log file
+            with open("data/agent_interactions_log.txt", "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
+                
+        except Exception as e:
+            logger.error(f"Failed to log agent interaction: {str(e)}")
+
     def is_ollama_available(self) -> bool:
         """Check if Ollama is running and accessible"""
         try:
