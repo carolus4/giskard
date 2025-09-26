@@ -556,8 +556,8 @@ class TaskManager {
         const isInProgress = task.status === 'in_progress';
         progressBtn.classList.toggle('in-progress', isInProgress);
         progressBtn.innerHTML = isInProgress 
-            ? '<i class="fas fa-pause"></i><span>pause</span>'
-            : '<i class="fas fa-play"></i><span>start</span>';
+            ? '<i class="fas fa-pause"></i><span> pause</span>'
+            : '<i class="fas fa-play"></i><span> start</span>';
     }
 
     /**
