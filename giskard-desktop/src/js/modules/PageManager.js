@@ -169,23 +169,23 @@ class PageManager {
                     }
                 }
                 
-                // Only set height if it's different from current
-                if (newHeight !== titleTextarea.offsetHeight) {
-                    titleTextarea.style.height = newHeight + 'px';
-                }
+                // Force the height regardless of current height
+                titleTextarea.style.height = newHeight + 'px';
+                titleTextarea.style.minHeight = newHeight + 'px';
+                titleTextarea.style.maxHeight = 'none';
             };
             
             // Bind multiple events to ensure it works
             titleTextarea.addEventListener('input', this._autoResizeTextarea);
             titleTextarea.addEventListener('paste', this._autoResizeTextarea);
             titleTextarea.addEventListener('keyup', this._autoResizeTextarea);
+            titleTextarea.addEventListener('keydown', this._autoResizeTextarea);
             
             // Also trigger on focus
             titleTextarea.addEventListener('focus', this._autoResizeTextarea);
             
             // Initial resize
             setTimeout(() => {
-                console.log('Initial auto-resize');
                 this._autoResizeTextarea();
             }, 100);
         } else {
