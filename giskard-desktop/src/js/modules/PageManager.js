@@ -155,18 +155,24 @@ class PageManager {
                 // Calculate lines
                 const lines = titleTextarea.value.split('\n').length;
                 
-                // If still only 1 line, estimate height based on text length
+                // Only resize if we actually have multiple lines or very long text
                 let newHeight = scrollHeight;
-                if (lines === 1 && titleTextarea.value.length > 50) {
-                    // Estimate height based on text length and width
+                if (lines > 1) {
+                    // Multiple lines - use scroll height
+                    newHeight = scrollHeight;
+                } else if (titleTextarea.value.length > 80) {
+                    // Very long single line - estimate if it would wrap
                     const charsPerLine = Math.floor(titleTextarea.offsetWidth / 14); // Approximate chars per line
                     const estimatedLines = Math.ceil(titleTextarea.value.length / charsPerLine);
-                    newHeight = Math.max(scrollHeight, estimatedLines * 1.2 * 28);
+                    if (estimatedLines > 1) {
+                        newHeight = Math.max(scrollHeight, estimatedLines * 1.2 * 28);
+                    }
                 }
                 
-                titleTextarea.style.height = newHeight + 'px';
-                titleTextarea.style.minHeight = newHeight + 'px';
-                titleTextarea.style.maxHeight = 'none';
+                // Only set height if it's different from current
+                if (newHeight !== titleTextarea.offsetHeight) {
+                    titleTextarea.style.height = newHeight + 'px';
+                }
             };
             
             // Bind multiple events to ensure it works
