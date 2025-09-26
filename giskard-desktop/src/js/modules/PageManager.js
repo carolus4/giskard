@@ -128,6 +128,64 @@ class PageManager {
             detailCheckbox.addEventListener('change', this._checkboxHandler);
         }
 
+        // Auto-resize title textarea
+        const titleTextarea = document.getElementById('detail-title');
+        if (titleTextarea) {
+            // Auto-resize function
+            this._autoResizeTextarea = () => {
+                // Reset height to auto to get natural height
+                titleTextarea.style.height = 'auto';
+                
+                // Ensure the textarea has proper width for wrapping
+                titleTextarea.style.width = '100%';
+                titleTextarea.style.maxWidth = 'none';
+                
+                // Force text wrapping
+                titleTextarea.style.whiteSpace = 'pre-wrap';
+                titleTextarea.style.wordWrap = 'break-word';
+                titleTextarea.style.overflowWrap = 'break-word';
+                titleTextarea.style.wordBreak = 'break-word';
+                
+                // Force a reflow
+                titleTextarea.offsetHeight;
+                
+                // Get the scroll height
+                const scrollHeight = titleTextarea.scrollHeight;
+                
+                // Calculate lines
+                const lines = titleTextarea.value.split('\n').length;
+                
+                // If still only 1 line, estimate height based on text length
+                let newHeight = scrollHeight;
+                if (lines === 1 && titleTextarea.value.length > 50) {
+                    // Estimate height based on text length and width
+                    const charsPerLine = Math.floor(titleTextarea.offsetWidth / 14); // Approximate chars per line
+                    const estimatedLines = Math.ceil(titleTextarea.value.length / charsPerLine);
+                    newHeight = Math.max(scrollHeight, estimatedLines * 1.2 * 28);
+                }
+                
+                titleTextarea.style.height = newHeight + 'px';
+                titleTextarea.style.minHeight = newHeight + 'px';
+                titleTextarea.style.maxHeight = 'none';
+            };
+            
+            // Bind multiple events to ensure it works
+            titleTextarea.addEventListener('input', this._autoResizeTextarea);
+            titleTextarea.addEventListener('paste', this._autoResizeTextarea);
+            titleTextarea.addEventListener('keyup', this._autoResizeTextarea);
+            
+            // Also trigger on focus
+            titleTextarea.addEventListener('focus', this._autoResizeTextarea);
+            
+            // Initial resize
+            setTimeout(() => {
+                console.log('Initial auto-resize');
+                this._autoResizeTextarea();
+            }, 100);
+        } else {
+            console.log('Textarea not found!');
+        }
+
         // Keyboard shortcuts for task detail page
         this._keyboardHandler = (e) => {
             if (this.currentPage === 'task-detail') {
@@ -171,6 +229,15 @@ class PageManager {
 
         if (detailCheckbox && this._checkboxHandler) {
             detailCheckbox.removeEventListener('change', this._checkboxHandler);
+        }
+
+        // Clean up textarea auto-resize
+        const titleTextarea = document.getElementById('detail-title');
+        if (titleTextarea && this._autoResizeTextarea) {
+            titleTextarea.removeEventListener('input', this._autoResizeTextarea);
+            titleTextarea.removeEventListener('paste', this._autoResizeTextarea);
+            titleTextarea.removeEventListener('keyup', this._autoResizeTextarea);
+            titleTextarea.removeEventListener('focus', this._autoResizeTextarea);
         }
 
         if (this._keyboardHandler) {
@@ -432,6 +499,13 @@ class PageManager {
             // Show formatted title with project prefix
             const displayTitle = this._formatTaskTitle(taskData);
             titleInput.value = displayTitle;
+            
+            // Trigger auto-resize for the textarea with a small delay
+            if (this._autoResizeTextarea) {
+                setTimeout(() => {
+                    this._autoResizeTextarea();
+                }, 10);
+            }
         }
         
         // Load categories
