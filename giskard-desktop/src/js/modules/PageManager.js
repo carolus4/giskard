@@ -135,6 +135,8 @@ class PageManager {
             this._autoResizeTextarea = () => {
                 // Reset height to auto to get natural height
                 titleTextarea.style.height = 'auto';
+                titleTextarea.style.minHeight = 'auto';
+                titleTextarea.style.maxHeight = 'none';
                 
                 // Ensure the textarea has proper width for wrapping
                 titleTextarea.style.width = '100%';
@@ -155,7 +157,7 @@ class PageManager {
                 // Calculate lines
                 const lines = titleTextarea.value.split('\n').length;
                 
-                // Only resize if we actually have multiple lines or very long text
+                // Calculate appropriate height
                 let newHeight = scrollHeight;
                 if (lines > 1) {
                     // Multiple lines - use scroll height
@@ -167,6 +169,9 @@ class PageManager {
                     if (estimatedLines > 1) {
                         newHeight = Math.max(scrollHeight, estimatedLines * 1.2 * 28);
                     }
+                } else {
+                    // Short text - use natural height (will shrink)
+                    newHeight = scrollHeight;
                 }
                 
                 // Force the height regardless of current height
