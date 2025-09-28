@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giskard LangGraph Agent Visualization</title>
+    <script src="https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        .content {
+            padding: 40px;
+        }
+        .graph-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .info-card h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+        }
+        .node-list {
+            list-style: none;
+            padding: 0;
+        }
+        .node-list li {
+            background: white;
+            margin: 8px 0;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #667eea;
+            font-weight: 500;
+        }
+        .endpoint-info {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .endpoint-info code {
+            background: #2d3748;
+            color: #68d391;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Giskard LangGraph Agent</h1>
+            <p>Visual representation of your AI agent workflow</p>
+        </div>
+        
+        <div class="content">
+            <div class="graph-container">
+                <div class="mermaid">
+graph TD
+    A["👤 Ingest User Input<br/>• Generate run ID<br/>• Emit run_started event"] --> B["🧠 Planner LLM<br/>• Load planner prompt<br/>• Call Ollama<br/>• Parse JSON response"]
+    B --> C["⚡ Action Execution<br/>• Execute planned actions<br/>• Emit action_call events<br/>• Emit action_result events"]
+    C --> D["📝 Synthesizer LLM<br/>• Load synthesizer prompt<br/>• Generate final response<br/>• Emit final_message"]
+    D --> E["✅ End"]
+    
+    style A fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style B fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    style C fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    style D fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style E fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+                </div>
+            </div>
+            
+            <div class="endpoint-info">
+                <h3>🚀 API Endpoints</h3>
+                <p><strong>Agent Step:</strong> <code>POST /api/agent/langgraph/step</code></p>
+                <p><strong>Graph Visualization:</strong> <code>GET /api/agent/langgraph/graph/visualize</code></p>
+            </div>
+            
+            <div class="info-grid">
+                <div class="info-card">
+                    <h3>📊 Graph Nodes</h3>
+                    <ul class="node-list">
+                        <li>👤 <strong>Ingest User Input</strong> - Initialize run and emit events</li>
+                        <li>🧠 <strong>Planner LLM</strong> - Plan actions using AI</li>
+                        <li>⚡ <strong>Action Execution</strong> - Execute planned actions</li>
+                        <li>📝 <strong>Synthesizer LLM</strong> - Generate final response</li>
+                    </ul>
+                </div>
+                
+                <div class="info-card">
+                    <h3>🔄 Flow Sequence</h3>
+                    <ol style="margin: 0; padding-left: 20px;">
+                        <li>User input received</li>
+                        <li>LLM plans actions</li>
+                        <li>Actions executed</li>
+                        <li>Final response generated</li>
+                    </ol>
+                </div>
+                
+                <div class="info-card">
+                    <h3>🛠️ Available Actions</h3>
+                    <ul class="node-list">
+                        <li><code>create_task</code> - Create new tasks</li>
+                        <li><code>update_task_status</code> - Change task status</li>
+                        <li><code>reorder_tasks</code> - Reorder task list</li>
+                        <li><code>fetch_tasks</code> - Get task list</li>
+                        <li><code>no_op</code> - No operation</li>
+                    </ul>
+                </div>
+                
+                <div class="info-card">
+                    <h3>🎯 Key Features</h3>
+                    <ul class="node-list">
+                        <li>✅ LangGraph 0.6.7 (Latest)</li>
+                        <li>✅ Hot Reloading</li>
+                        <li>✅ Visual Debugging</li>
+                        <li>✅ Event-driven Architecture</li>
+                        <li>✅ Error Handling</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            }
+        });
+    </script>
+</body>
+</html>

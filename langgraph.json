@@ -1,0 +1,6 @@
+{
+  "graphs": {
+    "giskard_agent": "./orchestrator/langgraph_orchestrator.py:LangGraphOrchestrator"
+  },
+  "env": ".env"
+}

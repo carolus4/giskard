@@ -7,6 +7,7 @@ from flask import Flask
 from flask_cors import CORS
 from api.routes_v2 import api_v2
 from server.routes.agent import agent
+from server.routes.agent_langgraph import agent_langgraph
 from database import init_database
 from utils.classification_manager import ClassificationManager
 import subprocess
@@ -77,6 +78,7 @@ CORS(app, origins=[
 # Register API blueprints
 app.register_blueprint(api_v2)  # Clean API
 app.register_blueprint(agent)  # Agent orchestrator
+app.register_blueprint(agent_langgraph, url_prefix='/api/agent/langgraph')  # LangGraph agent
 
 # Initialize database
 init_database()
