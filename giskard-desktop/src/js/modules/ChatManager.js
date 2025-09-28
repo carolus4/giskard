@@ -240,7 +240,7 @@ class ChatManager {
 
     /**
      * Send message to Ollama via agent orchestration (with timeout and error handling)
-     * Updated to use V2 orchestrator endpoint
+     * Updated to use orchestrator endpoint
      */
     async _sendToOllama(message) {
         const controller = new AbortController();
@@ -250,7 +250,7 @@ class ChatManager {
             // Generate session ID for this conversation
             const sessionId = this._getOrCreateSessionId();
             
-            const response = await fetch(`${this.baseURL}/agent/v2/step`, {
+            const response = await fetch(`${this.baseURL}/agent/step`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -272,13 +272,13 @@ class ChatManager {
             const data = await response.json();
             
             // Debug logging
-            console.log('🤖 Agent V2 response:', data);
+            console.log('🤖 Agent response:', data);
             
             if (data.success) {
-                // Handle events from the V2 orchestrator
+                // Handle events from the orchestrator
                 if (data.events && data.events.length > 0) {
-                    console.log('🔧 V2 Events:', data.events);
-                    this._handleV2Events(data.events);
+                    console.log('🔧 Events:', data.events);
+                    this._handleEvents(data.events);
                 }
                 
                 // Handle side effects (task creation, etc.) - maintain compatibility
@@ -287,20 +287,13 @@ class ChatManager {
                     this._handleSideEffects(data.side_effects);
                 }
                 
-                // Store undo token for potential undo operations (V1 only)
-                if (data.undo_token) {
-                    console.log('🔄 Undo token:', data.undo_token);
-                    this._storeUndoToken(data.undo_token);
-                } else {
-                    // V2 orchestrator doesn't support undo yet
-                    console.log('ℹ️ V2 orchestrator: No undo token available');
-                }
+                // Note: Undo functionality has been removed for simplicity
                 
-                // Return the final message from V2 response
+                // Return the final message from response
                 return data.final_message || data.assistant_text || 'I processed your request successfully.';
             } else {
-                console.error('❌ Agent V2 step failed:', data.error);
-                throw new Error(data.error || 'Agent V2 step failed');
+                console.error('❌ Agent step failed:', data.error);
+                throw new Error(data.error || 'Agent step failed');
             }
         } catch (error) {
             clearTimeout(timeoutId);
@@ -322,9 +315,9 @@ class ChatManager {
     }
 
     /**
-     * Handle V2 orchestrator events
+     * Handle orchestrator events
      */
-    _handleV2Events(events) {
+    _handleEvents(events) {
         events.forEach(event => {
             switch (event.type) {
                 case 'run_started':
@@ -454,24 +447,6 @@ class ChatManager {
         });
     }
     
-    /**
-     * Store undo token for potential undo operations
-     */
-    _storeUndoToken(undoToken) {
-        // Store the most recent undo token
-        this.lastUndoToken = undoToken;
-        
-        // You could also store multiple tokens if needed
-        if (!this.undoTokens) {
-            this.undoTokens = [];
-        }
-        this.undoTokens.push(undoToken);
-        
-        // Keep only the last 5 undo tokens
-        if (this.undoTokens.length > 5) {
-            this.undoTokens.shift();
-        }
-    }
 
     /**
      * Add message to chat
@@ -486,10 +461,7 @@ class ChatManager {
         this.chatMessages.push(message);
         const messageElement = this._renderMessage(message);
         
-        // Add undo button if this is an assistant message and we have an undo token (V1 only)
-        if (type === 'bot' && this.lastUndoToken) {
-            this._addUndoButton(messageElement);
-        }
+        // Undo functionality removed for simplicity
         
         this._scrollToBottom();
         this._saveChatHistory();
@@ -754,93 +726,7 @@ class ChatManager {
         return this.chatMessages;
     }
 
-    /**
-     * Undo the last agent action
-     */
-    async _undoLastAction() {
-        if (!this.lastUndoToken) {
-            this._showNotification('No action to undo', 'info');
-            return;
-        }
-        
-        try {
-            const response = await fetch(`${this.baseURL}/agent/undo`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    undo_token: this.lastUndoToken
-                })
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    this._showNotification(data.data.message, 'success');
-                    
-                    // Trigger task list refresh
-                    if (window.TaskManager && window.TaskManager.loadTasks) {
-                        console.log('🔄 Refreshing task list after undo');
-                        window.TaskManager.loadTasks(true); // Refresh with animation
-                    } else {
-                        console.warn('⚠️ TaskManager not available for task list refresh');
-                    }
-                    
-                    // Clear the undo token
-                    this.lastUndoToken = null;
-                } else {
-                    this._showNotification(data.error || 'Undo failed', 'error');
-                }
-            } else {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-        } catch (error) {
-            console.error('Undo failed:', error);
-            this._showNotification('Failed to undo action', 'error');
-        }
-    }
     
-    /**
-     * Add undo button to the last assistant message
-     */
-    _addUndoButton(messageElement) {
-        if (!this.lastUndoToken || !messageElement) return;
-        
-        const undoButton = document.createElement('button');
-        undoButton.className = 'undo-btn';
-        undoButton.innerHTML = '↶ Undo';
-        undoButton.style.cssText = `
-            background: #f44336;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            cursor: pointer;
-            margin-top: 8px;
-            opacity: 0.8;
-            transition: opacity 0.2s;
-        `;
-        
-        undoButton.addEventListener('mouseenter', () => {
-            undoButton.style.opacity = '1';
-        });
-        
-        undoButton.addEventListener('mouseleave', () => {
-            undoButton.style.opacity = '0.8';
-        });
-        
-        undoButton.addEventListener('click', () => {
-            this._undoLastAction();
-            undoButton.remove(); // Remove button after undo
-        });
-        
-        const messageContent = messageElement.querySelector('.message-content');
-        if (messageContent) {
-            messageContent.appendChild(undoButton);
-        }
-    }
 
     /**
      * NEW: Display tool calls in the chat interface

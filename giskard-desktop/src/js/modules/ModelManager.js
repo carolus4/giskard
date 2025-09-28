@@ -28,7 +28,7 @@ class ModelManager {
         
         try {
             // For now, just use the default model name
-            // TODO: Add model config endpoint to V2 API if needed
+            // TODO: Add model config endpoint to API if needed
             console.log('🤖 ModelManager: Using default model config:', this.modelName);
         } catch (error) {
             console.warn('⚠️ ModelManager: Error loading model config, using default:', error);

@@ -7,7 +7,7 @@ The Agent Orchestration Layer enables Giskard's chat UI to perform task operatio
 ## Architecture
 
 ```
-Chat UI → POST /api/agent/v2/step → OrchestratorGraph → LLM Nodes → Action Execution → Task API
+Chat UI → POST /api/agent/step → OrchestratorGraph → LLM Nodes → Action Execution → Task API
 ```
 
 ### Components
@@ -16,11 +16,11 @@ Chat UI → POST /api/agent/v2/step → OrchestratorGraph → LLM Nodes → Acti
 2. **GraphNodes** (`orchestrator/graph/nodes.py`) - Individual processing nodes
 3. **ActionExecutor** (`orchestrator/actions/actions.py`) - Tool execution wrapper
 4. **AgentState** (`orchestrator/graph/state.py`) - State management and events
-5. **API Endpoints** (`server/routes/agentV2.py`) - V2 HTTP interface
+5. **API Endpoints** (`server/routes/agent.py`) - HTTP interface
 
 ## API Endpoints
 
-### POST /api/agent/v2/step
+### POST /api/agent/step
 
 Process a single agent step with chat messages and UI context.
 
@@ -37,7 +37,7 @@ Process a single agent step with chat messages and UI context.
 ```json
 {
   "success": true,
-  "message": "Agent V2 step completed",
+  "message": "Agent step completed",
   "events": [
     {
       "type": "run_started",
@@ -78,29 +78,6 @@ Process a single agent step with chat messages and UI context.
 }
 ```
 
-### POST /api/agent/undo
-
-Undo the last agent mutation using an undo token.
-
-**Request:**
-```json
-{
-  "undo_token": "0280969a-7bbd-4250-8..."
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Undo completed",
-  "data": {
-    "success": true,
-    "message": "Undid creation of task: Review quarterly report",
-    "undone_task_id": 123
-  }
-}
-```
 
 ### GET /api/agent/metrics
 
@@ -181,7 +158,7 @@ ARGUMENTS: {"task_id": 123, "status": "done"}
 - **create_task**: Creates new tasks with validation
 - **get_tasks**: Retrieves task lists with optional status filtering
 - **update_task**: Modifies existing tasks (title, description, project, categories)
-- **delete_task**: Removes tasks with undo support
+- **delete_task**: Removes tasks
 - **update_task_status**: Changes task status (open, in_progress, done)
 - Structured tool call parsing from Ollama responses
 - Server-side validation of tool arguments
@@ -191,14 +168,10 @@ ARGUMENTS: {"task_id": 123, "status": "done"}
 - Title-based duplicate detection
 - Graceful handling of existing tasks
 
-### 3. Undo Functionality
-- Server-owned undo tokens for each mutation
-- Simple in-memory undo storage (stateless per request)
-- Support for undoing all operations:
-  - **create_task**: Deletes the created task
-  - **update_task**: Restores original values
-  - **delete_task**: Recreates the deleted task
-  - **update_task_status**: Restores original status
+### 3. Error Handling
+- Server-side validation and error handling
+- Graceful handling of API failures
+- User-friendly error messages
 
 ### 4. Observability
 - Request/response logging
@@ -228,13 +201,6 @@ result = agent_service.process_step(messages, {})
 print(result['assistant_text'])  # "✅ Created task: Review quarterly report"
 ```
 
-### Undo Operation
-
-```python
-undo_token = result['undo_token']
-undo_result = agent_service.undo_last_mutation(undo_token)
-print(undo_result['message'])  # "Undid creation of task: Review quarterly report"
-```
 
 ### Metrics Collection
 
@@ -271,10 +237,6 @@ curl -X POST http://localhost:5001/api/agent/step \
     "ui_context": {}
   }'
 
-# Test undo
-curl -X POST http://localhost:5001/api/agent/undo \
-  -H "Content-Type: application/json" \
-  -d '{"undo_token": "your-undo-token"}'
 
 # Get metrics
 curl http://localhost:5001/api/agent/metrics
@@ -296,7 +258,7 @@ The agent uses the existing Ollama configuration from `config/ollama_config.py`:
 ## Limitations (MVP)
 
 1. **Stateless**: No persistent session storage
-2. **Simple Undo**: In-memory undo tokens only (cleared on server restart)
+2. **Simple Architecture**: Clean, minimal implementation
 3. **No Streaming**: Synchronous requests only
 4. **No Multi-tool Planning**: Single tool call per request
 5. **Basic Error Recovery**: Limited retry mechanisms
@@ -307,7 +269,7 @@ The agent uses the existing Ollama configuration from `config/ollama_config.py`:
 2. **Additional Tools**: Task reordering, bulk operations
 3. **Streaming Support**: SSE for real-time responses
 4. **Multi-tool Planning**: ReAct-style tool chaining
-5. **Advanced Undo**: Persistent undo history with transaction logs
+5. **Advanced Features**: Enhanced error recovery and retry mechanisms
 6. **Agent Memory**: Long-term conversation context
 7. **Enhanced Error Recovery**: Automatic retry with exponential backoff
 
@@ -325,7 +287,7 @@ The agent uses the existing Ollama configuration from `config/ollama_config.py`:
 
 3. **Undo Token Issues**
    - Tokens are session-scoped and in-memory
-   - Restart server clears all undo tokens
+   - Restart server clears all session data
 
 4. **Performance Issues**
    - Check Ollama model size and GPU usage

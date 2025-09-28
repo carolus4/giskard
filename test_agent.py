@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Simple test script for the new Agent V2 orchestrator
+Simple test script for the Agent orchestrator
 """
 import requests
 import json
 import time
 
-def test_agent_v2_endpoint():
-    """Test the new /api/agent/v2/step endpoint"""
+def test_agent_endpoint():
+    """Test the /api/agent/step endpoint"""
     base_url = "http://localhost:5001"
-    endpoint = f"{base_url}/api/agent/v2/step"
+    endpoint = f"{base_url}/api/agent/step"
     
-    print("🧪 Testing Agent V2 Orchestrator")
+    print("🧪 Testing Agent Orchestrator")
     print("=" * 50)
     
     # Test data
@@ -82,4 +82,4 @@ def test_agent_v2_endpoint():
     print("🏁 Test completed!")
 
 if __name__ == "__main__":
-    test_agent_v2_endpoint()
+    test_agent_endpoint()

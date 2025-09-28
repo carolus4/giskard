@@ -168,19 +168,19 @@ class TestOrchestratorIntegration(unittest.TestCase):
             self.assertEqual(run_completed_events[0]["status"], "error")
 
 
-class TestAgentV2API(unittest.TestCase):
-    """Test the /api/agent/v2/step endpoint"""
+class TestAgentAPI(unittest.TestCase):
+    """Test the /api/agent/step endpoint"""
     
     def setUp(self):
         """Set up test environment"""
         self.base_url = "http://localhost:5001"
-        self.endpoint = f"{self.base_url}/api/agent/v2/step"
+        self.endpoint = f"{self.base_url}/api/agent/step"
     
     def test_api_endpoint_structure(self):
         """Test that the API endpoint exists and returns correct structure"""
         # This test would require the server to be running
         # For now, we'll test the endpoint logic directly
-        from server.routes.agentV2 import agent_v2_step
+        from server.routes.agent import agent_step
         
         # Mock request data
         class MockRequest:
@@ -207,7 +207,7 @@ class TestAgentV2API(unittest.TestCase):
             # Test the endpoint logic
             from flask import Flask
             app = Flask(__name__)
-            with app.test_request_context('/api/agent/v2/step', method='POST', json={
+            with app.test_request_context('/api/agent/step', method='POST', json={
                 "input_text": "Create a task to test the API",
                 "session_id": "test-session",
                 "domain": "test"

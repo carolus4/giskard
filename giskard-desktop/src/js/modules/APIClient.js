@@ -1,23 +1,23 @@
 /**
- * APIClientV2 - Clean REST API client for the new database-backed system
+ * APIClient - Clean REST API client for the database-backed system
  * 
  * Provides a clean interface for all backend API interactions with
  * the new SQLite-based task system using proper REST endpoints.
  * 
- * @class APIClientV2
+ * @class APIClient
  * @version 2.0.0
  * @author Giskard
  * 
  * @example
- * const api = new APIClientV2();
+ * const api = new APIClient();
  * const result = await api.getTasks();
  * if (result.success) {
  *   console.log(result.data.tasks);
  * }
  */
-class APIClientV2 {
+class APIClient {
     /**
-     * Create an APIClientV2 instance
+     * Create an APIClient instance
      * @constructor
      */
     constructor() {
@@ -27,7 +27,7 @@ class APIClientV2 {
         this.baseURL = this.isTauri ? 'http://localhost:5001/api' : '/api';
         
         // Debug Tauri detection
-        console.log('🔍 APIClientV2 Tauri detection:', {
+        console.log('🔍 APIClient Tauri detection:', {
             isTauri: this.isTauri,
             hasTauri: !!window.__TAURI__,
             hasInvoke: !!(window.__TAURI__?.invoke),
@@ -66,23 +66,23 @@ class APIClientV2 {
      */
     async _fetch(url, options = {}) {
         try {
-            console.log('🚀 API V2 Request:', { url, options, isTauri: this.isTauri });
+            console.log('🚀 API Request:', { url, options, isTauri: this.isTauri });
             
             // If running in Tauri, use Tauri commands (much more reliable!)
             if (this.isTauri && window.__TAURI__?.invoke) {
                 const { invoke } = window.__TAURI__;
                 
-                console.log('🦀 Using Tauri commands for V2 API:', url, options);
+                console.log('🦀 Using Tauri commands for API:', url, options);
                 
                 // Route to appropriate Tauri command  
                 if (url.includes('/api/tasks') && (!options.method || options.method === 'GET')) {
                     try {
                         const result = await invoke('api_v2_get_tasks');
                         const data = JSON.parse(result);
-                        console.log('✅ Tauri V2 getTasks success:', Object.keys(data));
+                        console.log('✅ Tauri getTasks success:', Object.keys(data));
                         return { success: true, data };
                     } catch (error) {
-                        console.error('❌ Tauri V2 getTasks failed:', error);
+                        console.error('❌ Tauri getTasks failed:', error);
                         throw error; // Fall back to regular fetch
                     }
                     
@@ -96,20 +96,20 @@ class APIClientV2 {
                             categories: body.categories ? body.categories.join(',') : null
                         });
                         const data = JSON.parse(result);
-                        console.log('✅ Tauri V2 createTask success:', data);
+                        console.log('✅ Tauri createTask success:', data);
                         return { success: true, data };
                     } catch (error) {
-                        console.error('❌ Tauri V2 createTask failed:', error);
+                        console.error('❌ Tauri createTask failed:', error);
                         throw error; // Fall back to regular fetch
                     }
                 }
                 
                 // For other endpoints, fall back to browser fetch for now
-                console.log('⚠️  V2 Endpoint not implemented in Tauri, using browser fetch');
+                console.log('⚠️  Endpoint not implemented in Tauri, using browser fetch');
             }
 
             // Fallback to regular fetch for browser or non-implemented endpoints
-            console.log('🌐 Using browser fetch for V2 API:', url);
+            console.log('🌐 Using browser fetch for API:', url);
             
             const config = {
                 headers: {
@@ -128,7 +128,7 @@ class APIClientV2 {
 
             return { success: true, data };
         } catch (error) {
-            console.error(`🔥 V2 API Error (${url}):`, error);
+            console.error(`🔥 API Error (${url}):`, error);
             return { success: false, error: error.message };
         }
     }
@@ -308,4 +308,4 @@ class APIClientV2 {
     }
 }
 
-export default APIClientV2;
+export default APIClient;

@@ -249,32 +249,6 @@ def chat():
         return APIResponse.error(f"Chat failed: {str(e)}", 500)
 
 
-@api_v2.route('/agent/undo', methods=['POST'])
-def agent_undo():
-    """Undo the last agent mutation
-    
-    DEPRECATED: This endpoint is deprecated with the V2 orchestrator.
-    Undo functionality is not yet implemented in the V2 orchestrator.
-    This endpoint will be removed in a future version.
-    """
-    try:
-        # Log deprecation warning
-        logger.warning("DEPRECATED: /api/agent/undo endpoint is deprecated. V2 orchestrator does not support undo functionality yet.")
-        
-        data = request.get_json()
-        undo_token = data.get('undo_token')
-        
-        if not undo_token:
-            return APIResponse.error('undo_token is required')
-        
-        # Return error indicating undo is not supported in V2
-        return APIResponse.error('Undo functionality is not available in V2 orchestrator. Please use the V2 endpoint for new operations.', 501)
-    
-    except Exception as e:
-        logger.error(f"Undo operation failed: {str(e)}")
-        return APIResponse.error(f"Undo failed: {str(e)}", 500)
-
-
 @api_v2.route('/agent/metrics', methods=['GET'])
 def get_agent_metrics():
     """Get agent metrics and observability data"""

@@ -1,5 +1,5 @@
 """
-Agent V2 routes for the new LangGraph orchestrator
+Agent routes for the LangGraph orchestrator
 """
 from flask import Blueprint, request, jsonify
 import logging
@@ -8,7 +8,7 @@ from orchestrator.runtime.run import OrchestratorRuntime
 logger = logging.getLogger(__name__)
 
 # Create Blueprint
-agent_v2 = Blueprint('agent_v2', __name__, url_prefix='/api/agent/v2')
+agent = Blueprint('agent', __name__, url_prefix='/api/agent')
 
 
 class APIResponse:
@@ -26,7 +26,7 @@ class APIResponse:
         return jsonify({"error": message}), status_code
 
 
-@agent_v2.route('/step', methods=['POST'])
+@agent.route('/step', methods=['POST'])
 def agent_step():
     """Handle agent orchestration step with LangGraph-style flow"""
     try:
@@ -45,10 +45,10 @@ def agent_step():
         result = runtime.execute(input_text, session_id, domain)
         
         # Log the request and response for observability
-        logger.info(f"Agent V2 step processed: input_text='{input_text[:50]}...', events_count={len(result.get('events', []))}")
+        logger.info(f"Agent step processed: input_text='{input_text[:50]}...', events_count={len(result.get('events', []))}")
         
-        return jsonify(APIResponse.success('Agent V2 step completed', result))
+        return jsonify(APIResponse.success('Agent step completed', result))
     
     except Exception as e:
-        logger.error(f"Agent V2 step failed: {str(e)}")
-        return APIResponse.error(f"Agent V2 step failed: {str(e)}", 500)
+        logger.error(f"Agent step failed: {str(e)}")
+        return APIResponse.error(f"Agent step failed: {str(e)}", 500)

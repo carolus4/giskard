@@ -1,4 +1,4 @@
-import APIClientV2 from './APIClientV2.js';
+import APIClient from './APIClient.js';
 import UIManager from './UIManager.js';
 import TaskList from './TaskList.js';
 import DragDropManager from './DragDropManager.js';
@@ -12,7 +12,7 @@ import Notification from './Notification.js';
 class TaskManager {
     constructor() {
         // Initialize core components
-        this.api = new APIClientV2();
+        this.api = new APIClient();
         this.ui = new UIManager();
         this.taskList = new TaskList();
         this.dragDrop = new DragDropManager();
