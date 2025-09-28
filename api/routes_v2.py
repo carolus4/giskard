@@ -251,8 +251,16 @@ def chat():
 
 @api_v2.route('/agent/step', methods=['POST'])
 def agent_step():
-    """Handle agent orchestration step with tool execution"""
+    """Handle agent orchestration step with tool execution
+    
+    DEPRECATED: This endpoint is deprecated. Please use /api/agent/v2/step instead.
+    The V2 endpoint provides better event tracking, improved error handling, and a cleaner API.
+    This endpoint will be removed in a future version.
+    """
     try:
+        # Log deprecation warning
+        logger.warning("DEPRECATED: /api/agent/step endpoint is deprecated. Please migrate to /api/agent/v2/step")
+        
         data = request.get_json()
         messages = data.get('messages', [])
         ui_context = data.get('ui_context', {})
@@ -277,7 +285,12 @@ def agent_step():
         logger.info(f"Agent step processed: success={result.get('success')}, undo_token={result.get('undo_token')}")
         
         if result.get('success'):
-            return jsonify(APIResponse.success('Agent step completed', result))
+            # Add deprecation warning to response headers
+            response = jsonify(APIResponse.success('Agent step completed', result))
+            response.headers['X-Deprecated-Endpoint'] = 'true'
+            response.headers['X-New-Endpoint'] = '/api/agent/v2/step'
+            response.headers['X-Deprecation-Message'] = 'This endpoint is deprecated. Please use /api/agent/v2/step instead.'
+            return response
         else:
             return jsonify(APIResponse.error(result.get('error', 'Agent step failed'), 500))
     

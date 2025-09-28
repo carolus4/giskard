@@ -240,35 +240,25 @@ class ChatManager {
 
     /**
      * Send message to Ollama via agent orchestration (with timeout and error handling)
+     * Updated to use V2 orchestrator endpoint
      */
     async _sendToOllama(message) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         
         try {
-            // Get current UI context (tasks, etc.)
-            const uiContext = await this._getUIContext();
+            // Generate session ID for this conversation
+            const sessionId = this._getOrCreateSessionId();
             
-            // Convert chat messages to agent format
-            const agentMessages = this.chatMessages.map(msg => ({
-                type: msg.type === 'user' ? 'user' : 'assistant',
-                content: msg.content
-            }));
-            
-            // Add current user message
-            agentMessages.push({
-                type: 'user',
-                content: message
-            });
-            
-            const response = await fetch(`${this.baseURL}/agent/step`, {
+            const response = await fetch(`${this.baseURL}/agent/v2/step`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    messages: agentMessages.slice(-6), // Keep last 6 messages for context
-                    ui_context: uiContext
+                    input_text: message,
+                    session_id: sessionId,
+                    domain: 'chat'
                 }),
                 signal: controller.signal
             });
@@ -282,16 +272,16 @@ class ChatManager {
             const data = await response.json();
             
             // Debug logging
-            console.log('🤖 Agent response:', data);
+            console.log('🤖 Agent V2 response:', data);
             
             if (data.success) {
-                // NEW: Display tool calls if they exist
-                if (data.tool_calls && data.tool_calls.length > 0) {
-                    console.log('🔧 Tool calls:', data.tool_calls);
-                    this._displayToolCalls(data.tool_calls);
+                // Handle events from the V2 orchestrator
+                if (data.events && data.events.length > 0) {
+                    console.log('🔧 V2 Events:', data.events);
+                    this._handleV2Events(data.events);
                 }
                 
-                // Handle side effects (task creation, etc.)
+                // Handle side effects (task creation, etc.) - maintain compatibility
                 if (data.side_effects && data.side_effects.length > 0) {
                     console.log('🔧 Side effects:', data.side_effects);
                     this._handleSideEffects(data.side_effects);
@@ -303,10 +293,11 @@ class ChatManager {
                     this._storeUndoToken(data.undo_token);
                 }
                 
-                return data.assistant_text;
+                // Return the final message from V2 response
+                return data.final_message || data.assistant_text || 'I processed your request successfully.';
             } else {
-                console.error('❌ Agent step failed:', data.error);
-                throw new Error(data.error || 'Agent step failed');
+                console.error('❌ Agent V2 step failed:', data.error);
+                throw new Error(data.error || 'Agent V2 step failed');
             }
         } catch (error) {
             clearTimeout(timeoutId);
@@ -317,6 +308,100 @@ class ChatManager {
         }
     }
     
+    /**
+     * Get or create session ID for this conversation
+     */
+    _getOrCreateSessionId() {
+        if (!this.sessionId) {
+            this.sessionId = 'chat-session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        }
+        return this.sessionId;
+    }
+
+    /**
+     * Handle V2 orchestrator events
+     */
+    _handleV2Events(events) {
+        events.forEach(event => {
+            switch (event.type) {
+                case 'run_started':
+                    console.log('🚀 Run started:', event.run_id);
+                    break;
+                case 'llm_message':
+                    console.log(`🧠 LLM ${event.node}:`, event.content);
+                    break;
+                case 'action_call':
+                    console.log('🔧 Action called:', event.name, event.args);
+                    this._displayActionCall(event);
+                    break;
+                case 'action_result':
+                    console.log('✅ Action result:', event.name, event.ok ? 'success' : 'failed');
+                    this._displayActionResult(event);
+                    break;
+                case 'final_message':
+                    console.log('💬 Final message:', event.content);
+                    break;
+                case 'run_completed':
+                    console.log('🏁 Run completed:', event.status);
+                    break;
+            }
+        });
+    }
+
+    /**
+     * Display action call in the chat
+     */
+    _displayActionCall(event) {
+        if (!this.chatMessagesContainer) return;
+        
+        const actionDiv = document.createElement('div');
+        actionDiv.className = 'action-call-container';
+        actionDiv.innerHTML = `
+            <div class="action-call-header">
+                <div class="action-call-avatar">🔧</div>
+                <div class="action-call-title">Executing ${this._formatActionName(event.name)}...</div>
+            </div>
+        `;
+        
+        this.chatMessagesContainer.appendChild(actionDiv);
+        this._scrollToBottom();
+    }
+
+    /**
+     * Display action result in the chat
+     */
+    _displayActionResult(event) {
+        if (!this.chatMessagesContainer) return;
+        
+        const resultDiv = document.createElement('div');
+        resultDiv.className = `action-result-container ${event.ok ? 'success' : 'error'}`;
+        resultDiv.innerHTML = `
+            <div class="action-result-header">
+                <div class="action-result-avatar">${event.ok ? '✅' : '❌'}</div>
+                <div class="action-result-title">${this._formatActionName(event.name)} ${event.ok ? 'completed' : 'failed'}</div>
+            </div>
+            ${event.result ? `<div class="action-result-details">${JSON.stringify(event.result, null, 2)}</div>` : ''}
+            ${event.error ? `<div class="action-result-error">Error: ${event.error}</div>` : ''}
+        `;
+        
+        this.chatMessagesContainer.appendChild(resultDiv);
+        this._scrollToBottom();
+    }
+
+    /**
+     * Format action names for display
+     */
+    _formatActionName(actionName) {
+        const nameMap = {
+            'create_task': 'Create Task',
+            'update_task_status': 'Update Task Status',
+            'reorder_tasks': 'Reorder Tasks',
+            'fetch_tasks': 'Fetch Tasks',
+            'no_op': 'No Operation'
+        };
+        return nameMap[actionName] || actionName;
+    }
+
     /**
      * Get current UI context for the agent
      */
