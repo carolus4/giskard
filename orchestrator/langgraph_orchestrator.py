@@ -66,7 +66,7 @@ class LangGraphOrchestrator:
         """Node 2: Plan actions using LLM"""
         try:
             # Load planner prompt
-            with open('/Users/charlesdupont/Dev/giskard/orchestrator/prompts/planner.txt', 'r') as f:
+            with open('/Users/charlesdupont/Dev/giskard/prompts/planner_v1.0.txt', 'r') as f:
                 planner_prompt = f.read()
             
             # Create system message with planner prompt
@@ -155,7 +155,7 @@ class LangGraphOrchestrator:
         """Node 4: Synthesize final response"""
         try:
             # Load synthesizer prompt
-            with open('/Users/charlesdupont/Dev/giskard/orchestrator/prompts/synthesizer.txt', 'r') as f:
+            with open('/Users/charlesdupont/Dev/giskard/prompts/synthesizer_v1.0.txt', 'r') as f:
                 synthesizer_prompt = f.read()
             
             # Prepare context

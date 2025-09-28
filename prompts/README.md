@@ -9,8 +9,11 @@ This directory contains prompt text files for the Giskard application. Each prom
 ```
 prompts/
 ├── README.md                           # This file
-├── coaching_system_v1.0.txt           # Coaching system prompt text
-├── task_classification_v3.0.txt       # Task classification prompt text
+├── coaching_system_v1.1.txt           # Coaching system prompt text
+├── task_classification_v3.1.txt       # Task classification prompt text
+├── task_classification_v3.2.txt       # Task classification prompt text (updated)
+├── planner_v1.0.txt                   # LangGraph planner prompt
+├── synthesizer_v1.0.txt               # LangGraph synthesizer prompt
 └── ...                                # Additional prompt text files
 ```
 
