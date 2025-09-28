@@ -3,7 +3,7 @@ Action wrappers for existing services
 """
 import requests
 import logging
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple, List, Union
 from models.task_db import TaskDB
 
 logger = logging.getLogger(__name__)
@@ -76,19 +76,52 @@ class ActionExecutor:
             logger.error(f"Failed to reorder tasks: {str(e)}")
             return False, {"error": str(e)}
     
-    def fetch_tasks(self, status: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
-        """Fetch tasks"""
+    def fetch_tasks(self, status: Optional[Union[str, List[str]]] = None) -> Tuple[bool, Dict[str, Any]]:
+        """Fetch tasks with optional status filtering
+        
+        Args:
+            status: Single status string, list of statuses, or None for all tasks
+                   Valid statuses: 'open', 'in_progress', 'done'
+        """
         try:
             if status:
-                # Filter by status
-                if status == 'open':
-                    tasks, _, _ = TaskDB.get_by_status()
-                elif status == 'in_progress':
-                    _, tasks, _ = TaskDB.get_by_status()
-                elif status == 'done':
-                    _, _, tasks = TaskDB.get_by_status()
+                # Get all tasks first
+                open_tasks, in_progress_tasks, done_tasks = TaskDB.get_by_status()
+                
+                # Handle single status
+                if isinstance(status, str):
+                    if status == 'open':
+                        tasks = open_tasks
+                    elif status == 'in_progress':
+                        tasks = in_progress_tasks
+                    elif status == 'done':
+                        tasks = done_tasks
+                    else:
+                        return False, {"error": f"Invalid status filter: {status}. Valid options: open, in_progress, done"}
+                
+                # Handle multiple statuses
+                elif isinstance(status, list):
+                    tasks = []
+                    for s in status:
+                        if s == 'open':
+                            tasks.extend(open_tasks)
+                        elif s == 'in_progress':
+                            tasks.extend(in_progress_tasks)
+                        elif s == 'done':
+                            tasks.extend(done_tasks)
+                        else:
+                            return False, {"error": f"Invalid status filter: {s}. Valid options: open, in_progress, done"}
+                    
+                    # Remove duplicates while preserving order
+                    seen = set()
+                    unique_tasks = []
+                    for task in tasks:
+                        if task.id not in seen:
+                            seen.add(task.id)
+                            unique_tasks.append(task)
+                    tasks = unique_tasks
                 else:
-                    return False, {"error": "Invalid status filter"}
+                    return False, {"error": "Status must be a string, list of strings, or None"}
             else:
                 # Get all tasks
                 open_tasks, in_progress_tasks, done_tasks = TaskDB.get_by_status()

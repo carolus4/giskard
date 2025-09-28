@@ -55,11 +55,27 @@ Response:
 User: "What are my current tasks?"
 Response:
 {
-  "assistant_text": "Let me fetch your current tasks for you.",
+  "assistant_text": "Let me fetch your current open and in-progress tasks for you.",
   "actions": [
     {
       "name": "fetch_tasks",
-      "args": {}
+      "args": {
+        "status": ["open", "in_progress"]
+      }
+    }
+  ]
+}
+
+User: "Show me what I need to work on today"
+Response:
+{
+  "assistant_text": "Let me get your current tasks that need attention.",
+  "actions": [
+    {
+      "name": "fetch_tasks",
+      "args": {
+        "status": ["open", "in_progress"]
+      }
     }
   ]
 }
