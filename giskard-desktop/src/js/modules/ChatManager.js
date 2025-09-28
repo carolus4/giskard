@@ -287,10 +287,13 @@ class ChatManager {
                     this._handleSideEffects(data.side_effects);
                 }
                 
-                // Store undo token for potential undo operations
+                // Store undo token for potential undo operations (V1 only)
                 if (data.undo_token) {
                     console.log('🔄 Undo token:', data.undo_token);
                     this._storeUndoToken(data.undo_token);
+                } else {
+                    // V2 orchestrator doesn't support undo yet
+                    console.log('ℹ️ V2 orchestrator: No undo token available');
                 }
                 
                 // Return the final message from V2 response
@@ -483,7 +486,7 @@ class ChatManager {
         this.chatMessages.push(message);
         const messageElement = this._renderMessage(message);
         
-        // Add undo button if this is an assistant message and we have an undo token
+        // Add undo button if this is an assistant message and we have an undo token (V1 only)
         if (type === 'bot' && this.lastUndoToken) {
             this._addUndoButton(messageElement);
         }

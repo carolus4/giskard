@@ -7,33 +7,29 @@ The Agent Orchestration Layer enables Giskard's chat UI to perform task operatio
 ## Architecture
 
 ```
-Chat UI → POST /api/agent/step → AgentService → Ollama → Tool Execution → Task API
+Chat UI → POST /api/agent/v2/step → OrchestratorGraph → LLM Nodes → Action Execution → Task API
 ```
 
 ### Components
 
-1. **AgentService** (`utils/agent_service.py`) - Core orchestration logic
-2. **AgentMetrics** (`utils/agent_metrics.py`) - Observability and metrics
-3. **API Endpoints** (`api/routes_v2.py`) - HTTP interface
-4. **Tool Schema** - Structured prompt for Ollama with tool definitions
+1. **OrchestratorGraph** (`orchestrator/graph/buildGraph.py`) - LangGraph-style state machine
+2. **GraphNodes** (`orchestrator/graph/nodes.py`) - Individual processing nodes
+3. **ActionExecutor** (`orchestrator/actions/actions.py`) - Tool execution wrapper
+4. **AgentState** (`orchestrator/graph/state.py`) - State management and events
+5. **API Endpoints** (`server/routes/agentV2.py`) - V2 HTTP interface
 
 ## API Endpoints
 
-### POST /api/agent/step
+### POST /api/agent/v2/step
 
 Process a single agent step with chat messages and UI context.
 
 **Request:**
 ```json
 {
-  "messages": [
-    {"type": "user", "content": "Create a task to review the quarterly report"},
-    {"type": "assistant", "content": "I'll help you with that."}
-  ],
-  "ui_context": {
-    "current_tasks": [],
-    "user_preferences": {}
-  }
+  "input_text": "Create a task to review the quarterly report",
+  "session_id": "chat-session-123",
+  "domain": "chat"
 }
 ```
 
@@ -41,20 +37,43 @@ Process a single agent step with chat messages and UI context.
 ```json
 {
   "success": true,
-  "message": "Agent step completed",
-  "data": {
-    "assistant_text": "✅ Created task: Review quarterly report",
-    "side_effects": [
-      {
-        "success": true,
-        "action": "create_task",
-        "task_id": 123,
-        "task_title": "Review quarterly report",
-        "message": "Created task: Review quarterly report"
-      }
-    ],
-    "undo_token": "0280969a-7bbd-4250-8...",
-    "success": true
+  "message": "Agent V2 step completed",
+  "events": [
+    {
+      "type": "run_started",
+      "run_id": "123e4567-e89b-12d3-a456-426614174000",
+      "input_text": "Create a task to review the quarterly report"
+    },
+    {
+      "type": "llm_message",
+      "node": "planner",
+      "content": "I'll create a task for you to review the quarterly report."
+    },
+    {
+      "type": "action_call",
+      "name": "create_task",
+      "args": {"title": "Review quarterly report"}
+    },
+    {
+      "type": "action_result",
+      "name": "create_task",
+      "ok": true,
+      "result": {"task_id": 123, "message": "Task created successfully"}
+    },
+    {
+      "type": "final_message",
+      "content": "✅ I've created a task for you: 'Review quarterly report' (Task #123)"
+    },
+    {
+      "type": "run_completed",
+      "status": "ok"
+    }
+  ],
+  "final_message": "✅ I've created a task for you: 'Review quarterly report' (Task #123)",
+  "state_patch": {
+    "session_id": "chat-session-123",
+    "domain": "chat",
+    "run_id": "123e4567-e89b-12d3-a456-426614174000"
   }
 }
 ```

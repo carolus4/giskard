@@ -249,82 +249,26 @@ def chat():
         return APIResponse.error(f"Chat failed: {str(e)}", 500)
 
 
-@api_v2.route('/agent/step', methods=['POST'])
-def agent_step():
-    """Handle agent orchestration step with tool execution
+@api_v2.route('/agent/undo', methods=['POST'])
+def agent_undo():
+    """Undo the last agent mutation
     
-    DEPRECATED: This endpoint is deprecated. Please use /api/agent/v2/step instead.
-    The V2 endpoint provides better event tracking, improved error handling, and a cleaner API.
+    DEPRECATED: This endpoint is deprecated with the V2 orchestrator.
+    Undo functionality is not yet implemented in the V2 orchestrator.
     This endpoint will be removed in a future version.
     """
     try:
         # Log deprecation warning
-        logger.warning("DEPRECATED: /api/agent/step endpoint is deprecated. Please migrate to /api/agent/v2/step")
+        logger.warning("DEPRECATED: /api/agent/undo endpoint is deprecated. V2 orchestrator does not support undo functionality yet.")
         
-        data = request.get_json()
-        messages = data.get('messages', [])
-        ui_context = data.get('ui_context', {})
-        
-        if not messages:
-            return APIResponse.error('Messages array is required')
-        
-        # Import agent service
-        from utils.agent_service import AgentService
-        
-        # Create agent service instance
-        agent_service = AgentService()
-        
-        # Check if Ollama is available
-        if not agent_service.is_ollama_available():
-            return APIResponse.error('Ollama service is not available', 503)
-        
-        # Process the agent step
-        result = agent_service.process_step(messages, ui_context)
-        
-        # Log the request and response for observability
-        logger.info(f"Agent step processed: success={result.get('success')}, undo_token={result.get('undo_token')}")
-        
-        if result.get('success'):
-            # Add deprecation warning to response headers
-            response = jsonify(APIResponse.success('Agent step completed', result))
-            response.headers['X-Deprecated-Endpoint'] = 'true'
-            response.headers['X-New-Endpoint'] = '/api/agent/v2/step'
-            response.headers['X-Deprecation-Message'] = 'This endpoint is deprecated. Please use /api/agent/v2/step instead.'
-            return response
-        else:
-            return jsonify(APIResponse.error(result.get('error', 'Agent step failed'), 500))
-    
-    except Exception as e:
-        logger.error(f"Agent step failed: {str(e)}")
-        return APIResponse.error(f"Agent step failed: {str(e)}", 500)
-
-
-@api_v2.route('/agent/undo', methods=['POST'])
-def agent_undo():
-    """Undo the last agent mutation"""
-    try:
         data = request.get_json()
         undo_token = data.get('undo_token')
         
         if not undo_token:
             return APIResponse.error('undo_token is required')
         
-        # Import agent service
-        from utils.agent_service import AgentService
-        
-        # Create agent service instance
-        agent_service = AgentService()
-        
-        # Execute undo operation
-        result = agent_service.undo_last_mutation(undo_token)
-        
-        # Log the undo operation
-        logger.info(f"Undo operation: token={undo_token}, success={result.get('success')}")
-        
-        if result.get('success'):
-            return jsonify(APIResponse.success('Undo completed', result))
-        else:
-            return jsonify(APIResponse.error(result.get('message', 'Undo failed'), 400))
+        # Return error indicating undo is not supported in V2
+        return APIResponse.error('Undo functionality is not available in V2 orchestrator. Please use the V2 endpoint for new operations.', 501)
     
     except Exception as e:
         logger.error(f"Undo operation failed: {str(e)}")
