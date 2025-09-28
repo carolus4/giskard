@@ -8,6 +8,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, System
 from langchain_ollama import OllamaLLM
 import json
 import logging
+from datetime import datetime
 from .actions.actions import ActionExecutor
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,41 @@ class LangGraphOrchestrator:
         self.llm = OllamaLLM(model="gemma3:4b", base_url="http://localhost:11434")
         self.action_executor = ActionExecutor()
         self.graph = self._build_graph()
+        # Set a reasonable timeout for the entire workflow (90 seconds)
+        self.workflow_timeout = 90
+    
+    def _log_node(self, node_name: str, input_data: Dict[str, Any], output_data: Dict[str, Any] = None):
+        """Log each node execution to a single file"""
+        timestamp = datetime.now().isoformat()
+        log_entry = {
+            "timestamp": timestamp,
+            "node": node_name,
+            "input": input_data,
+            "output": output_data
+        }
+        
+        # Read existing logs, append new entry, write back as JSON array
+        log_file = '/Users/charlesdupont/Dev/giskard/data/agent_logs.json'
+        
+        try:
+            # Read existing logs
+            with open(log_file, 'r') as f:
+                logs = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            # Start fresh if file doesn't exist or is invalid
+            logs = []
+        
+        # Append new entry
+        logs.append(log_entry)
+        
+        # Write back as proper JSON array
+        with open(log_file, 'w') as f:
+            json.dump(logs, f, indent=2)
+        
+        # Also log to console for debugging
+        logger.info(f"[{node_name}] {timestamp}")
+        if output_data:
+            logger.info(f"[{node_name}] Output: {json.dumps(output_data, indent=2)}")
     
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph workflow"""
@@ -55,15 +91,32 @@ class LangGraphOrchestrator:
     
     def _ingest_user_input(self, state: AgentState) -> AgentState:
         """Node 1: Ingest user input"""
+        input_data = {
+            "input_text": state["input_text"],
+            "session_id": state.get("session_id"),
+            "domain": state.get("domain")
+        }
+        
         logger.info(f"Processing input: {state['input_text']}")
         
         # Add user message to conversation
         state["messages"].append(HumanMessage(content=state["input_text"]))
         
+        output_data = {
+            "messages_count": len(state["messages"]),
+            "user_message_added": True
+        }
+        
+        self._log_node("ingest_user_input", input_data, output_data)
         return state
     
     def _planner_llm(self, state: AgentState) -> AgentState:
         """Node 2: Plan actions using LLM"""
+        input_data = {
+            "input_text": state["input_text"],
+            "messages_count": len(state["messages"])
+        }
+        
         try:
             # Load planner prompt
             with open('/Users/charlesdupont/Dev/giskard/prompts/planner_v1.0.txt', 'r') as f:
@@ -94,6 +147,13 @@ class LangGraphOrchestrator:
                 state["planner_output"] = planner_output
                 state["actions_to_execute"] = planner_output.get("actions", [])
                 
+                output_data = {
+                    "llm_response": response,
+                    "planner_output": planner_output,
+                    "actions_to_execute": state["actions_to_execute"],
+                    "parsing_success": True
+                }
+                
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse planner JSON: {str(e)}")
                 logger.error(f"Response was: {response}")
@@ -103,7 +163,15 @@ class LangGraphOrchestrator:
                     "actions": [{"name": "no_op", "args": {}}]
                 }
                 state["actions_to_execute"] = [{"name": "no_op", "args": {}}]
+                
+                output_data = {
+                    "llm_response": response,
+                    "parsing_success": False,
+                    "error": str(e),
+                    "fallback_used": True
+                }
             
+            self._log_node("planner_llm", input_data, output_data)
             return state
             
         except Exception as e:
@@ -114,10 +182,21 @@ class LangGraphOrchestrator:
                 "actions": [{"name": "no_op", "args": {}}]
             }
             state["actions_to_execute"] = [{"name": "no_op", "args": {}}]
+            
+            output_data = {
+                "error": str(e),
+                "fallback_used": True
+            }
+            
+            self._log_node("planner_llm", input_data, output_data)
             return state
     
     def _action_exec(self, state: AgentState) -> AgentState:
         """Node 3: Execute actions"""
+        input_data = {
+            "actions_to_execute": state["actions_to_execute"]
+        }
+        
         try:
             action_results = []
             
@@ -139,6 +218,15 @@ class LangGraphOrchestrator:
                 })
             
             state["action_results"] = action_results
+            
+            output_data = {
+                "action_results": action_results,
+                "actions_executed": len(action_results),
+                "successful_actions": len([r for r in action_results if r["ok"]]),
+                "failed_actions": len([r for r in action_results if not r["ok"]])
+            }
+            
+            self._log_node("action_exec", input_data, output_data)
             return state
             
         except Exception as e:
@@ -149,10 +237,23 @@ class LangGraphOrchestrator:
                 "result": None,
                 "error": str(e)
             }]
+            
+            output_data = {
+                "error": str(e),
+                "action_results": state["action_results"]
+            }
+            
+            self._log_node("action_exec", input_data, output_data)
             return state
     
     def _synthesizer_llm(self, state: AgentState) -> AgentState:
         """Node 4: Synthesize final response"""
+        input_data = {
+            "action_results": state["action_results"],
+            "planner_output": state.get("planner_output"),
+            "input_text": state["input_text"]
+        }
+        
         try:
             # Load synthesizer prompt
             with open('/Users/charlesdupont/Dev/giskard/prompts/synthesizer_v1.0.txt', 'r') as f:
@@ -174,6 +275,13 @@ class LangGraphOrchestrator:
             state["messages"].append(AIMessage(content=response))
             state["final_message"] = response
             
+            output_data = {
+                "final_message": response,
+                "messages_count": len(state["messages"]),
+                "synthesis_success": True
+            }
+            
+            self._log_node("synthesizer_llm", input_data, output_data)
             return state
             
         except Exception as e:
@@ -181,10 +289,28 @@ class LangGraphOrchestrator:
             fallback_response = "I'm sorry, I encountered an error processing your request. Please try again."
             state["final_message"] = fallback_response
             state["messages"].append(AIMessage(content=fallback_response))
+            
+            output_data = {
+                "error": str(e),
+                "fallback_response": fallback_response,
+                "synthesis_success": False
+            }
+            
+            self._log_node("synthesizer_llm", input_data, output_data)
             return state
     
     def run(self, input_text: str, session_id: str = None, domain: str = None) -> Dict[str, Any]:
-        """Run the LangGraph workflow"""
+        """Run the LangGraph workflow with timeout handling"""
+        import threading
+        import time
+        
+        # Log workflow start
+        self._log_node("workflow_start", {
+            "input_text": input_text,
+            "session_id": session_id,
+            "domain": domain
+        })
+        
         try:
             # Initialize state
             initial_state = AgentState(
@@ -198,10 +324,54 @@ class LangGraphOrchestrator:
                 final_message=None
             )
             
-            # Run the graph
-            final_state = self.graph.invoke(initial_state)
+            # Run the graph with timeout using threading
+            result = {"success": False, "final_state": None, "error": None}
             
-            # Convert to response format
+            def run_graph():
+                try:
+                    final_state = self.graph.invoke(initial_state)
+                    result["success"] = True
+                    result["final_state"] = final_state
+                except Exception as e:
+                    result["error"] = str(e)
+            
+            # Start the graph execution in a thread
+            thread = threading.Thread(target=run_graph)
+            thread.daemon = True
+            thread.start()
+            
+            # Wait for completion with timeout
+            thread.join(timeout=self.workflow_timeout)
+            
+            if thread.is_alive():
+                # Timeout occurred
+                logger.error("LangGraph execution timed out")
+                return {
+                    "success": False,
+                    "message": "Agent step timed out",
+                    "final_message": "I'm taking longer than expected to process your request. Please try with a simpler request or try again later.",
+                    "state_patch": {
+                        "session_id": session_id,
+                        "domain": domain
+                    }
+                }
+            
+            if not result["success"]:
+                # Error occurred during execution
+                logger.error(f"LangGraph execution failed: {result['error']}")
+                return {
+                    "success": False,
+                    "message": f"Agent step failed: {result['error']}",
+                    "final_message": "I'm sorry, I encountered an error processing your request. Please try again.",
+                    "state_patch": {
+                        "session_id": session_id,
+                        "domain": domain
+                    }
+                }
+            
+            # Success - convert to response format
+            final_state = result["final_state"]
+            
             return {
                 "success": True,
                 "message": "Agent step completed",

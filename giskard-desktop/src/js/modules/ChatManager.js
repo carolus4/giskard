@@ -129,8 +129,9 @@ class ChatManager {
         this._updateSendButton();
         this._hideSuggestions();
 
-        // Show typing indicator
+        // Show typing indicator with informative message
         this._showTyping();
+        this._updateTypingMessage('AI is processing your request...');
 
         try {
             // Send to Ollama
@@ -143,7 +144,7 @@ class ChatManager {
             let errorMessage = 'I encountered an error. Please try again.';
             
             if (error.message.includes('timeout') || error.message.includes('timed out')) {
-                errorMessage = 'The request timed out. The AI might be busy - please try again.';
+                errorMessage = 'The AI is taking longer than expected to process your request. This can happen with complex tasks. Please try again with a simpler request or wait a moment.';
             } else if (error.message.includes('HTTP error')) {
                 errorMessage = 'Server error occurred. Please try again.';
             } else if (error.message.includes('Failed to fetch')) {
@@ -244,7 +245,7 @@ class ChatManager {
      */
     async _sendToOllama(message) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for complex agent workflows
         
         try {
             // Generate session ID for this conversation
@@ -571,6 +572,18 @@ class ChatManager {
         this.isTyping = false;
         if (this.typingIndicator) {
             this.typingIndicator.style.display = 'none';
+        }
+    }
+
+    /**
+     * Update typing indicator message
+     */
+    _updateTypingMessage(message) {
+        if (this.typingIndicator) {
+            const messageElement = this.typingIndicator.querySelector('.typing-message');
+            if (messageElement) {
+                messageElement.textContent = message;
+            }
         }
     }
 

@@ -1,7 +1,6 @@
 """
 Action wrappers for existing services
 """
-import requests
 import logging
 from typing import Dict, Any, Optional, Tuple, List, Union
 from models.task_db import TaskDB
