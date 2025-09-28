@@ -6,6 +6,7 @@ Giskard API - Backend API for Tauri desktop app
 from flask import Flask
 from flask_cors import CORS
 from api.routes_v2 import api_v2
+from server.routes.agentV2 import agent_v2
 from database import init_database
 from utils.classification_manager import ClassificationManager
 import subprocess
@@ -73,8 +74,9 @@ CORS(app, origins=[
     "tauri://localhost"
 ], supports_credentials=True)
 
-# Register API blueprint
+# Register API blueprints
 app.register_blueprint(api_v2)  # Clean API
+app.register_blueprint(agent_v2)  # Agent V2 orchestrator
 
 # Initialize database
 init_database()
