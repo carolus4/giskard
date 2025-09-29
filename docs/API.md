@@ -21,6 +21,28 @@ GET /api/tasks
 
 **Description:** Retrieve all tasks grouped by status with counts and metadata.
 
+**Query Parameters:**
+- `completed_at_gte` (optional): ISO date/timestamp string (e.g., "2025-09-29" or "2025-09-29T00:00:00") - only include tasks completed on or after this date
+- `completed_at_lt` (optional): ISO date/timestamp string (e.g., "2025-09-29" or "2025-09-29T00:00:00") - only include tasks completed before this date
+
+**Examples:**
+```http
+# Get all tasks
+GET /api/tasks
+
+# Get tasks completed today (date format)
+GET /api/tasks?completed_at_gte=2025-09-29
+
+# Get tasks completed today (timestamp format)
+GET /api/tasks?completed_at_gte=2025-09-29T00:00:00
+
+# Get tasks completed in the last week
+GET /api/tasks?completed_at_gte=2025-09-22
+
+# Get tasks completed in a date range
+GET /api/tasks?completed_at_gte=2025-09-22&completed_at_lt=2025-09-29
+```
+
 **Response:**
 ```json
 {

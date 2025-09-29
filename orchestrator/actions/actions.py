@@ -75,12 +75,16 @@ class ActionExecutor:
             logger.error(f"Failed to reorder tasks: {str(e)}")
             return False, {"error": str(e)}
     
-    def fetch_tasks(self, status: Optional[Union[str, List[str]]] = None) -> Tuple[bool, Dict[str, Any]]:
-        """Fetch tasks with optional status filtering
+    def fetch_tasks(self, status: Optional[Union[str, List[str]]] = None, 
+                   completed_at_gte: Optional[str] = None,
+                   completed_at_lt: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
+        """Fetch tasks with optional status and completion date filtering
         
         Args:
             status: Single status string, list of statuses, or None for all tasks
                    Valid statuses: 'open', 'in_progress', 'done'
+            completed_at_gte: ISO date string (YYYY-MM-DD) to filter tasks completed since this date
+            completed_at_lt: ISO date string (YYYY-MM-DD) to filter tasks completed before this date
         """
         try:
             if status:
@@ -125,6 +129,57 @@ class ActionExecutor:
                 # Get all tasks
                 open_tasks, in_progress_tasks, done_tasks = TaskDB.get_by_status()
                 tasks = open_tasks + in_progress_tasks + done_tasks
+            
+            # Apply completed_at filtering if specified
+            if completed_at_gte or completed_at_lt:
+                from datetime import datetime
+                try:
+                    # Parse filter dates - ISO timestamp format only
+                    filter_gte = None
+                    filter_lt = None
+                    
+                    if completed_at_gte:
+                        try:
+                            filter_gte = datetime.fromisoformat(completed_at_gte.replace('Z', '+00:00'))
+                        except ValueError:
+                            return False, {"error": f"Invalid date format: {completed_at_gte}. Use ISO format (e.g., 2025-09-29 or 2025-09-29T00:00:00)"}
+                    
+                    if completed_at_lt:
+                        try:
+                            filter_lt = datetime.fromisoformat(completed_at_lt.replace('Z', '+00:00'))
+                        except ValueError:
+                            return False, {"error": f"Invalid date format: {completed_at_lt}. Use ISO format (e.g., 2025-09-29 or 2025-09-29T00:00:00)"}
+                    
+                    # Filter tasks
+                    filtered_tasks = []
+                    for task in tasks:
+                        # Only apply filtering to completed tasks
+                        if task.status != 'done' or not task.completed_at:
+                            filtered_tasks.append(task)
+                            continue
+                        
+                        # Parse task completion date
+                        try:
+                            task_completed = datetime.fromisoformat(task.completed_at.replace('Z', '+00:00'))
+                        except ValueError:
+                            # If task completion date is invalid, include it (don't filter out)
+                            filtered_tasks.append(task)
+                            continue
+                            
+                        # Apply completed_at_gte filter (greater than or equal)
+                        if filter_gte and task_completed < filter_gte:
+                            continue
+                            
+                        # Apply completed_at_lt filter (less than)
+                        if filter_lt and task_completed >= filter_lt:
+                            continue
+                            
+                        filtered_tasks.append(task)
+                    
+                    tasks = filtered_tasks
+                    
+                except Exception as e:
+                    return False, {"error": f"Date filtering error: {str(e)}"}
             
             return True, {
                 "tasks": [task.to_dict() for task in tasks],

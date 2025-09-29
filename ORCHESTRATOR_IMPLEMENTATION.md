@@ -68,7 +68,7 @@ Light wrappers around existing services:
 - **`create_task`** → `TaskDB.create()` + classification
 - **`update_task_status`** → `TaskDB.mark_*()` methods
 - **`reorder_tasks`** → `TaskDB.reorder_tasks()`
-- **`fetch_tasks`** → `TaskDB.get_by_status()`
+- **`fetch_tasks`** → `TaskDB.get_by_status()` + optional date filtering
 - **`no_op`** → Does nothing (for pure chat)
 
 ## 📡 API Endpoint

@@ -68,31 +68,39 @@ JSON:"""
 
 
 def get_planner_prompt() -> str:
-    """Get the planner prompt"""
+    """Get the planner prompt with current datetime context"""
+    from datetime import datetime
+    
+    # Get current datetime in ISO format
+    current_datetime = datetime.now().isoformat()
+    
     prompt_text = simple_prompt_registry.get_latest_prompt_text("planner")
     if prompt_text:
-        return prompt_text
+        # Add current datetime context to the prompt
+        return f"{prompt_text}\n\nCurrent datetime: {current_datetime}"
     
     # Fallback to hardcoded prompt if registry is not available
-    return """You are a task management assistant. Your job is to plan actions based on user input.
+    return f"""You are a task management assistant. Your job is to plan actions based on user input.
+
+Current datetime: {current_datetime}
 
 Available actions:
 - create_task: Create a new task (requires: title, description, project, categories)
 - update_task_status: Update task status (requires: task_id, status)
 - reorder_tasks: Reorder tasks (requires: task_ids list)
-- fetch_tasks: Get tasks (optional: status filter)
+- fetch_tasks: Get tasks (optional: status filter, completed_at_gte, completed_at_lt) - Use ISO format (e.g., 2025-09-29 or 2025-09-29T00:00:00)
 - no_op: No operation needed
 
 Respond with JSON in this format:
-{
+{{
   "assistant_text": "Brief explanation of what you'll do",
   "actions": [
-    {
+    {{
       "name": "action_name",
-      "args": {"key": "value"}
-    }
+      "args": {{"key": "value"}}
+    }}
   ]
-}"""
+}}"""
 
 
 def get_synthesizer_prompt(user_input: str, action_results: str) -> str:
