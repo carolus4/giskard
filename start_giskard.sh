@@ -1,134 +1,139 @@
 #!/bin/bash
 
-# 🚀 Giskard Startup Script
-# This script starts all components of the Giskard productivity system
+# Giskard Startup Script
+# Works for both daily use and development
 
-echo "🚀 Starting Giskard - AI-Powered Productivity Coach"
-echo "=================================================="
+# Cleanup function to stop all applications
+cleanup() {
+    echo ""
+    echo "🛑 Stopping Giskard..."
+    if [ ! -z "$DESKTOP_PID" ]; then
+        echo "   Stopping Desktop app (PID: $DESKTOP_PID)"
+        kill $DESKTOP_PID 2>/dev/null || true
+    fi
+    if [ ! -z "$FLASK_PID" ]; then
+        echo "   Stopping Flask backend (PID: $FLASK_PID)"
+        kill $FLASK_PID 2>/dev/null || true
+    fi
+    if [ ! -z "$OLLAMA_PID" ]; then
+        echo "   Stopping Ollama service (PID: $OLLAMA_PID)"
+        kill $OLLAMA_PID 2>/dev/null || true
+    fi
+    echo "✅ Giskard stopped"
+    exit 0
+}
 
-# Set GPU acceleration for Ollama
-export OLLAMA_GPU_LAYERS=999
-echo "🔧 Configured Ollama for GPU acceleration (OLLAMA_GPU_LAYERS=999)"
+# Set up signal handlers
+trap cleanup SIGINT SIGTERM
 
-# Check if Ollama is installed
-if ! command -v ollama &> /dev/null; then
-    echo "❌ Ollama is not installed. Please install it from https://ollama.ai"
+echo "🚀 Starting Giskard..."
+
+# Use the direct path to the conda environment's Python
+PYTHON_PATH="/Users/charlesdupont/miniconda3/envs/giskard/bin/python"
+
+# Check if the Python executable exists
+if [ ! -f "$PYTHON_PATH" ]; then
+    echo "❌ Python not found at $PYTHON_PATH"
+    echo "Please create the giskard conda environment first:"
+    echo "conda create -n giskard python=3.11 -y"
+    echo "conda activate giskard"
+    echo "pip install -r requirements.txt"
     exit 1
 fi
 
-# Check if Python is available
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is not installed."
-    exit 1
-fi
-
-# Check if Node.js is available
-if ! command -v node &> /dev/null; then
-    echo "❌ Node.js is not installed."
-    exit 1
-fi
-
-echo "✅ All prerequisites found"
-
-# Function to check if a model is currently running
-check_model_running() {
-    local model_name="$1"
-    if ollama ps | grep -q "$model_name"; then
-        return 0  # Model is running
-    else
-        return 1  # Model is not running
-    fi
+# Check if required packages are installed
+echo "🔍 Checking dependencies..."
+$PYTHON_PATH -c "import langgraph, langchain_core, langchain_community, langchain_ollama; print('✅ All dependencies are available')" || {
+    echo "❌ Missing dependencies. Installing..."
+    /Users/charlesdupont/miniconda3/envs/giskard/bin/pip install -r requirements.txt
 }
 
-# Function to check if a model is using GPU
-check_model_gpu() {
-    local model_name="$1"
-    local ps_output=$(ollama ps)
-    if echo "$ps_output" | grep -q "$model_name.*gpu"; then
-        return 0  # Model is using GPU
-    else
-        return 1  # Model is not using GPU
-    fi
-}
-
-# Function to start a model with GPU acceleration
-start_model_gpu() {
-    local model_name="$1"
-    echo "🚀 Starting $model_name with GPU acceleration..."
-    ollama run "$model_name" &
-    sleep 2  # Give it a moment to start
-}
-
-# Start Ollama if not running
-echo "🤖 Starting Ollama server..."
-if ! pgrep -f "ollama serve" > /dev/null; then
-    ollama serve > /dev/null 2>&1 &
-    echo "⏳ Waiting for Ollama to start..."
-    sleep 3
-fi
-
-# Check if gemma3:4b model is available
-echo "🧠 Checking for gemma3:4b model..."
-if ! ollama list | grep -q "gemma3:4b"; then
-    echo "📥 Pulling gemma3:4b model (this may take a while)..."
-    ollama pull gemma3:4b
-fi
-
-# Check if the model is running and using GPU
-TARGET_MODEL="gemma3:4b"
-echo "🔍 Checking if $TARGET_MODEL is running..."
-
-if check_model_running "$TARGET_MODEL"; then
-    echo "✅ $TARGET_MODEL is running"
-    
-    # Check if it's using GPU
-    if check_model_gpu "$TARGET_MODEL"; then
-        echo "🚀 $TARGET_MODEL is running on GPU - Excellent!"
-    else
-        echo "⚠️  $TARGET_MODEL is running but NOT using GPU - Performance may be slow"
-        echo "🔄 Restarting model to ensure GPU usage..."
-        # Kill the current model process
-        pkill -f "ollama run $TARGET_MODEL" 2>/dev/null || true
-        sleep 1
-        start_model_gpu "$TARGET_MODEL"
-    fi
+# Check if Ollama is running
+echo "🤖 Checking Ollama service..."
+if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+    echo "✅ Ollama is already running"
 else
-    echo "🚀 Starting $TARGET_MODEL with GPU acceleration..."
-    start_model_gpu "$TARGET_MODEL"
+    echo "🚀 Starting Ollama service..."
+    if command -v ollama >/dev/null 2>&1; then
+        # Set GPU acceleration environment variable
+        export OLLAMA_GPU_LAYERS=999
+        
+        # Start Ollama in background
+        ollama serve >/dev/null 2>&1 &
+        OLLAMA_PID=$!
+        
+        # Wait for Ollama to start (up to 10 seconds)
+        echo "   Waiting for Ollama to start..."
+        for i in {1..20}; do
+            sleep 0.5
+            if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+                echo "✅ Ollama started successfully"
+                break
+            fi
+            if [ $i -eq 20 ]; then
+                echo "⚠️  Ollama failed to start within 10 seconds"
+            fi
+        done
+    else
+        echo "⚠️  Ollama not found in PATH - please install Ollama first"
+        echo "   Visit: https://ollama.ai/download"
+    fi
 fi
 
-echo "✅ Ollama ready with $TARGET_MODEL"
+# Check if database directory exists
+echo "🗄️  Checking database..."
+if [ ! -d "data" ]; then
+    echo "   Creating data directory..."
+    mkdir -p data
+fi
 
-# Start Flask backend
-echo "🌐 Starting Flask backend..."
-python3 app.py &
+# Check if port 5001 is already in use
+if lsof -Pi :5001 -sTCP:LISTEN -t >/dev/null ; then
+    echo "⚠️  Port 5001 is already in use. Stopping existing processes..."
+    pkill -f "python.*app.py" || true
+    sleep 2
+fi
+
+# Start the Flask application
+echo "🌐 Starting Flask API backend on http://127.0.0.1:5001"
+$PYTHON_PATH app.py &
 FLASK_PID=$!
 
-# Wait for Flask to start
-sleep 2
+# Wait a moment for Flask to start
+sleep 3
 
-# Test if Flask is responding
-if curl -s http://localhost:5001/api/tasks > /dev/null; then
-    echo "✅ Flask backend running on http://localhost:5001"
-else
-    echo "❌ Flask backend failed to start"
-    kill $FLASK_PID 2>/dev/null
+# Check if Flask started successfully
+if ! kill -0 $FLASK_PID 2>/dev/null; then
+    echo "❌ Failed to start Flask backend"
     exit 1
 fi
 
-# Start Tauri desktop app
-echo "🖥️ Starting Giskard desktop app..."
-cd giskard-desktop
+echo "✅ Flask backend started successfully (PID: $FLASK_PID)"
 
-if [ ! -d "node_modules" ]; then
-    echo "📦 Installing dependencies..."
-    npm install
+# Start the Tauri desktop application
+echo "🖥️  Starting Giskard desktop application..."
+TAURI_APP="/Users/charlesdupont/Dev/giskard/giskard-desktop/src-tauri/target/release/giskard-desktop"
+
+if [ -f "$TAURI_APP" ]; then
+    echo "🚀 Launching desktop app..."
+    "$TAURI_APP" &
+    DESKTOP_PID=$!
+    echo "✅ Desktop app started (PID: $DESKTOP_PID)"
+    echo ""
+    echo "🎉 Giskard is now running!"
+    echo "   - API Backend: http://127.0.0.1:5001"
+    echo "   - Desktop App: Running in background"
+    echo "   - Ollama Service: Running with GPU acceleration"
+    echo ""
+    echo "Press Ctrl+C to stop all applications"
+    
+    # Wait for user to stop
+    wait
+else
+    echo "❌ Desktop app not found at $TAURI_APP"
+    echo "Please build the desktop app first:"
+    echo "cd giskard-desktop && ./build-dmg.sh"
+    echo ""
+    echo "Flask backend is still running on http://127.0.0.1:5001"
+    wait $FLASK_PID
 fi
-
-echo "🎉 Launching Giskard desktop app..."
-npm run tauri dev
-
-# Cleanup on exit
-trap 'kill $FLASK_PID 2>/dev/null; echo "🛑 Stopping Giskard components..."; exit 0' INT TERM
-
-wait

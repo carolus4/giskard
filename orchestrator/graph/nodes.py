@@ -45,9 +45,9 @@ class GraphNodes:
     def planner_llm(self, state: AgentState) -> AgentState:
         """Node 2: Call LLM to plan actions"""
         try:
-            # Load planner prompt
-            with open('/Users/charlesdupont/Dev/giskard/prompts/planner_v1.0.txt', 'r') as f:
-                planner_prompt = f.read()
+            # Load planner prompt from registry
+            from config.prompts import get_planner_prompt
+            planner_prompt = get_planner_prompt()
             
             # Prepare the prompt with user input
             full_prompt = f"{planner_prompt}\n\nUser: \"{state.input_text}\"\nResponse:"
@@ -153,15 +153,10 @@ class GraphNodes:
     def synthesizer_llm(self, state: AgentState) -> AgentState:
         """Node 4: Synthesize final response"""
         try:
-            # Load synthesizer prompt
-            with open('/Users/charlesdupont/Dev/giskard/prompts/synthesizer_v1.0.txt', 'r') as f:
-                synthesizer_prompt = f.read()
-            
-            # Prepare the prompt with context
+            # Load synthesizer prompt from registry
+            from config.prompts import get_synthesizer_prompt
             action_results_str = json.dumps(state.action_results, indent=2)
-            # Use string replacement instead of format to avoid issues with quotes
-            full_prompt = synthesizer_prompt.replace("{user_input}", state.input_text)
-            full_prompt = full_prompt.replace("{action_results}", action_results_str)
+            full_prompt = get_synthesizer_prompt(state.input_text, action_results_str)
             
             # Call Ollama
             response = self._call_ollama(full_prompt)

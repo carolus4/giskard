@@ -11,7 +11,7 @@ import json
 # Add the parent directory to the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.prompt_registry import prompt_registry, PromptConfig
+from config.simple_prompt_registry import simple_prompt_registry
 from utils.prompt_performance_tracker import performance_tracker, PerformanceMetrics
 
 
@@ -20,8 +20,8 @@ def simulate_prompt_execution(prompt_name: str, input_data: str, output: str,
     """Simulate a prompt execution with performance tracking"""
     
     # Get the latest version of the prompt
-    prompt = prompt_registry.get_latest_prompt(prompt_name)
-    if not prompt:
+    prompt_config = simple_prompt_registry.get_prompt_config(prompt_name)
+    if not prompt_config:
         print(f"Prompt '{prompt_name}' not found!")
         return
     
@@ -41,13 +41,13 @@ def simulate_prompt_execution(prompt_name: str, input_data: str, output: str,
     # Log the execution
     performance_tracker.log_execution(
         prompt_name=prompt_name,
-        prompt_version=prompt.version,
+        prompt_version=prompt_config['version'],
         output=output,
         metrics=metrics,
         input_data={"input": input_data}
     )
     
-    print(f"✓ Logged execution of {prompt_name} v{prompt.version}")
+    print(f"✓ Logged execution of {prompt_name} v{prompt_config['version']}")
     print(f"  Input: {input_data[:50]}...")
     print(f"  Output: {output[:50]}...")
     print(f"  Execution time: {execution_time_ms:.1f}ms")
@@ -62,12 +62,12 @@ def demonstrate_prompt_tracking():
     
     # Show available prompts
     print("\n1. Available Prompts:")
-    prompts = prompt_registry.list_prompts()
+    prompts = simple_prompt_registry.list_prompts()
     for prompt_name in prompts:
-        versions = prompt_registry.get_prompt_versions(prompt_name)
+        versions = simple_prompt_registry.get_prompt_versions(prompt_name)
         print(f"  {prompt_name}: {len(versions)} version(s)")
         for version in versions:
-            print(f"    v{version.version} - {version.goal}")
+            print(f"    v{version.version}")
     
     # Simulate some executions
     print("\n2. Simulating Prompt Executions:")
@@ -147,16 +147,7 @@ def create_custom_prompt_example():
     print("\n6. Creating Custom Prompt Example:")
     
     # Create a new prompt for creative writing
-    creative_prompt = PromptConfig(
-        name="creative_writing",
-        version="1.0",
-        goal="Generate creative and engaging story ideas and writing prompts",
-        model="gemma3:4b",
-        temperature=0.9,  # Higher temperature for creativity
-        token_limit=300,
-        top_p=0.95,
-        top_k=40,
-        prompt="""You are a creative writing assistant. Your job is to help writers overcome writer's block and generate engaging story ideas.
+    creative_prompt_text = """You are a creative writing assistant. Your job is to help writers overcome writer's block and generate engaging story ideas.
 
 Guidelines:
 - Be imaginative and original
@@ -168,11 +159,24 @@ Guidelines:
 User's writing context: {writing_context}
 
 Provide 3 creative writing prompts that match their context and interests."""
-    )
     
-    # Register the prompt
-    prompt_id = prompt_registry.register_prompt(creative_prompt)
-    print(f"✓ Created custom prompt: {prompt_id}")
+    # Save the prompt text file
+    try:
+        file_path = simple_prompt_registry.save_prompt("creative_writing", "1.0", creative_prompt_text)
+        print(f"✓ Created custom prompt text file: {file_path}")
+        print("Note: Add metadata to config/simple_prompt_registry.py manually")
+    except Exception as e:
+        print(f"Error creating prompt: {e}")
+        return
+    
+    # Add metadata to the registry (this would normally be done manually in the config file)
+    simple_prompt_registry.add_prompt_metadata("creative_writing", {
+        "goal": "Generate creative and engaging story ideas and writing prompts",
+        "model": "gemma3:4b",
+        "temperature": 0.9,
+        "token_limit": 300,
+        "top_p": 0.95
+    })
     
     # Simulate some executions
     simulate_prompt_execution(
@@ -197,10 +201,10 @@ if __name__ == "__main__":
         
         print("\n" + "=" * 50)
         print("Demo completed! Check the data/ directory for:")
-        print("- prompt_registry.json (prompt definitions)")
         print("- prompt_performance.json (execution logs)")
         print("- prompt_metrics.json (cached metrics)")
-        print("\nUse 'python scripts/prompt_manager.py list' to see all prompts")
+        print("\nCheck the prompts/ directory for prompt text files")
+        print("Use 'python scripts/prompt_manager.py list' to see all prompts")
         print("Use 'python scripts/prompt_manager.py performance <prompt_name>' to see metrics")
         
     except Exception as e:

@@ -129,6 +129,47 @@ def update_task(task_id):
         if 'categories' in data:
             task.categories = data['categories']
         
+        # Handle completed_at field with validation
+        if 'completed_at' in data:
+            completed_at = data['completed_at']
+            
+            # If completed_at is None or empty string, clear it
+            if completed_at is None or completed_at == '':
+                task.completed_at = None
+            else:
+                # Validate the timestamp format
+                try:
+                    from datetime import datetime
+                    parsed_date = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+                except (ValueError, AttributeError) as e:
+                    return APIResponse.error(
+                        f'Invalid completed_at format. Must be ISO 8601 timestamp (e.g., "2025-01-15T14:30:00"). Error: {str(e)}', 
+                        400
+                    )
+                
+                # Check if completion date is in the future
+                now = datetime.now()
+                if parsed_date > now:
+                    return APIResponse.error(
+                        f'Completion date cannot be in the future. Provided: {completed_at}, Current time: {now.isoformat()}', 
+                        400
+                    )
+                
+                # Check if completion date is before task creation
+                try:
+                    created_date = datetime.fromisoformat(task.created_at.replace('Z', '+00:00'))
+                    if parsed_date < created_date:
+                        return APIResponse.error(
+                            f'Completion date cannot be before task creation. Provided: {completed_at}, Created: {task.created_at}', 
+                            400
+                        )
+                except (ValueError, AttributeError):
+                    # If we can't parse created_at, skip this validation
+                    pass
+                
+                # Set the validated completion date
+                task.completed_at = completed_at
+        
         if not task.title:
             return APIResponse.error('Task title cannot be empty')
         

@@ -1,0 +1,14 @@
+name: giskard
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    - Flask==2.3.3
+    - flask-cors==4.0.0
+    - langgraph>=0.6.0
+    - langchain-core>=0.3.0
+    - langchain-community>=0.3.0
+    - langchain-ollama>=0.2.0

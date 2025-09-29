@@ -81,14 +81,8 @@ class ChatService:
             Formatted prompt string
         """
         # Get the coaching system prompt
-        from config.prompt_registry import prompt_registry
-        coaching_prompt = prompt_registry.get_latest_prompt("coaching_system")
-        
-        if coaching_prompt:
-            system_prompt = coaching_prompt.content
-        else:
-            # Fallback system prompt
-            system_prompt = """You are a helpful productivity coach. You help users organize their tasks, set priorities, and stay motivated. Be encouraging, practical, and focused on productivity."""
+        from config.prompts import get_coaching_prompt
+        system_prompt = get_coaching_prompt(task_context)
         
         # Build conversation context
         conversation_context = ""

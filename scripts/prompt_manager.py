@@ -11,13 +11,13 @@ from datetime import datetime, timedelta
 # Add the parent directory to the path so we can import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.prompt_registry import prompt_registry, PromptConfig
+from config.simple_prompt_registry import simple_prompt_registry
 from utils.prompt_performance_tracker import performance_tracker, PerformanceMetrics
 
 
 def list_prompts():
     """List all available prompts"""
-    prompts = prompt_registry.list_prompts()
+    prompts = simple_prompt_registry.list_prompts()
     if not prompts:
         print("No prompts found in registry.")
         return
@@ -25,35 +25,33 @@ def list_prompts():
     print("Available prompts:")
     print("-" * 50)
     for prompt_name in prompts:
-        versions = prompt_registry.get_prompt_versions(prompt_name)
+        versions = simple_prompt_registry.get_prompt_versions(prompt_name)
         print(f"{prompt_name}:")
         for version in versions:
-            print(f"  v{version.version} - {version.goal}")
-            print(f"    Model: {version.model}, Temp: {version.temperature}")
+            print(f"  v{version.version}")
             print(f"    Created: {version.created_at.strftime('%Y-%m-%d %H:%M') if version.created_at else 'Unknown'}")
         print()
 
 
 def show_prompt_details(prompt_name: str, version: str = None):
     """Show detailed information about a specific prompt"""
-    prompt = prompt_registry.get_prompt(prompt_name, version)
-    if not prompt:
+    prompt_config = simple_prompt_registry.get_prompt_config(prompt_name, version)
+    if not prompt_config:
         print(f"Prompt '{prompt_name}' not found.")
         return
     
-    print(f"Prompt: {prompt.name} v{prompt.version}")
+    print(f"Prompt: {prompt_config['name']} v{prompt_config['version']}")
     print("=" * 60)
-    print(f"Goal: {prompt.goal}")
-    print(f"Model: {prompt.model}")
-    print(f"Temperature: {prompt.temperature}")
-    print(f"Token Limit: {prompt.token_limit}")
-    print(f"Top-P: {prompt.top_p}")
-    print(f"Top-K: {prompt.top_k}")
-    print(f"Created: {prompt.created_at.strftime('%Y-%m-%d %H:%M') if prompt.created_at else 'Unknown'}")
+    print(f"Goal: {prompt_config.get('goal', 'N/A')}")
+    print(f"Model: {prompt_config.get('model', 'N/A')}")
+    print(f"Temperature: {prompt_config.get('temperature', 'N/A')}")
+    print(f"Token Limit: {prompt_config.get('token_limit', 'N/A')}")
+    print(f"Top-P: {prompt_config.get('top_p', 'N/A')}")
+    print(f"Created: {prompt_config.get('created_at', 'Unknown')}")
     print()
     print("Prompt Text:")
     print("-" * 40)
-    print(prompt.prompt)
+    print(prompt_config.get('text', 'N/A'))
     print()
 
 
@@ -134,6 +132,9 @@ def create_new_prompt():
     """Interactive prompt creation"""
     print("Create New Prompt")
     print("=" * 30)
+    print("Note: This creates a new prompt text file. Metadata (model, temperature, etc.)")
+    print("should be added to config/simple_prompt_registry.py manually.")
+    print()
     
     name = input("Prompt name: ").strip()
     if not name:
@@ -141,30 +142,6 @@ def create_new_prompt():
         return
     
     version = input("Version (default: 1.0): ").strip() or "1.0"
-    goal = input("Goal (one sentence): ").strip()
-    if not goal:
-        print("Goal is required.")
-        return
-    
-    model = input("Model (default: gemma3:4b): ").strip() or "gemma3:4b"
-    
-    try:
-        temperature = float(input("Temperature (0-1, default: 0.7): ").strip() or "0.7")
-    except ValueError:
-        print("Invalid temperature value.")
-        return
-    
-    try:
-        token_limit = int(input("Token limit (default: 500): ").strip() or "500")
-    except ValueError:
-        print("Invalid token limit.")
-        return
-    
-    top_p_input = input("Top-P (0-1, default: 0.9): ").strip()
-    top_p = float(top_p_input) if top_p_input else 0.9
-    
-    top_k_input = input("Top-K (optional): ").strip()
-    top_k = int(top_k_input) if top_k_input else None
     
     print("\nEnter the prompt text (end with a line containing only 'END'):")
     prompt_lines = []
@@ -179,22 +156,15 @@ def create_new_prompt():
         print("Prompt text is required.")
         return
     
-    # Create the prompt configuration
-    prompt_config = PromptConfig(
-        name=name,
-        version=version,
-        goal=goal,
-        model=model,
-        temperature=temperature,
-        token_limit=token_limit,
-        top_p=top_p,
-        top_k=top_k,
-        prompt=prompt_text
-    )
-    
-    # Register the prompt
-    prompt_id = prompt_registry.register_prompt(prompt_config)
-    print(f"\nPrompt created successfully: {prompt_id}")
+    # Save the prompt text file
+    try:
+        file_path = simple_prompt_registry.save_prompt(name, version, prompt_text)
+        print(f"\nPrompt text saved successfully: {file_path}")
+        print("\nNext steps:")
+        print("1. Add metadata to config/simple_prompt_registry.py in the _prompt_metadata dict")
+        print("2. Include goal, model, temperature, token_limit, and top_p settings")
+    except Exception as e:
+        print(f"Error creating prompt: {e}")
 
 
 def export_data(prompt_name: str = None, format: str = "json"):

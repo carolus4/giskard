@@ -252,13 +252,9 @@ class AgentService:
         """Build the agent prompt with tool schema"""
         
         # Get the coaching system prompt
-        from config.prompt_registry import prompt_registry
-        coaching_prompt = prompt_registry.get_latest_prompt("coaching_system")
-        
-        if coaching_prompt:
-            system_prompt = coaching_prompt.content
-        else:
-            system_prompt = """You are a helpful productivity coach. You help users organize their tasks, set priorities, and stay motivated. Be encouraging, practical, and focused on productivity."""
+        from config.prompts import get_coaching_prompt
+        task_context = ui_context.get("task_context", "")
+        system_prompt = get_coaching_prompt(task_context)
         
         # Add tool schema
         tool_schema = """
@@ -279,6 +275,7 @@ You have access to the following tools:
    - description (string, optional): New task description
    - project (string, optional): New project name
    - categories (array of strings, optional): New task categories
+   - completed_at (string, optional): ISO 8601 timestamp for completion date (cannot be future, cannot be before created_at)
 
 4. delete_task: Delete a task
    - task_id (integer, required): The task ID to delete
@@ -295,7 +292,7 @@ TOOL_CALL: get_tasks
 ARGUMENTS: {"status": "open"}
 
 TOOL_CALL: update_task
-ARGUMENTS: {"task_id": 123, "title": "Updated title", "description": "Updated description"}
+ARGUMENTS: {"task_id": 123, "title": "Updated title", "description": "Updated description", "completed_at": "2025-01-15T14:30:00"}
 
 TOOL_CALL: delete_task
 ARGUMENTS: {"task_id": 123}

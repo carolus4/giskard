@@ -37,14 +37,10 @@ def debug_synthesis():
         ]
     }
     
-    # Load the synthesizer prompt
-    with open('/Users/charlesdupont/Dev/giskard/prompts/synthesizer_v1.0.txt', 'r') as f:
-        synthesizer_prompt = f.read()
-    
-    # Show the full prompt that would be sent to the LLM
+    # Load the synthesizer prompt from registry
+    from config.prompts import get_synthesizer_prompt
     action_results_str = json.dumps(mock_state["action_results"], indent=2)
-    full_prompt = synthesizer_prompt.replace("{user_input}", mock_state["input_text"])
-    full_prompt = full_prompt.replace("{action_results}", action_results_str)
+    full_prompt = get_synthesizer_prompt(mock_state["input_text"], action_results_str)
     
     print("📝 FULL SYNTHESIS PROMPT SENT TO LLM:")
     print("=" * 50)

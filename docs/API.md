@@ -119,7 +119,7 @@ GET /api/tasks/{id}
 PUT /api/tasks/{id}
 ```
 
-**Description:** Update an existing task's properties.
+**Description:** Update an existing task's properties, including completion date.
 
 **Request Body:**
 ```json
@@ -127,9 +127,23 @@ PUT /api/tasks/{id}
   "title": "Buy groceries and household items",
   "description": "Milk, eggs, bread, vegetables, and cleaning supplies",
   "project": "Household",
-  "categories": ["shopping", "household"]
+  "categories": ["shopping", "household"],
+  "completed_at": "2025-01-15T14:30:00"
 }
 ```
+
+**Request Body Fields:**
+- `title` (string, optional): Task title
+- `description` (string, optional): Task description  
+- `project` (string, optional): Project name
+- `categories` (array, optional): Array of category strings
+- `completed_at` (string, optional): ISO 8601 timestamp for completion date
+
+**completed_at Validation Rules:**
+- Must be a valid ISO 8601 timestamp (e.g., "2025-01-15T14:30:00")
+- Cannot be in the future (relative to server time)
+- Cannot be before the task's `created_at` date
+- Set to `null` or empty string to clear completion date
 
 **Response:**
 ```json
@@ -147,8 +161,33 @@ PUT /api/tasks/{id}
     "created_at": "2025-09-23T10:48:04.535457",
     "updated_at": "2025-09-23T12:30:00.000000",
     "started_at": null,
-    "completed_at": null
+    "completed_at": "2025-01-15T14:30:00"
   }
+}
+```
+
+**Error Responses:**
+```json
+{
+  "success": false,
+  "error": "Invalid completed_at format. Must be ISO 8601 timestamp (e.g., \"2025-01-15T14:30:00\"). Error: ...",
+  "status": 400
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "Completion date cannot be in the future. Provided: 2025-12-31T23:59:59, Current time: 2025-01-15T10:30:00",
+  "status": 400
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "Completion date cannot be before task creation. Provided: 2025-01-10T10:00:00, Created: 2025-01-15T09:00:00",
+  "status": 400
 }
 ```
 

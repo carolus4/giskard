@@ -15,7 +15,7 @@ Follows the laws of robotics.
 ./start_giskard.sh
 ```
 
-This will start the Tauri desktop app with the Flask API backend!
+This will start the Flask API backend with proper environment management!
 
 ## ✨ Features
 

@@ -2,7 +2,7 @@
 Ollama configuration settings
 """
 
-from .prompt_registry import prompt_registry
+from .simple_prompt_registry import simple_prompt_registry
 
 # Default Ollama settings
 OLLAMA_BASE_URL = "http://localhost:11434/api/generate"
@@ -14,21 +14,20 @@ REQUEST_TIMEOUT = 100  # Reduced back to 30 seconds with better handling
 
 def get_prompt_config(prompt_name: str, version: str = None):
     """Get prompt configuration from registry"""
-    return prompt_registry.get_prompt(prompt_name, version)
+    return simple_prompt_registry.get_prompt_config(prompt_name, version)
 
 
 def get_chat_config():
     """Get chat configuration using the latest coaching prompt"""
-    coaching_prompt = prompt_registry.get_latest_prompt("coaching_system")
-    if coaching_prompt:
+    coaching_config = simple_prompt_registry.get_prompt_config("coaching_system")
+    if coaching_config:
         return {
-            "model": coaching_prompt.model,
+            "model": coaching_config["model"],
             "stream": False,
             "options": {
-                "temperature": coaching_prompt.temperature,
-                "top_p": coaching_prompt.top_p,
-                "max_tokens": coaching_prompt.token_limit,
-                "top_k": coaching_prompt.top_k
+                "temperature": coaching_config["temperature"],
+                "top_p": coaching_config["top_p"],
+                "max_tokens": coaching_config["token_limit"]
             }
         }
     
@@ -46,16 +45,15 @@ def get_chat_config():
 
 def get_classification_config():
     """Get classification configuration using the latest classification prompt"""
-    classification_prompt = prompt_registry.get_latest_prompt("task_classification")
-    if classification_prompt:
+    classification_config = simple_prompt_registry.get_prompt_config("task_classification")
+    if classification_config:
         return {
-            "model": classification_prompt.model,
+            "model": classification_config["model"],
             "stream": False,
             "options": {
-                "temperature": classification_prompt.temperature,
-                "top_p": classification_prompt.top_p,
-                "max_tokens": classification_prompt.token_limit,
-                "top_k": classification_prompt.top_k
+                "temperature": classification_config["temperature"],
+                "top_p": classification_config["top_p"],
+                "max_tokens": classification_config["token_limit"]
             }
         }
     

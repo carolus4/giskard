@@ -118,9 +118,9 @@ class LangGraphOrchestrator:
         }
         
         try:
-            # Load planner prompt
-            with open('/Users/charlesdupont/Dev/giskard/prompts/planner_v1.0.txt', 'r') as f:
-                planner_prompt = f.read()
+            # Load planner prompt from registry
+            from config.prompts import get_planner_prompt
+            planner_prompt = get_planner_prompt()
             
             # Create system message with planner prompt
             system_msg = SystemMessage(content=planner_prompt)
@@ -255,14 +255,10 @@ class LangGraphOrchestrator:
         }
         
         try:
-            # Load synthesizer prompt
-            with open('/Users/charlesdupont/Dev/giskard/prompts/synthesizer_v1.0.txt', 'r') as f:
-                synthesizer_prompt = f.read()
-            
-            # Prepare context
+            # Load synthesizer prompt from registry
+            from config.prompts import get_synthesizer_prompt
             action_results_str = json.dumps(state["action_results"], indent=2)
-            full_prompt = synthesizer_prompt.replace("{user_input}", state["input_text"])
-            full_prompt = full_prompt.replace("{action_results}", action_results_str)
+            full_prompt = get_synthesizer_prompt(state["input_text"], action_results_str)
             
             # Create messages
             system_msg = SystemMessage(content=full_prompt)

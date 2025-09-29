@@ -1,0 +1,27 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4fc3f7"/>
+      <stop offset="50%" stop-color="#fff176"/>
+      <stop offset="100%" stop-color="#ff7043"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)" rx="100"/>
+
+  <!-- Robot head -->
+  <circle cx="256" cy="150" r="90" fill="#e0e0e0" stroke="#424242" stroke-width="16"/>
+  <circle cx="220" cy="140" r="16" fill="#424242"/>
+  <circle cx="292" cy="140" r="16" fill="#424242"/>
+
+  <!-- Torso: larger rectangle that sits flush with bottom -->
+  <rect x="166" y="240" width="180" height="220" rx="30" fill="#bdbdbd" stroke="#424242" stroke-width="16"/>
+
+  <!-- Heart: centered, higher up on torso -->
+  <path d="M256 300
+           C236 270, 196 270, 196 300
+           C196 330, 236 370, 256 390
+           C276 370, 316 330, 316 300
+           C316 270, 276 270, 256 300 Z"
+        fill="#e57373" stroke="none"/>
+</svg>

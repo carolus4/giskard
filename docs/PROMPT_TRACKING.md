@@ -88,7 +88,7 @@ The system tracks the following performance metrics:
 
 All data is stored in JSON files in the `data/` directory:
 
-- `prompt_registry.json`: Prompt definitions and configurations
+- `prompts/`: Directory containing prompt text files
 - `prompt_performance.json`: Execution logs and performance data
 - `prompt_metrics.json`: Cached performance metrics for quick access
 
@@ -97,24 +97,21 @@ All data is stored in JSON files in the `data/` directory:
 ### Using the Prompt Registry
 
 ```python
-from config.prompt_registry import prompt_registry, PromptConfig
+from config.simple_prompt_registry import simple_prompt_registry
 
 # Get a prompt
-coaching_prompt = prompt_registry.get_latest_prompt("coaching_system")
+coaching_prompt = simple_prompt_registry.get_prompt_config("coaching_system")
 
-# Create a new prompt
-new_prompt = PromptConfig(
-    name="my_prompt",
-    version="1.0",
-    goal="Do something useful",
-    model="llama3.1:8b",
-    temperature=0.7,
-    token_limit=500,
-    prompt="Your prompt text here"
-)
+# Create a new prompt (save text file)
+file_path = simple_prompt_registry.save_prompt("my_prompt", "1.0", "Your prompt text here")
 
-# Register the prompt
-prompt_registry.register_prompt(new_prompt)
+# Add metadata (normally done in config/simple_prompt_registry.py)
+simple_prompt_registry.add_prompt_metadata("my_prompt", {
+    "goal": "Do something useful",
+    "model": "llama3.1:8b",
+    "temperature": 0.7,
+    "token_limit": 500
+})
 ```
 
 ### Using Performance Tracking

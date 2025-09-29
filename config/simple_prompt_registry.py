@@ -36,6 +36,20 @@ class SimplePromptRegistry:
                 "temperature": 0.0,
                 "token_limit": 100,
                 "top_p": 0.9
+            },
+            "planner": {
+                "goal": "Plan actions for task management based on user input",
+                "model": "gemma3:4b",
+                "temperature": 0.3,
+                "token_limit": 1000,
+                "top_p": 0.9
+            },
+            "synthesizer": {
+                "goal": "Synthesize final responses based on user input and action results",
+                "model": "gemma3:4b",
+                "temperature": 0.5,
+                "token_limit": 800,
+                "top_p": 0.9
             }
         }
 

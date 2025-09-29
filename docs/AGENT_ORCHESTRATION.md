@@ -127,6 +127,7 @@ You have access to the following tools:
    - description (string, optional): New task description
    - project (string, optional): New project name
    - categories (array of strings, optional): New task categories
+   - completed_at (string, optional): ISO 8601 timestamp for completion date (cannot be future, cannot be before created_at)
 
 4. delete_task: Delete a task
    - task_id (integer, required): The task ID to delete
@@ -143,7 +144,7 @@ TOOL_CALL: get_tasks
 ARGUMENTS: {"status": "open"}
 
 TOOL_CALL: update_task
-ARGUMENTS: {"task_id": 123, "title": "Updated title", "description": "Updated description"}
+ARGUMENTS: {"task_id": 123, "title": "Updated title", "description": "Updated description", "completed_at": "2025-01-15T14:30:00"}
 
 TOOL_CALL: delete_task
 ARGUMENTS: {"task_id": 123}
@@ -157,7 +158,7 @@ ARGUMENTS: {"task_id": 123, "status": "done"}
 ### 1. Tool Execution
 - **create_task**: Creates new tasks with validation
 - **get_tasks**: Retrieves task lists with optional status filtering
-- **update_task**: Modifies existing tasks (title, description, project, categories)
+- **update_task**: Modifies existing tasks (title, description, project, categories, completion date)
 - **delete_task**: Removes tasks
 - **update_task_status**: Changes task status (open, in_progress, done)
 - Structured tool call parsing from Ollama responses

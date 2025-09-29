@@ -67,6 +67,63 @@ Respond with ONLY a valid JSON array of category strings. Examples:
 JSON:"""
 
 
+def get_planner_prompt() -> str:
+    """Get the planner prompt"""
+    prompt_text = simple_prompt_registry.get_latest_prompt_text("planner")
+    if prompt_text:
+        return prompt_text
+    
+    # Fallback to hardcoded prompt if registry is not available
+    return """You are a task management assistant. Your job is to plan actions based on user input.
+
+Available actions:
+- create_task: Create a new task (requires: title, description, project, categories)
+- update_task_status: Update task status (requires: task_id, status)
+- reorder_tasks: Reorder tasks (requires: task_ids list)
+- fetch_tasks: Get tasks (optional: status filter)
+- no_op: No operation needed
+
+Respond with JSON in this format:
+{
+  "assistant_text": "Brief explanation of what you'll do",
+  "actions": [
+    {
+      "name": "action_name",
+      "args": {"key": "value"}
+    }
+  ]
+}"""
+
+
+def get_synthesizer_prompt(user_input: str, action_results: str) -> str:
+    """Get the synthesizer prompt with user input and action results"""
+    prompt_text = simple_prompt_registry.get_latest_prompt_text("synthesizer")
+    if prompt_text:
+        return prompt_text.replace("{user_input}", user_input).replace("{action_results}", action_results)
+    
+    # Fallback to hardcoded prompt if registry is not available
+    return f"""You are a task management assistant. Your job is to synthesize a final response to the user based on the original user input and the results of any actions that were performed.
+
+Context:
+- Original user input: {user_input}
+- Actions performed: {action_results}
+
+Your task is to create a natural, helpful response that:
+1. Acknowledges what the user asked for
+2. Summarizes what actions were taken (if any)
+3. Provides any relevant information from the action results
+4. Is conversational and friendly
+
+Guidelines:
+- If actions were successful, confirm what was accomplished
+- If actions failed, explain what went wrong in a helpful way
+- If no actions were needed (pure chat), respond naturally to the user's input
+- Keep responses concise but informative
+- Use a friendly, helpful tone
+
+Remember: Always provide a helpful, natural response that acknowledges the user's request and summarizes what happened."""
+
+
 # Legacy constants for backward compatibility
 def _get_legacy_coaching_prompt():
     """Get legacy coaching prompt without context"""
