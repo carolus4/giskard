@@ -90,8 +90,28 @@ fi
 # Check if port 5001 is already in use
 if lsof -Pi :5001 -sTCP:LISTEN -t >/dev/null ; then
     echo "⚠️  Port 5001 is already in use. Stopping existing processes..."
+    
+    # Get PIDs of processes using port 5001
+    PIDS=$(lsof -Pi :5001 -sTCP:LISTEN -t)
+    if [ ! -z "$PIDS" ]; then
+        echo "   Killing processes: $PIDS"
+        echo $PIDS | xargs kill -9 2>/dev/null || true
+    fi
+    
+    # Also try to kill any Python processes that might be running the app
     pkill -f "python.*app.py" || true
-    sleep 2
+    pkill -f "flask" || true
+    
+    # Wait for processes to actually stop
+    sleep 3
+    
+    # Double-check that port is free
+    if lsof -Pi :5001 -sTCP:LISTEN -t >/dev/null ; then
+        echo "❌ Port 5001 is still in use after cleanup attempts"
+        echo "Please manually stop the processes using port 5001:"
+        lsof -Pi :5001 -sTCP:LISTEN
+        exit 1
+    fi
 fi
 
 # Start the Flask application
