@@ -56,28 +56,30 @@ def filter_tasks_by_completed_at(tasks: List[TaskDB],
     filtered_tasks = []
     
     for task in tasks:
-        # Only apply filtering to completed tasks
-        if task.status != 'done' or not task.completed_at:
+        # If filtering by completed_at, only include tasks that have been completed
+        if filter_gte or filter_lt:
+            # Only include completed tasks with valid completed_at
+            if task.status != 'done' or not task.completed_at:
+                continue  # Skip tasks that aren't completed or have null completed_at
+            
+            # Parse task completion date
+            try:
+                task_completed = datetime.fromisoformat(task.completed_at.replace('Z', '+00:00'))
+            except ValueError:
+                continue  # Skip tasks with invalid completed_at
+                
+            # Apply completed_at_gte filter (greater than or equal)
+            if filter_gte and task_completed < filter_gte:
+                continue
+                
+            # Apply completed_at_lt filter (less than)
+            if filter_lt and task_completed >= filter_lt:
+                continue
+                
             filtered_tasks.append(task)
-            continue
-        
-        # Parse task completion date
-        try:
-            task_completed = datetime.fromisoformat(task.completed_at.replace('Z', '+00:00'))
-        except ValueError:
-            # If task completion date is invalid, include it (don't filter out)
+        else:
+            # No completed_at filtering, include all tasks
             filtered_tasks.append(task)
-            continue
-            
-        # Apply completed_at_gte filter (greater than or equal)
-        if filter_gte and task_completed < filter_gte:
-            continue
-            
-        # Apply completed_at_lt filter (less than)
-        if filter_lt and task_completed >= filter_lt:
-            continue
-            
-        filtered_tasks.append(task)
     
     return filtered_tasks
 
