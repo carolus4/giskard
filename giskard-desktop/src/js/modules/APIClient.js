@@ -102,6 +102,21 @@ class APIClient {
                         console.error('❌ Tauri createTask failed:', error);
                         throw error; // Fall back to regular fetch
                     }
+                } else if (url.includes('/api/tasks/') && url.includes('/status') && options.method === 'PATCH') {
+                    try {
+                        const body = JSON.parse(options.body);
+                        const taskId = url.match(/\/api\/tasks\/(\d+)\/status/)[1];
+                        const result = await invoke('api_v2_update_task_status', {
+                            task_id: parseInt(taskId),
+                            status: body.status
+                        });
+                        const data = JSON.parse(result);
+                        console.log('✅ Tauri updateTaskStatus success:', data);
+                        return { success: true, data };
+                    } catch (error) {
+                        console.error('❌ Tauri updateTaskStatus failed:', error);
+                        throw error; // Fall back to regular fetch
+                    }
                 }
                 
                 // For other endpoints, fall back to browser fetch for now

@@ -98,6 +98,36 @@ async fn api_v2_create_task(title: String, description: String, project: Option<
 }
 
 #[tauri::command]
+async fn api_v2_update_task_status(task_id: u32, status: String) -> Result<String, String> {
+    println!("🦀 Rust: Updating V2 task status - task_id: {}, status: {}", task_id, status);
+    
+    let json_body = format!(r#"{{"status": "{}"}}"#, status.replace("\"", "\\\""));
+    
+    match std::process::Command::new("curl")
+        .args([
+            "-X", "PATCH",
+            &format!("http://localhost:5001/api/tasks/{}/status", task_id),
+            "-H", "Content-Type: application/json",
+            "-d", &json_body,
+            "-s"
+        ])
+        .output()
+    {
+        Ok(output) => {
+            if output.status.success() {
+                let response = String::from_utf8_lossy(&output.stdout);
+                println!("✅ V2 Task status updated: {}", response);
+                Ok(response.to_string())
+            } else {
+                let error = String::from_utf8_lossy(&output.stderr);
+                Err(format!("V2 Update task status failed: {}", error))
+            }
+        }
+        Err(e) => Err(format!("Failed to update V2 task status: {}", e)),
+    }
+}
+
+#[tauri::command]
 fn check_backend_status() -> Result<String, String> {
     // Try to make a request to the Python backend using curl
     match std::process::Command::new("curl")
@@ -178,7 +208,8 @@ pub fn run() {
             start_python_backend,
             api_get_tasks,
             api_v2_get_tasks,
-            api_v2_create_task
+            api_v2_create_task,
+            api_v2_update_task_status
         ])
         .setup(|_app| {
             // Start the Python backend when the app launches in a separate thread

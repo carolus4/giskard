@@ -13,15 +13,24 @@ Available actions:
    - task_id (integer, required): The task ID to update
    - status (string, required): New status (open, in_progress, done)
 
-3. reorder_tasks - Reorder tasks
+3. update_task - Update task properties including dates
+   - task_id (integer, required): The task ID to update
+   - title (string, optional): New task title
+   - description (string, optional): New task description
+   - project (string, optional): New project name
+   - categories (array of strings, optional): New task categories
+   - completed_at (string, optional): ISO timestamp for completion date (e.g., "2025-01-15T14:30:00")
+   - started_at (string, optional): ISO timestamp for start date (e.g., "2025-01-15T14:30:00")
+
+4. reorder_tasks - Reorder tasks
    - task_ids (array of integers, required): List of task IDs in desired order
 
-4. fetch_tasks - Get all tasks
+5. fetch_tasks - Get all tasks
    - status (string, optional): Filter by status (open, in_progress, done)
    - completed_at_gte (string, optional): ISO date/timestamp format (e.g., "2025-09-29" or "2025-09-29T00:00:00") - tasks completed on/after this date
    - completed_at_lt (string, optional): ISO date/timestamp format (e.g., "2025-09-29" or "2025-09-29T00:00:00") - tasks completed before this date
 
-5. no_op - Do nothing (for pure chat)
+6. no_op - Do nothing (for pure chat)
 
 You must always respond with valid JSON in this exact format:
 {
@@ -94,6 +103,36 @@ Response:
       "args": {
         "task_id": 5,
         "status": "done"
+      }
+    }
+  ]
+}
+
+User: "Update task 145 completed_at date to yesterday"
+Response:
+{
+  "assistant_text": "I'll update the completion date for task 145 to yesterday.",
+  "actions": [
+    {
+      "name": "update_task",
+      "args": {
+        "task_id": 145,
+        "completed_at": "2025-01-14T23:59:59"
+      }
+    }
+  ]
+}
+
+User: "Change the title of task 10 to 'Updated task title'"
+Response:
+{
+  "assistant_text": "I'll update the title for task 10.",
+  "actions": [
+    {
+      "name": "update_task",
+      "args": {
+        "task_id": 10,
+        "title": "Updated task title"
       }
     }
   ]

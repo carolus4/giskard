@@ -264,7 +264,7 @@ def update_task(task_id):
         return APIResponse.error(f"Failed to update task: {str(e)}", 500)
 
 
-@api_v2.route('/tasks/<int:task_id>/status', methods=['PUT'])
+@api_v2.route('/tasks/<int:task_id>/status', methods=['PUT', 'PATCH'])
 def update_task_status(task_id):
     """Update task status"""
     try:

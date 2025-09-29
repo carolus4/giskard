@@ -192,6 +192,85 @@ class ActionExecutor:
             logger.error(f"Failed to fetch tasks: {str(e)}")
             return False, {"error": str(e)}
     
+    def update_task(self, task_id: int, title: Optional[str] = None, 
+                   description: Optional[str] = None, project: Optional[str] = None,
+                   categories: Optional[List[str]] = None, completed_at: Optional[str] = None,
+                   started_at: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
+        """Update task properties including completion and start dates
+        
+        Args:
+            task_id: ID of the task to update
+            title: New task title (optional)
+            description: New task description (optional)
+            project: New project name (optional)
+            categories: New categories list (optional)
+            completed_at: ISO timestamp for completion date (optional)
+            started_at: ISO timestamp for start date (optional)
+        """
+        try:
+            task = TaskDB.get_by_id(task_id)
+            if not task:
+                return False, {"error": "Task not found"}
+            
+            # Update provided fields
+            if title is not None:
+                task.title = title
+            if description is not None:
+                task.description = description
+            if project is not None:
+                task.project = project
+            if categories is not None:
+                task.categories = categories
+            
+            # Handle date updates with validation
+            if completed_at is not None:
+                if completed_at == "" or completed_at.lower() == "null":
+                    # Clear completion date
+                    task.completed_at = None
+                    if task.status == 'done':
+                        task.status = 'open'  # Reset status if clearing completion
+                else:
+                    # Validate and set completion date
+                    from datetime import datetime
+                    try:
+                        # Parse the provided date
+                        parsed_date = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+                        task.completed_at = parsed_date.isoformat()
+                        # If setting completion date, mark as done
+                        if task.status != 'done':
+                            task.status = 'done'
+                    except ValueError:
+                        return False, {"error": f"Invalid completed_at format: {completed_at}. Use ISO format (e.g., 2025-01-15T14:30:00)"}
+            
+            if started_at is not None:
+                if started_at == "" or started_at.lower() == "null":
+                    # Clear start date
+                    task.started_at = None
+                else:
+                    # Validate and set start date
+                    from datetime import datetime
+                    try:
+                        # Parse the provided date
+                        parsed_date = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+                        task.started_at = parsed_date.isoformat()
+                        # If setting start date, mark as in progress
+                        if task.status == 'open':
+                            task.status = 'in_progress'
+                    except ValueError:
+                        return False, {"error": f"Invalid started_at format: {started_at}. Use ISO format (e.g., 2025-01-15T14:30:00)"}
+            
+            # Save the updated task
+            task.save()
+            
+            return True, {
+                "task_id": task.id,
+                "task": task.to_dict(),
+                "message": f"Updated task {task.id}"
+            }
+        except Exception as e:
+            logger.error(f"Failed to update task: {str(e)}")
+            return False, {"error": str(e)}
+    
     def no_op(self) -> Tuple[bool, Dict[str, Any]]:
         """No operation - does nothing"""
         return True, {"message": "No operation performed"}
@@ -220,6 +299,16 @@ class ActionExecutor:
                     status=args.get("status"),
                     completed_at_gte=args.get("completed_at_gte"),
                     completed_at_lt=args.get("completed_at_lt")
+                )
+            elif action_name == "update_task":
+                return self.update_task(
+                    task_id=args.get("task_id"),
+                    title=args.get("title"),
+                    description=args.get("description"),
+                    project=args.get("project"),
+                    categories=args.get("categories"),
+                    completed_at=args.get("completed_at"),
+                    started_at=args.get("started_at")
                 )
             elif action_name == "no_op":
                 return self.no_op()
