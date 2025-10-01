@@ -5,7 +5,7 @@ Giskard API - Backend API for Tauri desktop app
 
 from flask import Flask
 from flask_cors import CORS
-from api.routes_v2 import api_v2
+from api.routes import api
 # from server.routes.agent import agent  # Temporarily disabled due to import error
 from server.routes.agent_langgraph import agent_langgraph
 from database import init_database
@@ -76,7 +76,7 @@ CORS(app, origins=[
 ], supports_credentials=True)
 
 # Register API blueprints
-app.register_blueprint(api_v2)  # Clean API
+app.register_blueprint(api)  # Clean API
 # app.register_blueprint(agent)  # Agent orchestrator - temporarily disabled
 app.register_blueprint(agent_langgraph, url_prefix='/api/agent')  # LangGraph agent
 

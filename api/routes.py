@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 # Create Blueprint
-api_v2 = Blueprint('api', __name__, url_prefix='/api')
+api = Blueprint('api', __name__, url_prefix='/api')
 
 
 class APIResponse:
@@ -84,7 +84,7 @@ def filter_tasks_by_completed_at(tasks: List[TaskDB],
     return filtered_tasks
 
 
-@api_v2.route('/tasks', methods=['GET'])
+@api.route('/tasks', methods=['GET'])
 def get_tasks():
     """Get all tasks grouped by status with optional filtering
 
@@ -216,7 +216,7 @@ def get_tasks():
         return APIResponse.error(f"Failed to load tasks: {str(e)}", 500)
 
 
-@api_v2.route('/tasks', methods=['POST'])
+@api.route('/tasks', methods=['POST'])
 def create_task():
     """Create a new task"""
     try:
@@ -254,7 +254,7 @@ def create_task():
         return APIResponse.error(f"Failed to create task: {str(e)}", 500)
 
 
-@api_v2.route('/tasks/<int:task_id>', methods=['GET'])
+@api.route('/tasks/<int:task_id>', methods=['GET'])
 def get_task(task_id):
     """Get a specific task by ID"""
     try:
@@ -270,7 +270,7 @@ def get_task(task_id):
         return APIResponse.error(f"Failed to get task: {str(e)}", 500)
 
 
-@api_v2.route('/tasks/<int:task_id>', methods=['PUT'])
+@api.route('/tasks/<int:task_id>', methods=['PUT'])
 def update_task(task_id):
     """Update a task"""
     try:
@@ -359,7 +359,7 @@ def update_task(task_id):
         return APIResponse.error(f"Failed to update task: {str(e)}", 500)
 
 
-@api_v2.route('/tasks/<int:task_id>/status', methods=['PUT', 'PATCH'])
+@api.route('/tasks/<int:task_id>/status', methods=['PUT', 'PATCH'])
 def update_task_status(task_id):
     """Update task status"""
     try:
@@ -393,7 +393,7 @@ def update_task_status(task_id):
         return APIResponse.error(f"Failed to update task status: {str(e)}", 500)
 
 
-@api_v2.route('/tasks/<int:task_id>', methods=['DELETE'])
+@api.route('/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
     """Delete a task"""
     try:
@@ -411,7 +411,7 @@ def delete_task(task_id):
         return APIResponse.error(f"Failed to delete task: {str(e)}", 500)
 
 
-@api_v2.route('/tasks/reorder', methods=['POST'])
+@api.route('/tasks/reorder', methods=['POST'])
 def reorder_tasks():
     """Reorder tasks by updating their sort_key values"""
     try:

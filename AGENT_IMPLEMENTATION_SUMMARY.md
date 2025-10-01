@@ -23,7 +23,7 @@ I've successfully implemented a **minimal orchestration layer** that enables Gis
    - Monitors performance and errors
    - Provides observability data
 
-3. **API Endpoints** (added to `api/routes_v2.py`)
+3. **API Endpoints** (added to `api/routes.py`)
    - `POST /api/agent/step` - Main orchestration endpoint
    - `POST /api/agent/undo` - Undo functionality
    - `GET /api/agent/metrics` - Observability data
@@ -137,7 +137,7 @@ curl http://localhost:5001/api/agent/metrics
 - `docs/AGENT_ORCHESTRATION.md` - Complete documentation
 
 ### Modified Files
-- `api/routes_v2.py` - Added agent endpoints
+- `api/routes.py` - Added agent endpoints
 - `giskard-desktop/src/js/modules/ChatManager.js` - Updated to use agent orchestration
 
 ## Next Steps (Future Enhancements)

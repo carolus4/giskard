@@ -77,7 +77,7 @@ class APIClient {
                 // Route to appropriate Tauri command  
                 if (url.includes('/api/tasks') && (!options.method || options.method === 'GET')) {
                     try {
-                        const result = await invoke('api_v2_get_tasks');
+                        const result = await invoke('api_get_tasks');
                         const data = JSON.parse(result);
                         console.log('✅ Tauri getTasks success:', Object.keys(data));
                         return { success: true, data };
@@ -89,7 +89,7 @@ class APIClient {
                 } else if (url.includes('/api/tasks') && options.method === 'POST' && !url.includes('/')) {
                     try {
                         const body = JSON.parse(options.body);
-                        const result = await invoke('api_v2_create_task', {
+                        const result = await invoke('api_create_task', {
                             title: body.title,
                             description: body.description || '',
                             project: body.project || null,
@@ -106,7 +106,7 @@ class APIClient {
                     try {
                         const body = JSON.parse(options.body);
                         const taskId = url.match(/\/api\/tasks\/(\d+)\/status/)[1];
-                        const result = await invoke('api_v2_update_task_status', {
+                        const result = await invoke('api_update_task_status', {
                             task_id: parseInt(taskId),
                             status: body.status
                         });

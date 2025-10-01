@@ -5,9 +5,11 @@ use std::thread;
 // Global reference to the Python backend process
 static BACKEND_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 
+
+// API Commands
 #[tauri::command]
 async fn api_get_tasks() -> Result<String, String> {
-    println!("🦀 Rust: Getting tasks from Python backend");
+    println!("🦀 Rust: Getting tasks from API");
     
     match std::process::Command::new("curl")
         .args(["-s", "http://localhost:5001/api/tasks"])
@@ -20,39 +22,16 @@ async fn api_get_tasks() -> Result<String, String> {
                 Ok(response.to_string())
             } else {
                 let error = String::from_utf8_lossy(&output.stderr);
-                Err(format!("Backend request failed: {}", error))
+                Err(format!("API request failed: {}", error))
             }
         }
-        Err(e) => Err(format!("Failed to call backend: {}", e)),
-    }
-}
-
-// V2 API Commands
-#[tauri::command]
-async fn api_v2_get_tasks() -> Result<String, String> {
-    println!("🦀 Rust: Getting tasks from V2 API");
-    
-    match std::process::Command::new("curl")
-        .args(["-s", "http://localhost:5001/api/tasks"])
-        .output()
-    {
-        Ok(output) => {
-            if output.status.success() {
-                let response = String::from_utf8_lossy(&output.stdout);
-                println!("✅ Got V2 tasks: {}", response.len());
-                Ok(response.to_string())
-            } else {
-                let error = String::from_utf8_lossy(&output.stderr);
-                Err(format!("V2 API request failed: {}", error))
-            }
-        }
-        Err(e) => Err(format!("Failed to call V2 API: {}", e)),
+        Err(e) => Err(format!("Failed to call API: {}", e)),
     }
 }
 
 #[tauri::command]
-async fn api_v2_create_task(title: String, description: String, project: Option<String>, categories: Option<String>) -> Result<String, String> {
-    println!("🦀 Rust: Creating V2 task - title: {}, desc: {}, project: {:?}, categories: {:?}", title, description, project, categories);
+async fn api_create_task(title: String, description: String, project: Option<String>, categories: Option<String>) -> Result<String, String> {
+    println!("🦀 Rust: Creating task - title: {}, desc: {}, project: {:?}, categories: {:?}", title, description, project, categories);
     
     let mut json_body = format!(r#"{{"title": "{}", "description": "{}""#, 
                                title.replace("\"", "\\\""), 
@@ -86,20 +65,20 @@ async fn api_v2_create_task(title: String, description: String, project: Option<
         Ok(output) => {
             if output.status.success() {
                 let response = String::from_utf8_lossy(&output.stdout);
-                println!("✅ V2 Task created: {}", response);
+                println!("✅ Task created: {}", response);
                 Ok(response.to_string())
             } else {
                 let error = String::from_utf8_lossy(&output.stderr);
-                Err(format!("V2 Create task failed: {}", error))
+                Err(format!("Create task failed: {}", error))
             }
         }
-        Err(e) => Err(format!("Failed to create V2 task: {}", e)),
+        Err(e) => Err(format!("Failed to create task: {}", e)),
     }
 }
 
 #[tauri::command]
-async fn api_v2_update_task_status(task_id: u32, status: String) -> Result<String, String> {
-    println!("🦀 Rust: Updating V2 task status - task_id: {}, status: {}", task_id, status);
+async fn api_update_task_status(task_id: u32, status: String) -> Result<String, String> {
+    println!("🦀 Rust: Updating task status - task_id: {}, status: {}", task_id, status);
     
     let json_body = format!(r#"{{"status": "{}"}}"#, status.replace("\"", "\\\""));
     
@@ -116,14 +95,14 @@ async fn api_v2_update_task_status(task_id: u32, status: String) -> Result<Strin
         Ok(output) => {
             if output.status.success() {
                 let response = String::from_utf8_lossy(&output.stdout);
-                println!("✅ V2 Task status updated: {}", response);
+                println!("✅ Task status updated: {}", response);
                 Ok(response.to_string())
             } else {
                 let error = String::from_utf8_lossy(&output.stderr);
-                Err(format!("V2 Update task status failed: {}", error))
+                Err(format!("Update task status failed: {}", error))
             }
         }
-        Err(e) => Err(format!("Failed to update V2 task status: {}", e)),
+        Err(e) => Err(format!("Failed to update task status: {}", e)),
     }
 }
 
@@ -204,12 +183,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
-            check_backend_status, 
+            check_backend_status,
             start_python_backend,
             api_get_tasks,
-            api_v2_get_tasks,
-            api_v2_create_task,
-            api_v2_update_task_status
+            api_create_task,
+            api_update_task_status
         ])
         .setup(|_app| {
             // Start the Python backend when the app launches in a separate thread

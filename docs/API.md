@@ -426,7 +426,7 @@ The API automatically integrates with AI classification:
 
 ### Adding New Endpoints
 
-1. Add route to `api/routes_v2.py`
+1. Add route to `api/routes.py`
 2. Follow REST conventions (GET, POST, PUT, DELETE, PATCH)
 3. Use `APIResponse` helper for consistent responses
 4. Add error handling with appropriate status codes

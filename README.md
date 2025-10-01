@@ -44,7 +44,7 @@ app.py (30 lines)              # API-only entry point
 ├── models/
 │   └── task_db.py            # Database task model
 ├── api/
-│   └── routes_v2.py          # Clean REST API endpoints
+│   └── routes.py             # Clean REST API endpoints
 └── utils/
     ├── classification_manager.py  # Task classification system
     └── classification_service.py  # LLM classification service
@@ -80,7 +80,7 @@ giskard-desktop/src/
 
 ### **Adding New Features**
 
-1. **New API Endpoint**: Add to `api/routes_v2.py`
+1. **New API Endpoint**: Add to `api/routes.py`
 2. **New UI Component**: Create in `static/js/modules/`
 3. **New Task Property**: Extend `models/task_db.py`
 
