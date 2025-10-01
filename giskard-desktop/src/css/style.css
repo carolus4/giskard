@@ -490,18 +490,22 @@ body {
 }
 
 .task-drag-handle {
-    color: #ccc;
-    cursor: pointer;
+    color: #999;
+    cursor: grab;
     padding: 4px;
     border-radius: 4px;
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
     display: flex;
     align-items: center;
-    opacity: 0;
+    opacity: 0.7;
     user-select: none;
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+}
+
+.task-drag-handle:active {
+    cursor: grabbing;
 }
 
 .task-item:hover .task-drag-handle {
