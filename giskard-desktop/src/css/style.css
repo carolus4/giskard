@@ -207,6 +207,35 @@ body {
     transform: translateY(0);
 }
 
+/* Save button styling for task detail page */
+.save-task-btn {
+    background: #1a1a1a;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.save-task-btn:hover {
+    background: #333333;
+    transform: translateY(-1px);
+}
+
+.save-task-btn:active {
+    transform: translateY(0);
+}
+
+.save-task-btn i {
+    font-size: 12px;
+}
+
 .action-buttons {
     display: flex;
     gap: 12px;
@@ -666,18 +695,18 @@ body.dragging .insertion-line {
 }
 
 .category-health {
-    background-color: #e8f5e8;
-    color: #2d5a2d;
+    background-color: #f5f5f5;
+    color: #666666;
 }
 
 .category-career {
-    background-color: #e3f2fd;
-    color: #1565c0;
+    background-color: #f0f0f0;
+    color: #666666;
 }
 
 .category-learning {
-    background-color: #fff3e0;
-    color: #ef6c00;
+    background-color: #f0f0f0;
+    color: #666666;
 }
 
 /* Task Detail Page Categories */
@@ -708,18 +737,18 @@ body.dragging .insertion-line {
 }
 
 .category-badge-detail.category-health {
-    background-color: #e8f5e8;
-    color: #2d5a2d;
+    background-color: #f5f5f5;
+    color: #666666;
 }
 
 .category-badge-detail.category-career {
-    background-color: #e3f2fd;
-    color: #1565c0;
+    background-color: #f0f0f0;
+    color: #666666;
 }
 
 .category-badge-detail.category-learning {
-    background-color: #fff3e0;
-    color: #ef6c00;
+    background-color: #f0f0f0;
+    color: #666666;
 }
 
 .task-description {
@@ -1120,56 +1149,11 @@ body.dragging .insertion-line {
     margin-bottom: 8px;
 }
 
-.task-checkbox-large {
-    flex-shrink: 0;
-    position: relative;
-    margin-top: 2px;
-}
-
-.task-check-large {
-    width: 24px;
-    height: 24px;
-    appearance: none;
-    border: 2px solid #ddd;
-    border-radius: 50%;
-    background: #fff;
-    cursor: pointer;
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.task-check-large:hover {
-    border-color: #dc4c3e;
-}
-
-.task-check-large:checked {
-    background: #dc4c3e;
-    border-color: #dc4c3e;
-}
-
-.checkmark-large {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #fff;
-    font-size: 14px;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    pointer-events: none;
-}
-
-.task-check-large:checked + .checkmark-large {
-    opacity: 1;
-}
-
-.checkmark-large::before {
-    content: '✓';
-    font-weight: bold;
-}
 
 .task-title-actions {
     display: flex;
     align-items: center;
+    gap: 12px;
     margin-left: auto;
 }
 
@@ -1200,6 +1184,70 @@ body.dragging .insertion-line {
 
 .progress-btn-inline i {
     font-size: 12px;
+}
+
+/* Status Selector */
+.status-selector {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    padding: 2px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.status-option {
+    background: none;
+    border: none;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+    position: relative;
+    white-space: nowrap;
+}
+
+.status-option:hover {
+    color: #202020;
+    background: #f8f8f8;
+}
+
+.status-option.active {
+    background: #202020;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.status-option.active:hover {
+    background: #333;
+    color: #fff;
+}
+
+/* More Actions Button */
+.more-actions-btn {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.more-actions-btn:hover {
+    background: #f0f0f0;
+    color: #202020;
 }
 
 .task-detail-content-area {
@@ -1298,59 +1346,6 @@ body.dragging .insertion-line {
     margin-top: 16px;
 }
 
-.save-btn {
-    background: #dc4c3e;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    justify-content: center;
-    min-height: 36px;
-    box-shadow: 0 2px 4px rgba(220, 76, 62, 0.2);
-}
-
-.save-btn:hover {
-    background: #c23321;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(220, 76, 62, 0.3);
-}
-
-.save-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(220, 76, 62, 0.2);
-}
-
-.save-btn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
-
-.save-btn.primary-cta {
-    background: #dc4c3e;
-    position: relative;
-    font-weight: 600;
-    box-shadow: 0 3px 6px rgba(220, 76, 62, 0.25);
-}
-
-.save-btn.primary-cta:hover {
-    background: #c23321;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 12px rgba(220, 76, 62, 0.35);
-}
-
-.save-btn.primary-cta:focus {
-    outline: none;
-    box-shadow: 0 3px 6px rgba(220, 76, 62, 0.25), 0 0 0 3px rgba(220, 76, 62, 0.2);
-}
 
 .delete-link {
     background: none;

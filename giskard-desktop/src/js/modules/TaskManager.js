@@ -85,6 +85,10 @@ class TaskManager {
         document.addEventListener('task:toggle-completion-from-page', (e) => {
             this._handleToggleCompletionFromPage(e.detail);
         });
+
+        document.addEventListener('task:change-status-from-page', (e) => {
+            this._handleStatusChangeFromPage(e.detail);
+        });
     }
 
     /**
@@ -277,14 +281,19 @@ class TaskManager {
     }
 
     /**
-     * Handle saving task from detail page
+     * Handle saving task from detail page (legacy method for programmatic saves)
      */
     async _handleSaveTaskFromPage(taskData) {
         if (!taskData.title.trim()) {
             Notification.error('Task title cannot be empty');
             return;
         }
-        
+
+        // Flush any pending debounced updates for this task before manual save
+        if (this.pageManager && taskData.fileIdx) {
+            await this.pageManager._flushPendingUpdate(taskData.fileIdx);
+        }
+
         const result = await this.api.updateTask(
             taskData.fileIdx,
             {
@@ -292,9 +301,10 @@ class TaskManager {
                 description: taskData.description,
                 project: taskData.project,
                 categories: taskData.categories
+                // No _debounced flag - this is a programmatic save that should trigger immediate classification
             }
         );
-        
+
         if (result.success) {
             Notification.success('Task saved!');
             await this.loadTasks();
@@ -308,8 +318,13 @@ class TaskManager {
      * Handle starting a task
      */
     async _handleStartTask(task) {
+        // Flush any pending updates for this task before status change
+        if (this.pageManager) {
+            await this.pageManager._flushPendingUpdate(task.id);
+        }
+
         const result = await this.api.updateTaskStatus(task.id, 'in_progress');
-        
+
         if (result.success) {
             await this.loadTasks();
             Notification.success('Task started!');
@@ -322,8 +337,13 @@ class TaskManager {
      * Handle stopping a task
      */
     async _handleStopTask(task) {
+        // Flush any pending updates for this task before status change
+        if (this.pageManager) {
+            await this.pageManager._flushPendingUpdate(task.id);
+        }
+
         const result = await this.api.updateTaskStatus(task.id, 'open');
-        
+
         if (result.success) {
             await this.loadTasks();
             Notification.success('Task stopped!');
@@ -336,8 +356,13 @@ class TaskManager {
      * Handle completing a task
      */
     async _handleCompleteTask(task) {
+        // Flush any pending updates for this task before status change
+        if (this.pageManager) {
+            await this.pageManager._flushPendingUpdate(task.id);
+        }
+
         const result = await this.api.updateTaskStatus(task.id, 'done');
-        
+
         if (result.success) {
             await this.loadTasks();
             Notification.success('Task completed!');
@@ -521,6 +546,79 @@ class TaskManager {
         // Close the detail page after successful completion/uncompletion
         if (success) {
             this.pageManager.showPage('task-list');
+        }
+    }
+
+    /**
+     * Handle status change from status selector
+     */
+    async _handleStatusChangeFromPage({ taskId, status }) {
+        // Get task data
+        const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
+        const task = allTasks.find(t => t.id === taskId);
+        
+        if (!task) {
+            Notification.error('Task not found');
+            return;
+        }
+        
+        // First, save any changes made in the page (title, description)
+        const titleInput = document.getElementById('detail-title');
+        const descriptionInput = document.getElementById('detail-description');
+        
+        if (titleInput && titleInput.value.trim()) {
+            const taskData = {
+                fileIdx: taskId,
+                title: titleInput.value.trim(),
+                description: descriptionInput?.value.trim() || ''
+            };
+            await this._handleSaveTaskFromPage(taskData);
+        }
+        
+        // Then change the status
+        await this._changeTaskStatus(task, status);
+        
+        // Update the status selector in the detail page after data refresh
+        setTimeout(() => {
+            this._updateDetailPageStatusSelector(taskId);
+        }, 100);
+    }
+
+    /**
+     * Change task status using API
+     */
+    async _changeTaskStatus(task, newStatus) {
+        try {
+            const result = await this.api.updateTaskStatus(task.id, newStatus);
+            
+            if (result.success) {
+                console.log(`✅ Task ${task.id} status changed to ${newStatus}`);
+                // Reload tasks to reflect the change
+                await this.loadTasks();
+                Notification.success(`Task status changed to ${newStatus}`);
+            } else {
+                console.error('❌ Status change failed:', result.error);
+                Notification.error(`Failed to change status: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('❌ Error changing task status:', error);
+            Notification.error('Failed to change task status');
+        }
+    }
+
+    /**
+     * Update status selector in detail page
+     */
+    _updateDetailPageStatusSelector(taskId) {
+        // Get updated task data
+        const allTasks = [...this.tasks.in_progress, ...this.tasks.open, ...this.tasks.done];
+        const task = allTasks.find(t => t.id === taskId);
+        
+        if (!task) return;
+        
+        // Update the status selector
+        if (this.pageManager._updateStatusSelector) {
+            this.pageManager._updateStatusSelector(task.status);
         }
     }
 

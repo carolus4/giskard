@@ -15,13 +15,15 @@ logger = logging.getLogger(__name__)
 
 class ClassificationManager:
     """Manages task classification queue and background processing"""
-    
+
     def __init__(self):
         self.classification_service = TaskClassificationService()
         self.classification_queue = []
+        self.deferred_tasks = {}  # task_id -> task_data for deferred processing
         self.is_processing = False
         self.processing_thread = None
         self.stop_event = threading.Event()
+        self.deferred_timeout = 5  # seconds to wait before processing deferred tasks
         
     def start_background_processing(self):
         """Start background thread for processing classification queue"""
@@ -91,23 +93,34 @@ class ClassificationManager:
             logger.error(f"Startup classification failed: {str(e)}")
             return 0
     
-    def enqueue_classification(self, task: TaskDB):
+    def enqueue_classification(self, task: TaskDB, deferred: bool = False):
         """
         Add a task to the classification queue
-        
+
         Args:
             task: TaskDB object to classify
+            deferred: Whether to defer classification (for debounced updates)
         """
-        # Always enqueue for classification - even if task already has categories
-        # This allows re-classification when task content is updated
-        self.classification_queue.append({
+        task_data = {
             'id': task.id,
             'title': task.title,
             'description': task.description,
             'project': task.project,
-            'timestamp': datetime.now()
-        })
-        logger.debug(f"Enqueued task for classification: {task.title}")
+            'timestamp': datetime.now(),
+            'deferred': deferred
+        }
+
+        if deferred:
+            # For deferred tasks, store in deferred_tasks dict and set a timeout
+            self.deferred_tasks[task.id] = task_data
+            # Set a timer to process this task after the deferred timeout
+            threading.Timer(self.deferred_timeout, self._process_deferred_task, args=[task.id]).start()
+            logger.debug(f"Deferred classification for task: {task.title} (will process in {self.deferred_timeout}s)")
+        else:
+            # Always enqueue for immediate classification - even if task already has categories
+            # This allows re-classification when task content is updated
+            self.classification_queue.append(task_data)
+            logger.debug(f"Enqueued task for immediate classification: {task.title}")
     
     def enqueue_tasks_batch(self, tasks: List[TaskDB]):
         """
@@ -119,6 +132,14 @@ class ClassificationManager:
         for task in tasks:
             self.enqueue_classification(task)
     
+    def _process_deferred_task(self, task_id: int):
+        """Process a deferred task after timeout"""
+        if task_id in self.deferred_tasks:
+            task_data = self.deferred_tasks.pop(task_id)
+            # Move from deferred to regular queue for processing
+            self.classification_queue.append(task_data)
+            logger.debug(f"Processing deferred task: {task_data.get('title', 'Unknown')}")
+
     def _process_queue_loop(self):
         """Background loop for processing classification queue"""
         while not self.stop_event.is_set():
@@ -186,6 +207,7 @@ class ClassificationManager:
         """Get current status of the classification queue"""
         return {
             'queue_size': len(self.classification_queue),
+            'deferred_tasks_count': len(self.deferred_tasks),
             'is_processing': self.is_processing,
             'ollama_available': self.classification_service.is_ollama_available()
         }
@@ -194,7 +216,16 @@ class ClassificationManager:
     def clear_queue(self):
         """Clear the classification queue"""
         self.classification_queue.clear()
-        logger.info("Classification queue cleared")
+        self.deferred_tasks.clear()
+        logger.info("Classification queue and deferred tasks cleared")
+
+    def cancel_deferred_task(self, task_id: int) -> bool:
+        """Cancel a deferred task if it exists"""
+        if task_id in self.deferred_tasks:
+            del self.deferred_tasks[task_id]
+            logger.debug(f"Cancelled deferred classification for task {task_id}")
+            return True
+        return False
     
     def force_classify_task(self, task: TaskDB) -> List[str]:
         """

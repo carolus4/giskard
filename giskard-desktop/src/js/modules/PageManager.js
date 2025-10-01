@@ -1,10 +1,15 @@
-/**
- * PageManager - Handles page navigation and routing
- */
+    /**
+     * PageManager - Handles page navigation and routing
+     */
 class PageManager {
     constructor() {
         this.currentPage = 'task-list';
         this.currentTaskId = null;
+
+        // Debouncing for task updates to avoid overwhelming classification queue
+        this.updateTimeouts = new Map();
+        this.pendingUpdates = new Map();
+
         this._bindEvents();
         this._initialize();
     }
@@ -92,17 +97,11 @@ class PageManager {
         this._unbindDetailPageEvents();
 
         // Task detail page form
-        const saveTaskBtn = document.getElementById('save-task-btn');
         const detailDeleteBtn = document.getElementById('detail-delete-btn');
         const detailProgressBtn = document.getElementById('detail-progress-btn');
-        const detailCheckbox = document.getElementById('detail-checkbox');
-
-        if (saveTaskBtn) {
-            this._saveTaskHandler = () => {
-                this._handleSaveTaskFromPage();
-            };
-            saveTaskBtn.addEventListener('click', this._saveTaskHandler);
-        }
+        const statusSelector = document.getElementById('status-selector');
+        const moreActionsBtn = document.getElementById('more-actions-btn');
+        const saveTaskBtn = document.getElementById('save-task-btn');
 
         if (detailDeleteBtn) {
             this._deleteTaskHandler = () => {
@@ -121,11 +120,41 @@ class PageManager {
             detailProgressBtn.addEventListener('click', this._progressHandler);
         }
 
-        if (detailCheckbox) {
-            this._checkboxHandler = (e) => {
-                this._handleToggleCompletionFromPage(e.target.checked);
+
+        // Status selector events
+        if (statusSelector) {
+            this._statusSelectorHandler = (e) => {
+                const statusOption = e.target.closest('.status-option');
+                if (statusOption) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const newStatus = statusOption.dataset.status;
+                    console.log('Status selector clicked, newStatus:', newStatus);
+                    this._handleStatusChangeFromPage(newStatus);
+                }
             };
-            detailCheckbox.addEventListener('change', this._checkboxHandler);
+            statusSelector.addEventListener('click', this._statusSelectorHandler);
+        }
+
+        // More actions button events
+        if (moreActionsBtn) {
+            this._moreActionsHandler = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('More actions button clicked');
+                this._handleMoreActionsClick();
+            };
+            moreActionsBtn.addEventListener('click', this._moreActionsHandler);
+        }
+
+        if (saveTaskBtn) {
+            this._saveTaskHandler = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Save task button clicked');
+                this._handleSaveTaskFromPage();
+            };
+            saveTaskBtn.addEventListener('click', this._saveTaskHandler);
         }
 
         // Auto-resize title textarea
@@ -137,26 +166,26 @@ class PageManager {
                 titleTextarea.style.height = 'auto';
                 titleTextarea.style.minHeight = 'auto';
                 titleTextarea.style.maxHeight = 'none';
-                
+
                 // Ensure the textarea has proper width for wrapping
                 titleTextarea.style.width = '100%';
                 titleTextarea.style.maxWidth = 'none';
-                
+
                 // Force text wrapping
                 titleTextarea.style.whiteSpace = 'pre-wrap';
                 titleTextarea.style.wordWrap = 'break-word';
                 titleTextarea.style.overflowWrap = 'break-word';
                 titleTextarea.style.wordBreak = 'break-word';
-                
+
                 // Force a reflow
                 titleTextarea.offsetHeight;
-                
+
                 // Get the scroll height
                 const scrollHeight = titleTextarea.scrollHeight;
-                
+
                 // Calculate lines
                 const lines = titleTextarea.value.split('\n').length;
-                
+
                 // Calculate appropriate height
                 let newHeight = scrollHeight;
                 if (lines > 1) {
@@ -173,22 +202,22 @@ class PageManager {
                     // Short text - use natural height (will shrink)
                     newHeight = scrollHeight;
                 }
-                
+
                 // Force the height regardless of current height
                 titleTextarea.style.height = newHeight + 'px';
                 titleTextarea.style.minHeight = newHeight + 'px';
                 titleTextarea.style.maxHeight = 'none';
             };
-            
+
             // Bind multiple events to ensure it works
             titleTextarea.addEventListener('input', this._autoResizeTextarea);
             titleTextarea.addEventListener('paste', this._autoResizeTextarea);
             titleTextarea.addEventListener('keyup', this._autoResizeTextarea);
             titleTextarea.addEventListener('keydown', this._autoResizeTextarea);
-            
+
             // Also trigger on focus
             titleTextarea.addEventListener('focus', this._autoResizeTextarea);
-            
+
             // Initial resize
             setTimeout(() => {
                 this._autoResizeTextarea();
@@ -197,38 +226,35 @@ class PageManager {
             console.log('Textarea not found!');
         }
 
+        // Add real-time save handlers for automatic updates
+        this._bindRealTimeSaveHandlers();
+
         // Keyboard shortcuts for task detail page
         this._keyboardHandler = (e) => {
             if (this.currentPage === 'task-detail') {
-                // Cmd+Enter or Ctrl+Enter to save
+                // Cmd+Enter or Ctrl+Enter to save/create task (only in add mode)
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                     e.preventDefault();
-                    if (saveTaskBtn) {
-                        // Visual feedback
-                        saveTaskBtn.style.transform = 'scale(0.95)';
-                        setTimeout(() => {
-                            saveTaskBtn.style.transform = '';
-                        }, 150);
-                        saveTaskBtn.click();
+                    // Only save if we're in add mode (not edit mode)
+                    if (this.currentTaskId === 'new') {
+                        this._handleSaveTaskFromPage();
                     }
                 }
             }
         };
         document.addEventListener('keydown', this._keyboardHandler);
+
     }
 
     /**
      * Unbind detail page events to prevent duplicates
      */
     _unbindDetailPageEvents() {
-        const saveTaskBtn = document.getElementById('save-task-btn');
         const detailDeleteBtn = document.getElementById('detail-delete-btn');
         const detailProgressBtn = document.getElementById('detail-progress-btn');
-        const detailCheckbox = document.getElementById('detail-checkbox');
-
-        if (saveTaskBtn && this._saveTaskHandler) {
-            saveTaskBtn.removeEventListener('click', this._saveTaskHandler);
-        }
+        const statusSelector = document.getElementById('status-selector');
+        const moreActionsBtn = document.getElementById('more-actions-btn');
+        const saveTaskBtn = document.getElementById('save-task-btn');
 
         if (detailDeleteBtn && this._deleteTaskHandler) {
             detailDeleteBtn.removeEventListener('click', this._deleteTaskHandler);
@@ -238,8 +264,17 @@ class PageManager {
             detailProgressBtn.removeEventListener('click', this._progressHandler);
         }
 
-        if (detailCheckbox && this._checkboxHandler) {
-            detailCheckbox.removeEventListener('change', this._checkboxHandler);
+
+        if (statusSelector && this._statusSelectorHandler) {
+            statusSelector.removeEventListener('click', this._statusSelectorHandler);
+        }
+
+        if (moreActionsBtn && this._moreActionsHandler) {
+            moreActionsBtn.removeEventListener('click', this._moreActionsHandler);
+        }
+
+        if (saveTaskBtn && this._saveTaskHandler) {
+            saveTaskBtn.removeEventListener('click', this._saveTaskHandler);
         }
 
         // Clean up textarea auto-resize
@@ -254,12 +289,20 @@ class PageManager {
         if (this._keyboardHandler) {
             document.removeEventListener('keydown', this._keyboardHandler);
         }
+
     }
 
     /**
      * Show a specific page
      */
     showPage(pageName, taskId = null) {
+        // If leaving task detail page, flush any pending updates
+        if (this.currentPage === 'task-detail' && pageName !== 'task-detail') {
+            if (this.currentTaskId && this.currentTaskId !== 'new') {
+                this._flushPendingUpdate(this.currentTaskId);
+            }
+        }
+
         // Hide all pages
         const pages = document.querySelectorAll('.page');
         pages.forEach(page => {
@@ -347,7 +390,6 @@ class PageManager {
         const titleInput = document.getElementById('detail-title');
         const descriptionInput = document.getElementById('detail-description');
         const categoriesContainer = document.getElementById('task-categories-detail');
-        const checkbox = document.getElementById('detail-checkbox');
         const progressBtn = document.getElementById('detail-progress-btn');
         const deleteBtn = document.getElementById('detail-delete-btn');
         const saveBtn = document.getElementById('save-task-btn');
@@ -364,12 +406,21 @@ class PageManager {
         if (titleInput) titleInput.value = '';
         if (descriptionInput) descriptionInput.value = '';
         if (categoriesContainer) categoriesContainer.innerHTML = '';
-        if (checkbox) checkbox.checked = false;
 
         // Hide elements not needed for add mode
-        if (checkbox) checkbox.style.display = 'none';
         if (progressBtn) progressBtn.style.display = 'none';
         if (deleteBtn) deleteBtn.style.display = 'none';
+        
+        // Hide status selector and more actions in add mode
+        const statusSelector = document.getElementById('status-selector');
+        const moreActionsBtn = document.getElementById('more-actions-btn');
+        if (statusSelector) statusSelector.style.display = 'none';
+        if (moreActionsBtn) moreActionsBtn.style.display = 'none';
+
+        // Show save button in add mode
+        if (saveBtn) {
+            saveBtn.style.display = 'flex';
+        }
 
         // Update save button text
         if (saveBtn) {
@@ -402,18 +453,19 @@ class PageManager {
     }
 
     /**
-     * Handle saving task from page
+     * Handle saving task from page (legacy method for external calls)
+     * Since we no longer have a save button, this is mainly for programmatic saves
      */
     async _handleSaveTaskFromPage() {
         const titleInput = document.getElementById('detail-title');
         const descriptionInput = document.getElementById('detail-description');
-        
-        console.log('_handleSaveTaskFromPage called', { 
-            currentTaskId: this.currentTaskId, 
+
+        console.log('_handleSaveTaskFromPage called (programmatic save)', {
+            currentTaskId: this.currentTaskId,
             titleValue: titleInput?.value,
-            hasTitleInput: !!titleInput 
+            hasTitleInput: !!titleInput
         });
-        
+
         if (!titleInput || !titleInput.value.trim()) {
             console.log('No title input or empty title, returning');
             return;
@@ -421,10 +473,10 @@ class PageManager {
 
         // Parse the formatted title to extract project and title
         const parsedTitle = this._parseTaskTitle(titleInput.value.trim());
-        
+
         // Check if we're in add mode or edit mode
         if (this.currentTaskId === 'new') {
-            // Add mode
+            // Add mode - immediate save (no debouncing for new tasks)
             const taskData = {
                 title: parsedTitle.title,
                 description: descriptionInput?.value.trim() || '',
@@ -437,19 +489,84 @@ class PageManager {
                 detail: taskData
             }));
         } else {
-            // Edit mode
+            // Edit mode - get original task data to compare
+            const allTasks = [...(window.app?.taskManager?.tasks?.in_progress || []), 
+                             ...(window.app?.taskManager?.tasks?.open || []), 
+                             ...(window.app?.taskManager?.tasks?.done || [])];
+            const originalTask = allTasks.find(t => t.id === this.currentTaskId);
+            
             const taskData = {
                 fileIdx: this.currentTaskId,
                 title: parsedTitle.title,
-                description: descriptionInput?.value.trim() || '',
-                project: parsedTitle.project
+                description: descriptionInput?.value.trim() || ''
             };
+            
+            // Only include project if it's different from the original or if original had no project
+            if (originalTask) {
+                if (parsedTitle.project !== originalTask.project) {
+                    taskData.project = parsedTitle.project;
+                }
+            } else {
+                // Fallback if we can't find original task
+                taskData.project = parsedTitle.project;
+            }
 
-            console.log('Dispatching task:save-from-page event with data:', taskData);
-            // Dispatch event to TaskManager
-            document.dispatchEvent(new CustomEvent('task:save-from-page', {
-                detail: taskData
-            }));
+            // Force immediate save (this will trigger classification)
+            await this._debouncedUpdateTask(this.currentTaskId, taskData, true);
+        }
+    }
+
+    /**
+     * Bind real-time save handlers for automatic updates
+     */
+    _bindRealTimeSaveHandlers() {
+        // Only bind for edit mode (not add mode)
+        if (this.currentTaskId === 'new') return;
+
+        const titleInput = document.getElementById('detail-title');
+        const descriptionInput = document.getElementById('detail-description');
+
+        if (titleInput) {
+            // Debounced save on title changes
+            let titleTimeout;
+            titleInput.addEventListener('input', () => {
+                clearTimeout(titleTimeout);
+                titleTimeout = setTimeout(async () => {
+                    if (titleInput.value.trim()) {
+                        const parsedTitle = this._parseTaskTitle(titleInput.value.trim());
+                        
+                        // Get original task data to compare
+                        const allTasks = [...(window.app?.taskManager?.tasks?.in_progress || []), 
+                                         ...(window.app?.taskManager?.tasks?.open || []), 
+                                         ...(window.app?.taskManager?.tasks?.done || [])];
+                        const originalTask = allTasks.find(t => t.id === this.currentTaskId);
+                        
+                        const updateData = {
+                            title: parsedTitle.title
+                        };
+                        
+                        // Only include project if it's different from the original
+                        if (originalTask && parsedTitle.project !== originalTask.project) {
+                            updateData.project = parsedTitle.project;
+                        }
+                        
+                        await this._debouncedUpdateTask(this.currentTaskId, updateData);
+                    }
+                }, 1000); // 1 second debounce for title changes
+            });
+        }
+
+        if (descriptionInput) {
+            // Debounced save on description changes
+            let descriptionTimeout;
+            descriptionInput.addEventListener('input', () => {
+                clearTimeout(descriptionTimeout);
+                descriptionTimeout = setTimeout(async () => {
+                    await this._debouncedUpdateTask(this.currentTaskId, {
+                        description: descriptionInput.value.trim()
+                    });
+                }, 1500); // 1.5 second debounce for description changes
+            });
         }
     }
 
@@ -494,13 +611,55 @@ class PageManager {
     }
 
     /**
+     * Handle status change from status selector
+     */
+    async _handleStatusChangeFromPage(newStatus) {
+        if (this.currentTaskId === null || this.currentTaskId === undefined) {
+            return;
+        }
+
+        // Dispatch event to TaskManager
+        document.dispatchEvent(new CustomEvent('task:change-status-from-page', {
+            detail: { taskId: this.currentTaskId, status: newStatus }
+        }));
+    }
+
+    /**
+     * Handle more actions button click
+     */
+    _handleMoreActionsClick() {
+        // For now, just show a simple alert or could implement a dropdown menu
+        console.log('More actions clicked - could implement dropdown menu here');
+        // TODO: Implement dropdown menu with additional actions
+    }
+
+    /**
+     * Update status selector to reflect current task status
+     */
+    _updateStatusSelector(currentStatus) {
+        const statusSelector = document.getElementById('status-selector');
+        if (!statusSelector) return;
+
+        // Remove active class from all options
+        const statusOptions = statusSelector.querySelectorAll('.status-option');
+        statusOptions.forEach(option => {
+            option.classList.remove('active');
+        });
+
+        // Add active class to current status
+        const currentOption = statusSelector.querySelector(`[data-status="${currentStatus}"]`);
+        if (currentOption) {
+            currentOption.classList.add('active');
+        }
+    }
+
+    /**
      * Load task data into detail page
      */
     loadTaskIntoDetailPage(taskData) {
         const titleInput = document.getElementById('detail-title');
         const descriptionInput = document.getElementById('detail-description');
         const categoriesContainer = document.getElementById('task-categories-detail');
-        const checkbox = document.getElementById('detail-checkbox');
         const titleHeader = document.querySelector('.task-title-header');
         const progressBtn = document.getElementById('detail-progress-btn');
         const deleteBtn = document.getElementById('detail-delete-btn');
@@ -555,45 +714,44 @@ class PageManager {
         }
         
         // Show all elements for edit mode
-        if (checkbox) {
-            checkbox.style.display = 'block';
-            checkbox.checked = taskData.status === 'done';
-        }
         if (progressBtn) {
-            progressBtn.style.display = 'block';
-            const isInProgress = taskData.status === 'in_progress';
-            progressBtn.classList.toggle('in-progress', isInProgress);
-            progressBtn.innerHTML = isInProgress 
-                ? '<i class="fas fa-pause"></i><span> pause</span>'
-                : '<i class="fas fa-play"></i><span> start</span>';
+            progressBtn.style.display = 'none'; // Hide old progress button
         }
         if (deleteBtn) {
             deleteBtn.style.display = 'block';
         }
         if (saveBtn) {
-            saveBtn.textContent = 'Save';
-            saveBtn.classList.remove('add-btn');
-            saveBtn.classList.add('save-btn');
+            // Hide save button in edit mode since saving is automatic
+            saveBtn.style.display = 'none';
         }
+
+        // Show status selector and more actions in edit mode
+        const statusSelector = document.getElementById('status-selector');
+        const moreActionsBtn = document.getElementById('more-actions-btn');
+        if (statusSelector) statusSelector.style.display = 'flex';
+        if (moreActionsBtn) moreActionsBtn.style.display = 'flex';
+
+        // Update status selector
+        this._updateStatusSelector(taskData.status);
         
         // Update title header styling
         if (titleHeader) {
             titleHeader.classList.toggle('completed', taskData.status === 'done');
         }
 
-        // Update keyboard shortcut display
+        // Update keyboard shortcut display (Cmd+Enter to go back to task list)
         this._updateKeyboardShortcut();
+
     }
 
     /**
-     * Update keyboard shortcut display
+     * Update keyboard shortcut display (no visual indicator needed since no save button)
+     * Cmd+Enter/Ctrl+Enter still works to go back to task list
      */
     _updateKeyboardShortcut() {
-        const shortcutSpan = document.querySelector('.keyboard-shortcut');
-        if (shortcutSpan) {
-            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-            shortcutSpan.textContent = isMac ? '⌘↵' : 'Ctrl+↵';
-        }
+        // Keyboard shortcut (Cmd+Enter/Ctrl+Enter) still works to navigate back to task list
+        // No visual indicator needed since there's no save button to attach it to
+        // The shortcut functionality is handled in the keyboard event handler above
     }
 
     /**
@@ -641,18 +799,134 @@ class PageManager {
     _parseTaskTitle(formattedTitle) {
         const projectPattern = /^\[([^\]]+)\]\s+(.+)$/;
         const match = formattedTitle.match(projectPattern);
-        
+
         if (match) {
             return {
                 project: match[1].trim(),
                 title: match[2].trim()
             };
         }
-        
+
         return {
             project: null,
             title: formattedTitle.trim()
         };
+    }
+
+    /**
+     * Debounced task update - saves changes but defers classification
+     * @param {string} taskId - Task ID to update
+     * @param {Object} taskData - Task data to save
+     * @param {boolean} immediate - Whether to skip debouncing and save immediately
+     */
+    async _debouncedUpdateTask(taskId, taskData, immediate = false) {
+        // Clear any existing timeout for this task
+        if (this.updateTimeouts.has(taskId)) {
+            clearTimeout(this.updateTimeouts.get(taskId));
+            this.updateTimeouts.delete(taskId);
+        }
+
+        // Store the pending update
+        this.pendingUpdates.set(taskId, {
+            data: taskData,
+            timestamp: Date.now()
+        });
+
+        if (immediate) {
+            // Save immediately without debouncing
+            await this._executeTaskUpdate(taskId, taskData);
+        } else {
+            // Set up debounced save (wait 2 seconds after last change)
+            const timeoutId = setTimeout(async () => {
+                this.updateTimeouts.delete(taskId);
+                const pendingUpdate = this.pendingUpdates.get(taskId);
+
+                if (pendingUpdate) {
+                    this.pendingUpdates.delete(taskId);
+                    await this._executeTaskUpdate(taskId, pendingUpdate.data);
+                }
+            }, 2000); // 2 second debounce delay
+
+            this.updateTimeouts.set(taskId, timeoutId);
+        }
+    }
+
+    /**
+     * Execute the actual task update via API
+     * @param {string} taskId - Task ID to update
+     * @param {Object} taskData - Task data to save
+     */
+    async _executeTaskUpdate(taskId, taskData) {
+        try {
+            // Use APIClient to update task immediately (for persistence)
+            const apiClient = new (await import('./APIClient.js')).default();
+
+            const result = await apiClient.updateTask(taskId, {
+                title: taskData.title,
+                description: taskData.description,
+                project: taskData.project,
+                categories: taskData.categories,
+                // Add a flag to indicate this is a debounced update that should defer classification
+                _debounced: true
+            });
+
+            if (result.success) {
+                console.log(`✅ Task ${taskId} updated (debounced - classification deferred)`);
+                // Show subtle feedback that changes were saved
+                this._showDebouncedSaveFeedback();
+            } else {
+                console.error('❌ Debounced task update failed:', result.error);
+                // Still show error notification
+                if (window.app?.notificationManager) {
+                    window.app.notificationManager.error('Failed to save changes');
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error in debounced task update:', error);
+        }
+    }
+
+    /**
+     * Show subtle feedback that changes were saved
+     * Since there's no save button, we could add a subtle indicator elsewhere
+     * or just rely on the console logging for now
+     */
+    _showDebouncedSaveFeedback() {
+        // For now, just log the save (could add a subtle toast notification here later)
+        console.log('💾 Changes auto-saved');
+        // Could add a subtle visual indicator in the future, like:
+        // - A small checkmark that appears briefly
+        // - A subtle color change on the title input
+        // - A small "Saved" indicator that fades in/out
+    }
+
+    /**
+     * Force immediate save of pending changes (e.g., when navigating away)
+     * @param {string} taskId - Task ID to save immediately
+     */
+    async _flushPendingUpdate(taskId) {
+        if (this.updateTimeouts.has(taskId)) {
+            clearTimeout(this.updateTimeouts.get(taskId));
+            this.updateTimeouts.delete(taskId);
+        }
+
+        const pendingUpdate = this.pendingUpdates.get(taskId);
+        if (pendingUpdate) {
+            this.pendingUpdates.delete(taskId);
+            await this._executeTaskUpdate(taskId, pendingUpdate.data);
+        }
+    }
+
+    /**
+     * Cancel all pending updates (e.g., when navigating away without saving)
+     */
+    _cancelAllPendingUpdates() {
+        // Clear all timeouts
+        for (const timeoutId of this.updateTimeouts.values()) {
+            clearTimeout(timeoutId);
+        }
+        this.updateTimeouts.clear();
+        this.pendingUpdates.clear();
     }
 
 }

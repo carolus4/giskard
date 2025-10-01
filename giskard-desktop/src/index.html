@@ -62,18 +62,33 @@
                         
                         <!-- Task Title as H1 -->
                         <div class="task-title-header">
-                            <div class="task-checkbox-large">
-                                <input type="checkbox" class="task-check-large" id="detail-checkbox">
-                                <span class="checkmark-large"></span>
-                            </div>
                             <div class="task-title-section">
                                 <textarea class="task-title-h1" id="detail-title" placeholder="Task title..."></textarea>
                                 <div class="task-categories-detail" id="task-categories-detail"></div>
                             </div>
                             <div class="task-title-actions">
-                                <button class="progress-btn-inline" id="detail-progress-btn">
-                                    <i class="fas fa-play"></i>
-                                    <span> start</span>
+                                <!-- Save/Add Task Button -->
+                                <button class="save-task-btn" id="save-task-btn" title="Save task">
+                                    <i class="fas fa-save"></i>
+                                    <span>Save</span>
+                                </button>
+                                
+                                <!-- Status Selector -->
+                                <div class="status-selector" id="status-selector">
+                                    <button class="status-option" data-status="open" title="Open">
+                                        <span>Open</span>
+                                    </button>
+                                    <button class="status-option" data-status="in_progress" title="In Progress">
+                                        <span>In Progress</span>
+                                    </button>
+                                    <button class="status-option" data-status="done" title="Complete">
+                                        <span>Complete</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- More Actions Menu -->
+                                <button class="more-actions-btn" id="more-actions-btn" title="More actions">
+                                    <i class="fas fa-ellipsis-v"></i>
                                 </button>
                             </div>
                         </div>
@@ -92,10 +107,6 @@
                                     <button class="delete-link" id="detail-delete-btn" title="Delete task">
                                         <i class="fas fa-trash"></i>
                                         <span>Delete</span>
-                                    </button>
-                                    <button class="save-btn primary-cta" id="save-task-btn">
-                                        Save
-                                        <span class="keyboard-shortcut">⌘↵</span>
                                     </button>
                                 </div>
                             </div>

@@ -346,12 +346,13 @@ def update_task(task_id):
         
         # Save changes
         task.save()
-        
+
         # Enqueue for classification if title or description changed
-        if 'title' in data or 'description' in data:
+        # But skip classification for debounced updates (real-time auto-saves)
+        if ('title' in data or 'description' in data) and not data.get('_debounced', False):
             from app import classification_manager
             classification_manager.enqueue_classification(task)
-        
+
         return jsonify(APIResponse.success('Task updated', {'task': task.to_dict()}))
     
     except Exception as e:
