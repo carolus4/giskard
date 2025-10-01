@@ -67,7 +67,7 @@ body {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: #dc4c3e;
+    background: #8AB6B5;
 }
 
 .nav-item i {
@@ -188,7 +188,7 @@ body {
 
 /* Add button styling for task detail page */
 .add-btn {
-    background: #dc4c3e;
+    background: #8AB6B5;
     color: white;
     border: none;
     padding: 8px 16px;
@@ -199,7 +199,7 @@ body {
 }
 
 .add-btn:hover {
-    background: #c73e2f;
+    background: #7a9fa0;
     transform: translateY(-1px);
 }
 
@@ -261,8 +261,8 @@ body {
 }
 
 .task-name-input:focus {
-    border-color: #dc4c3e;
-    box-shadow: 0 0 0 3px rgba(220, 76, 62, 0.1);
+    border-color: #8AB6B5;
+    box-shadow: 0 0 0 3px rgba(138, 182, 181, 0.1);
 }
 
 .task-description-input {
@@ -281,8 +281,8 @@ body {
 }
 
 .task-description-input:focus {
-    border-color: #dc4c3e;
-    box-shadow: 0 0 0 3px rgba(220, 76, 62, 0.1);
+    border-color: #8AB6B5;
+    box-shadow: 0 0 0 3px rgba(138, 182, 181, 0.1);
 }
 
 .task-options {
@@ -310,9 +310,9 @@ body {
 }
 
 .task-tag.active {
-    background: #dc4c3e;
+    background: #8AB6B5;
     color: #fff;
-    border-color: #dc4c3e;
+    border-color: #8AB6B5;
 }
 
 .task-tag:disabled {
@@ -584,8 +584,8 @@ body.dragging .insertion-line {
 }
 
 .task-item.in-progress {
-    border-left: 4px solid #246fe0;
-    background: #f8fbff;
+    border-left: 4px solid #F7B550;
+    background: #fff9f0;
 }
 
 .task-item.completed {
@@ -623,12 +623,12 @@ body.dragging .insertion-line {
 }
 
 .task-check:hover {
-    border-color: #dc4c3e;
+    border-color: #8AB6B5;
 }
 
 .task-check:checked {
-    background: #dc4c3e;
-    border-color: #dc4c3e;
+    background: #8AB6B5;
+    border-color: #8AB6B5;
 }
 
 .checkmark {
@@ -849,14 +849,14 @@ body.dragging .insertion-line {
 
 .task-item.highlighted {
     animation: highlight 2s ease-out;
-    border-color: #dc4c3e;
-    box-shadow: 0 2px 12px rgba(220, 76, 62, 0.3);
+    border-color: #8AB6B5;
+    box-shadow: 0 2px 12px rgba(138, 182, 181, 0.3);
 }
 
 @keyframes highlight {
     0% {
-        background-color: #fff3f0;
-        border-color: #dc4c3e;
+        background-color: #f0f8f8;
+        border-color: #8AB6B5;
     }
     100% {
         background-color: #fff;
@@ -975,7 +975,7 @@ body.dragging .insertion-line {
 }
 
 .task-name-input:focus {
-    border-bottom-color: #dc4c3e;
+    border-bottom-color: #8AB6B5;
 }
 
 .task-name-input::placeholder {
@@ -1030,13 +1030,13 @@ body.dragging .insertion-line {
 }
 
 .task-tag:hover:not(:disabled) {
-    border-color: #dc4c3e;
-    color: #dc4c3e;
+    border-color: #8AB6B5;
+    color: #8AB6B5;
 }
 
 .task-tag.active {
-    background: #dc4c3e;
-    border-color: #dc4c3e;
+    background: #8AB6B5;
+    border-color: #8AB6B5;
     color: #fff;
 }
 
@@ -1092,7 +1092,7 @@ body.dragging .insertion-line {
 }
 
 .btn-add {
-    background: #dc4c3e;
+    background: #8AB6B5;
     color: #fff;
     border: none;
     padding: 8px 20px;
@@ -1104,7 +1104,7 @@ body.dragging .insertion-line {
 }
 
 .btn-add:hover {
-    background: #c23c2e;
+    background: #7a9fa0;
 }
 
 .btn-add:disabled {
@@ -1171,7 +1171,7 @@ body.dragging .insertion-line {
 }
 
 .progress-btn-inline:hover {
-    color: #dc4c3e;
+    color: #8AB6B5;
 }
 
 .progress-btn-inline.in-progress {
@@ -1324,8 +1324,8 @@ body.dragging .insertion-line {
 
 .description-input:focus {
     outline: none;
-    border-color: #dc4c3e;
-    box-shadow: 0 0 0 2px rgba(220, 76, 62, 0.1);
+    border-color: #8AB6B5;
+    box-shadow: 0 0 0 2px rgba(138, 182, 181, 0.1);
     min-height: 250px;
 }
 
@@ -1536,13 +1536,13 @@ body.dragging .insertion-line {
 
 .add-task-simple-btn:hover {
     background: #f8f8f8;
-    border-color: #dc4c3e;
-    color: #dc4c3e;
+    border-color: #8AB6B5;
+    color: #8AB6B5;
 }
 
 .add-task-simple-btn i {
     font-size: 12px;
-    color: #dc4c3e;
+    color: #8AB6B5;
 }
 
 /* Scrollbar Styling */
@@ -1593,13 +1593,13 @@ body.dragging .insertion-line {
 
 .chat-action-btn:hover {
     background: #f8f8f8;
-    border-color: #dc4c3e;
-    color: #dc4c3e;
+    border-color: #8AB6B5;
+    color: #8AB6B5;
 }
 
 .chat-action-btn i {
     font-size: 12px;
-    color: #dc4c3e;
+    color: #8AB6B5;
 }
 
 /* Specific styling for clear button */
@@ -1728,8 +1728,8 @@ body.dragging .insertion-line {
 
 .suggestion-btn:hover {
     background: #e9ecef;
-    border-color: #dc4c3e;
-    color: #dc4c3e;
+    border-color: #8AB6B5;
+    color: #8AB6B5;
 }
 
 .chat-input-container {
@@ -1753,7 +1753,7 @@ body.dragging .insertion-line {
 }
 
 .chat-input-wrapper:focus-within {
-    border-color: #dc4c3e;
+    border-color: #8AB6B5;
 }
 
 #chat-input {
@@ -1775,7 +1775,7 @@ body.dragging .insertion-line {
 .send-btn {
     width: 32px;
     height: 32px;
-    background: #dc4c3e;
+    background: #8AB6B5;
     border: none;
     border-radius: 8px;
     color: #fff;
@@ -1788,7 +1788,7 @@ body.dragging .insertion-line {
 }
 
 .send-btn:hover:not(:disabled) {
-    background: #c23c2e;
+    background: #7a9fa0;
 }
 
 .send-btn:disabled {

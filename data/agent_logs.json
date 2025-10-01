@@ -31904,5 +31904,253 @@
       "messages_count": 3,
       "synthesis_success": true
     }
+  },
+  {
+    "timestamp": "2025-10-01T14:48:25.826812",
+    "node": "workflow_start",
+    "input": {
+      "input_text": "what tasks did I complete today?",
+      "session_id": "chat-session-1759355305819-nd4wbtr1b",
+      "domain": "chat"
+    },
+    "output": null
+  },
+  {
+    "timestamp": "2025-10-01T14:48:25.874675",
+    "node": "ingest_user_input",
+    "input": {
+      "input_text": "what tasks did I complete today?",
+      "session_id": "chat-session-1759355305819-nd4wbtr1b",
+      "domain": "chat"
+    },
+    "output": {
+      "messages_count": 1,
+      "user_message_added": true
+    }
+  },
+  {
+    "timestamp": "2025-10-01T14:48:31.931840",
+    "node": "planner_llm",
+    "input": {
+      "input_text": "what tasks did I complete today?",
+      "messages_count": 1
+    },
+    "output": {
+      "llm_response": "```json\n{\n  \"assistant_text\": \"Let me fetch your completed tasks for today.\",\n  \"actions\": [\n    {\n      \"name\": \"fetch_tasks\",\n      \"args\": {\n        \"status\": \"done\",\n        \"completed_at_gte\": \"2025-10-01T14:48:25.906430\"\n      }\n    }\n  ]\n}\n```",
+      "planner_output": {
+        "assistant_text": "Let me fetch your completed tasks for today.",
+        "actions": [
+          {
+            "name": "fetch_tasks",
+            "args": {
+              "status": "done",
+              "completed_at_gte": "2025-10-01T14:48:25.906430"
+            }
+          }
+        ]
+      },
+      "actions_to_execute": [
+        {
+          "name": "fetch_tasks",
+          "args": {
+            "status": "done",
+            "completed_at_gte": "2025-10-01T14:48:25.906430"
+          }
+        }
+      ],
+      "parsing_success": true
+    }
+  },
+  {
+    "timestamp": "2025-10-01T14:48:31.975356",
+    "node": "action_exec",
+    "input": {
+      "actions_to_execute": [
+        {
+          "name": "fetch_tasks",
+          "args": {
+            "status": "done",
+            "completed_at_gte": "2025-10-01T14:48:25.906430"
+          }
+        }
+      ]
+    },
+    "output": {
+      "action_results": [
+        {
+          "name": "fetch_tasks",
+          "ok": true,
+          "result": {
+            "tasks": [],
+            "count": 0,
+            "message": "Fetched 0 tasks"
+          },
+          "error": null
+        }
+      ],
+      "actions_executed": 1,
+      "successful_actions": 1,
+      "failed_actions": 0
+    }
+  },
+  {
+    "timestamp": "2025-10-01T14:48:33.721617",
+    "node": "synthesizer_llm",
+    "input": {
+      "action_results": [
+        {
+          "name": "fetch_tasks",
+          "ok": true,
+          "result": {
+            "tasks": [],
+            "count": 0,
+            "message": "Fetched 0 tasks"
+          },
+          "error": null
+        }
+      ],
+      "planner_output": {
+        "assistant_text": "Let me fetch your completed tasks for today.",
+        "actions": [
+          {
+            "name": "fetch_tasks",
+            "args": {
+              "status": "done",
+              "completed_at_gte": "2025-10-01T14:48:25.906430"
+            }
+          }
+        ]
+      },
+      "input_text": "what tasks did I complete today?"
+    },
+    "output": {
+      "final_message": "Okay, let\u2019s see what tasks you completed today. I checked, but unfortunately, it looks like I didn't find any tasks recorded for you today \u2013 I found 0 tasks.",
+      "messages_count": 3,
+      "synthesis_success": true
+    }
+  },
+  {
+    "timestamp": "2025-10-01T14:50:51.389177",
+    "node": "workflow_start",
+    "input": {
+      "input_text": "mark task id 151 as in progress please",
+      "session_id": "chat-session-1759355305819-nd4wbtr1b",
+      "domain": "chat"
+    },
+    "output": null
+  },
+  {
+    "timestamp": "2025-10-01T14:50:51.445639",
+    "node": "ingest_user_input",
+    "input": {
+      "input_text": "mark task id 151 as in progress please",
+      "session_id": "chat-session-1759355305819-nd4wbtr1b",
+      "domain": "chat"
+    },
+    "output": {
+      "messages_count": 1,
+      "user_message_added": true
+    }
+  },
+  {
+    "timestamp": "2025-10-01T14:50:57.235179",
+    "node": "planner_llm",
+    "input": {
+      "input_text": "mark task id 151 as in progress please",
+      "messages_count": 1
+    },
+    "output": {
+      "llm_response": "```json\n{\n  \"assistant_text\": \"Okay, I'll mark task 151 as in progress.\",\n  \"actions\": [\n    {\n      \"name\": \"update_task_status\",\n      \"args\": {\n        \"task_id\": 151,\n        \"status\": \"in_progress\"\n      }\n    }\n  ]\n}\n```",
+      "planner_output": {
+        "assistant_text": "Okay, I'll mark task 151 as in progress.",
+        "actions": [
+          {
+            "name": "update_task_status",
+            "args": {
+              "task_id": 151,
+              "status": "in_progress"
+            }
+          }
+        ]
+      },
+      "actions_to_execute": [
+        {
+          "name": "update_task_status",
+          "args": {
+            "task_id": 151,
+            "status": "in_progress"
+          }
+        }
+      ],
+      "parsing_success": true
+    }
+  },
+  {
+    "timestamp": "2025-10-01T14:50:57.277352",
+    "node": "action_exec",
+    "input": {
+      "actions_to_execute": [
+        {
+          "name": "update_task_status",
+          "args": {
+            "task_id": 151,
+            "status": "in_progress"
+          }
+        }
+      ]
+    },
+    "output": {
+      "action_results": [
+        {
+          "name": "update_task_status",
+          "ok": true,
+          "result": {
+            "task_id": 151,
+            "status": "in_progress",
+            "message": "Updated task 151 status to in_progress"
+          },
+          "error": null
+        }
+      ],
+      "actions_executed": 1,
+      "successful_actions": 1,
+      "failed_actions": 0
+    }
+  },
+  {
+    "timestamp": "2025-10-01T14:50:59.114321",
+    "node": "synthesizer_llm",
+    "input": {
+      "action_results": [
+        {
+          "name": "update_task_status",
+          "ok": true,
+          "result": {
+            "task_id": 151,
+            "status": "in_progress",
+            "message": "Updated task 151 status to in_progress"
+          },
+          "error": null
+        }
+      ],
+      "planner_output": {
+        "assistant_text": "Okay, I'll mark task 151 as in progress.",
+        "actions": [
+          {
+            "name": "update_task_status",
+            "args": {
+              "task_id": 151,
+              "status": "in_progress"
+            }
+          }
+        ]
+      },
+      "input_text": "mark task id 151 as in progress please"
+    },
+    "output": {
+      "final_message": "Okay, I\u2019ve marked task ID 151 as in progress! You\u2019ll see a confirmation message that the status has been updated. Let me know if you need anything else.",
+      "messages_count": 3,
+      "synthesis_success": true
+    }
   }
 ]
