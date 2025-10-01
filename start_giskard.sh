@@ -3,6 +3,52 @@
 # Giskard Startup Script
 # Works for both daily use and development
 
+# Set default mode to "dev" if not specified externally
+MODE="${MODE:-dev}"
+
+# Ensure cargo binaries are in PATH
+export PATH="$HOME/.cargo/bin:$PATH"
+
+# Define the Tauri desktop project directory
+TAURI_DIR="/Users/charlesdupont/Dev/giskard/giskard-desktop"
+
+# Helper function to start Tauri in development mode
+start_tauri_dev() {
+    echo "   Starting Tauri in development mode..."
+    cd "$TAURI_DIR"
+    cargo tauri dev &
+    DESKTOP_PID=$!
+    echo "✅ Tauri dev server started (PID: $DESKTOP_PID)"
+    cd - >/dev/null
+}
+
+# Helper function to start Tauri bundle
+start_tauri_bundle() {
+    local APP_BUNDLE="$TAURI_DIR/src-tauri/target/release/bundle/macos/Giskard Desktop.app"
+
+    if [ -d "$APP_BUNDLE" ]; then
+        echo "   Launching Tauri app bundle..."
+        open -n "$APP_BUNDLE" &
+        DESKTOP_PID=$!
+        echo "✅ App bundle launched (PID: $DESKTOP_PID)"
+    else
+        echo "   App bundle not found, building first..."
+        cd "$TAURI_DIR"
+        cargo tauri build
+
+        if [ -d "$APP_BUNDLE" ]; then
+            echo "   Build completed, launching bundle..."
+            open -n "$APP_BUNDLE" &
+            DESKTOP_PID=$!
+            echo "✅ App bundle launched (PID: $DESKTOP_PID)"
+        else
+            echo "❌ Failed to build app bundle"
+            exit 1
+        fi
+        cd - >/dev/null
+    fi
+}
+
 # Cleanup function to stop all applications
 cleanup() {
     echo ""
@@ -167,29 +213,28 @@ fi
 echo "✅ Flask backend started successfully (PID: $FLASK_PID)"
 
 # Start the Tauri desktop application
-echo "🖥️  Starting Giskard desktop application..."
-TAURI_APP="/Users/charlesdupont/Dev/giskard/giskard-desktop/src-tauri/target/release/giskard-desktop"
+echo "🖥️  Starting Giskard desktop application (MODE=$MODE)..."
 
-if [ -f "$TAURI_APP" ]; then
-    echo "🚀 Launching desktop app..."
-    "$TAURI_APP" &
-    DESKTOP_PID=$!
-    echo "✅ Desktop app started (PID: $DESKTOP_PID)"
-    echo ""
-    echo "🎉 Giskard is now running!"
-    echo "   - API Backend: http://127.0.0.1:5001"
-    echo "   - Desktop App: Running in background"
-    echo "   - Ollama Service: Running with GPU acceleration"
-    echo ""
-    echo "Press Ctrl+C to stop all applications"
-    
-    # Wait for user to stop
-    wait
-else
-    echo "❌ Desktop app not found at $TAURI_APP"
-    echo "Please build the desktop app first:"
-    echo "cd giskard-desktop && ./build-dmg.sh"
-    echo ""
-    echo "Flask backend is still running on http://127.0.0.1:5001"
-    wait $FLASK_PID
-fi
+case "$MODE" in
+  dev)
+    start_tauri_dev
+    ;;
+  bundle)
+    start_tauri_bundle
+    ;;
+  *)
+    echo "❌ Unknown MODE=$MODE (use dev or bundle)"
+    exit 1
+    ;;
+esac
+
+echo ""
+echo "🎉 Giskard is now running!"
+echo "   - API Backend: http://127.0.0.1:5001"
+echo "   - Desktop App: Running in background"
+echo "   - Ollama Service: Running with GPU acceleration"
+echo ""
+echo "Press Ctrl+C to stop all applications"
+
+# Wait for user to stop
+wait

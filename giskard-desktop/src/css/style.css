@@ -1358,28 +1358,33 @@ body.dragging .insertion-line {
     border: none;
     padding: 8px 0;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 400;
     cursor: pointer;
-    transition: color 0.2s ease, transform 0.2s ease;
+    transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     margin-right: 12px;
     text-decoration: none;
+    opacity: 0.9;
 }
 
 .delete-link:hover {
     color: #b91c1c;
-    transform: scale(1.05);
+    text-decoration: underline;
+    opacity: 1;
+    transform: none;
 }
 
 .delete-link:active {
-    transform: scale(0.95);
+    transform: none;
+    color: #991a1a;
 }
 
 .delete-link i {
     font-size: 14px;
-    opacity: 0.8;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
 }
 
 .delete-link:hover i {
