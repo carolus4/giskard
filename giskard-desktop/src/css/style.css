@@ -1303,49 +1303,87 @@ body.dragging .insertion-line {
     color: #fff;
     border: none;
     border-radius: 6px;
-    padding: 8px 16px;
+    padding: 10px 20px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
     display: inline-flex;
     align-items: center;
     gap: 8px;
     justify-content: center;
+    min-height: 36px;
+    box-shadow: 0 2px 4px rgba(220, 76, 62, 0.2);
 }
 
 .save-btn:hover {
     background: #c23321;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 76, 62, 0.3);
+}
+
+.save-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(220, 76, 62, 0.2);
 }
 
 .save-btn:disabled {
     background: #ccc;
     cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
-.delete-btn {
-    background: #dc3545;
-    color: #fff;
+.save-btn.primary-cta {
+    background: #dc4c3e;
+    position: relative;
+    font-weight: 600;
+    box-shadow: 0 3px 6px rgba(220, 76, 62, 0.25);
+}
+
+.save-btn.primary-cta:hover {
+    background: #c23321;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(220, 76, 62, 0.35);
+}
+
+.save-btn.primary-cta:focus {
+    outline: none;
+    box-shadow: 0 3px 6px rgba(220, 76, 62, 0.25), 0 0 0 3px rgba(220, 76, 62, 0.2);
+}
+
+.delete-link {
+    background: none;
+    color: #dc3545;
     border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
+    padding: 8px 0;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    transition: color 0.2s ease, transform 0.2s ease;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     margin-right: 12px;
+    text-decoration: none;
 }
 
-.delete-btn:hover {
-    background: #c82333;
+.delete-link:hover {
+    color: #b91c1c;
     transform: scale(1.05);
 }
 
-.delete-btn:active {
+.delete-link:active {
     transform: scale(0.95);
+}
+
+.delete-link i {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.delete-link:hover i {
+    opacity: 1;
 }
 
 /* Confirmation Modal */

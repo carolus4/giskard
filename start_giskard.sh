@@ -19,6 +19,16 @@ cleanup() {
         echo "   Stopping Ollama service (PID: $OLLAMA_PID)"
         kill $OLLAMA_PID 2>/dev/null || true
     fi
+
+    # Clean up any remaining Ollama processes on port 11434
+    if lsof -ti:11434 >/dev/null 2>&1; then
+        echo "   Cleaning up remaining Ollama processes..."
+        lsof -ti:11434 | xargs kill -9 >/dev/null 2>&1 || true
+    fi
+
+    # Clean up temporary log files
+    rm -f /tmp/ollama.log /tmp/ollama_startup.log
+
     echo "✅ Giskard stopped"
     exit 0
 }
@@ -50,33 +60,59 @@ $PYTHON_PATH -c "import langgraph, langchain_core, langchain_community, langchai
 
 # Check if Ollama is running
 echo "🤖 Checking Ollama service..."
-if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
-    echo "✅ Ollama is already running"
+
+# Function to check if Ollama is responding
+check_ollama() {
+    # Try multiple times with timeout to avoid hanging
+    for i in {1..3}; do
+        if curl -s --max-time 3 http://localhost:11434/api/tags >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+# Check if port 11434 is in use and kill any existing Ollama processes
+if lsof -ti:11434 >/dev/null 2>&1; then
+    echo "   Found existing process on port 11434, cleaning up..."
+    lsof -ti:11434 | xargs kill -9 >/dev/null 2>&1 || true
+    sleep 2
+fi
+
+if check_ollama; then
+    echo "✅ Ollama is already running and responding"
 else
     echo "🚀 Starting Ollama service..."
     if command -v ollama >/dev/null 2>&1; then
         # Set GPU acceleration environment variable
         export OLLAMA_GPU_LAYERS=999
-        
-        # Start Ollama in background
-        ollama serve >/dev/null 2>&1 &
+
+        # Start Ollama in background with logging
+        ollama serve >/tmp/ollama_startup.log 2>&1 &
         OLLAMA_PID=$!
-        
-        # Wait for Ollama to start (up to 10 seconds)
+
+        # Wait for Ollama to start (up to 15 seconds with better feedback)
         echo "   Waiting for Ollama to start..."
-        for i in {1..20}; do
-            sleep 0.5
-            if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+        for i in {1..15}; do
+            sleep 1
+            if check_ollama; then
                 echo "✅ Ollama started successfully"
                 break
             fi
-            if [ $i -eq 20 ]; then
-                echo "⚠️  Ollama failed to start within 10 seconds"
+            if [ $i -eq 5 ]; then
+                echo "   Still waiting... (this can take a moment on first run)"
+            fi
+            if [ $i -eq 15 ]; then
+                echo "❌ Ollama failed to start within 15 seconds"
+                echo "   Check /tmp/ollama_startup.log for details"
+                echo "   You may need to pull a model first: ollama pull gemma3:4b"
             fi
         done
     else
-        echo "⚠️  Ollama not found in PATH - please install Ollama first"
+        echo "❌ Ollama not found in PATH - please install Ollama first"
         echo "   Visit: https://ollama.ai/download"
+        echo "   Or install via Homebrew: brew install ollama"
     fi
 fi
 
