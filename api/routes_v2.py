@@ -292,18 +292,57 @@ def update_task(task_id):
             if len(title) > 200:
                 return APIResponse.error('Title too long (max 200 characters)', 400)
             task.title = title
-        
+
         if 'description' in data:
             task.description = data['description'].strip()
-        
+
         if 'project' in data:
             task.project = data['project']
-        
+
         if 'categories' in data:
             categories = data['categories']
             if not isinstance(categories, list):
                 return APIResponse.error('Categories must be a list', 400)
             task.categories = categories
+
+        # Handle date fields
+        if 'completed_at' in data:
+            completed_at = data['completed_at']
+            if completed_at == "" or completed_at.lower() == "null":
+                # Clear completion date
+                task.completed_at = None
+                if task.status == 'done':
+                    task.status = 'open'  # Reset status if clearing completion
+            else:
+                # Validate and set completion date
+                from datetime import datetime
+                try:
+                    # Parse the provided date
+                    parsed_date = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+                    task.completed_at = parsed_date.isoformat()
+                    # If setting completion date, mark as done
+                    if task.status != 'done':
+                        task.status = 'done'
+                except ValueError:
+                    return APIResponse.error(f"Invalid completed_at format: {completed_at}. Use ISO format (e.g., 2025-01-15T14:30:00)", 400)
+
+        if 'started_at' in data:
+            started_at = data['started_at']
+            if started_at == "" or started_at.lower() == "null":
+                # Clear start date
+                task.started_at = None
+            else:
+                # Validate and set start date
+                from datetime import datetime
+                try:
+                    # Parse the provided date
+                    parsed_date = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+                    task.started_at = parsed_date.isoformat()
+                    # If setting start date, mark as in progress
+                    if task.status == 'open':
+                        task.status = 'in_progress'
+                except ValueError:
+                    return APIResponse.error(f"Invalid started_at format: {started_at}. Use ISO format (e.g., 2025-01-15T14:30:00)", 400)
         
         # Save changes
         task.save()

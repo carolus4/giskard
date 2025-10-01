@@ -132,33 +132,10 @@ class ActionExecutor:
             started_at: ISO timestamp for start date (optional)
         """
         try:
-            # Use HTTP API call instead of direct DB access
-            # Note: The current API doesn't support updating completion/start dates directly
-            # We'll need to use the status update endpoint for those
-            response_data = self.api_client.update_task(task_id, title, description, project, categories)
-
-            # Handle date updates separately if provided
-            if completed_at is not None or started_at is not None:
-                # For now, we'll handle this by calling the status update if dates are provided
-                # This is a simplified approach - in a full implementation, we might need
-                # to extend the API to support date updates directly
-                if completed_at is not None:
-                    if completed_at == "" or completed_at.lower() == "null":
-                        # Clear completion - set status to open
-                        self.api_client.update_task_status(task_id, 'open')
-                    else:
-                        # Set as completed
-                        self.api_client.update_task_status(task_id, 'done')
-
-                if started_at is not None:
-                    if started_at == "" or started_at.lower() == "null":
-                        # Clear start - set status to open if not done
-                        current_task = self.api_client.get_task(task_id)
-                        if current_task.get('status') != 'done':
-                            self.api_client.update_task_status(task_id, 'open')
-                    else:
-                        # Set as in progress
-                        self.api_client.update_task_status(task_id, 'in_progress')
+            # Use HTTP API call - now supports updating completion/start dates directly
+            response_data = self.api_client.update_task(
+                task_id, title, description, project, categories, completed_at, started_at
+            )
 
             return True, {
                 "task_id": task_id,

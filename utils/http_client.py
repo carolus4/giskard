@@ -132,7 +132,9 @@ class APIClient:
     def update_task(self, task_id: int, title: Optional[str] = None,
                    description: Optional[str] = None,
                    project: Optional[str] = None,
-                   categories: Optional[List[str]] = None) -> Dict[str, Any]:
+                   categories: Optional[List[str]] = None,
+                   completed_at: Optional[str] = None,
+                   started_at: Optional[str] = None) -> Dict[str, Any]:
         """
         Update a task
 
@@ -142,6 +144,8 @@ class APIClient:
             description: New description
             project: New project
             categories: New categories
+            completed_at: ISO timestamp for completion date
+            started_at: ISO timestamp for start date
 
         Returns:
             Updated task data
@@ -159,6 +163,12 @@ class APIClient:
 
         if categories is not None:
             data['categories'] = categories
+
+        if completed_at is not None:
+            data['completed_at'] = completed_at
+
+        if started_at is not None:
+            data['started_at'] = started_at
 
         response = self._make_request('PUT', f'/api/tasks/{task_id}', json=data)
         return response.json()
