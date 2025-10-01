@@ -101,6 +101,7 @@ class TaskDB:
         return {
             'id': self.id,
             'title': self.title,
+            'description': self.description,
             'status': self.status,
             'sort_key': self.sort_key,
             'project': self.project,

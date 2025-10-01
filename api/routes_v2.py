@@ -86,16 +86,32 @@ def filter_tasks_by_completed_at(tasks: List[TaskDB],
 
 @api_v2.route('/tasks', methods=['GET'])
 def get_tasks():
-    """Get all tasks grouped by status with optional completed_at filtering
-    
+    """Get all tasks grouped by status with optional filtering
+
     Query Parameters:
+        status: Filter by status (open, in_progress, done) - single status or comma-separated list
         completed_at_gte: ISO date string (YYYY-MM-DD) - only include tasks completed on or after this date
         completed_at_lt: ISO date string (YYYY-MM-DD) - only include tasks completed before this date
     """
     try:
         # Get query parameters
+        status_filter = request.args.get('status')
         completed_at_gte = request.args.get('completed_at_gte')
         completed_at_lt = request.args.get('completed_at_lt')
+
+        # Parse status filter
+        status_filters = None
+        if status_filter:
+            if ',' in status_filter:
+                status_filters = [s.strip() for s in status_filter.split(',')]
+            else:
+                status_filters = [status_filter.strip()]
+
+            # Validate status filters
+            valid_statuses = ['open', 'in_progress', 'done']
+            for status in status_filters:
+                if status not in valid_statuses:
+                    return APIResponse.error(f"Invalid status filter: {status}. Valid options: {', '.join(valid_statuses)}", 400)
         
         # Validate date formats if provided (ISO format)
         if completed_at_gte:
@@ -112,16 +128,56 @@ def get_tasks():
         
         # Get all tasks
         open_tasks, in_progress_tasks, done_tasks = TaskDB.get_by_status()
-        
+
+        # Apply status filtering if specified
+        if status_filters:
+            filtered_open = []
+            filtered_in_progress = []
+            filtered_done = []
+
+            for status in status_filters:
+                if status == 'open':
+                    filtered_open.extend(open_tasks)
+                elif status == 'in_progress':
+                    filtered_in_progress.extend(in_progress_tasks)
+                elif status == 'done':
+                    filtered_done.extend(done_tasks)
+
+            open_tasks = filtered_open
+            in_progress_tasks = filtered_in_progress
+            done_tasks = filtered_done
+
         # Apply completed_at filtering to done tasks
         if completed_at_gte or completed_at_lt:
             done_tasks = filter_tasks_by_completed_at(done_tasks, completed_at_gte, completed_at_lt)
-        
-        # Convert to UI format
+
+            # If completed_at filtering is applied without status filter, only return done tasks
+            if not status_filters:
+                # Only return done tasks when completed_at filtering is applied without status filter
+                in_progress_tasks = []
+                open_tasks = []
+
+        # Convert to UI format (exclude description for list view)
+        def task_to_list_dict(task):
+            """Convert task to dict format for list view (excluding description)"""
+            return {
+                'id': task.id,
+                'title': task.title,
+                'status': task.status,
+                'sort_key': task.sort_key,
+                'project': task.project,
+                'categories': task.categories,
+                'created_at': task.created_at,
+                'updated_at': task.updated_at,
+                'started_at': task.started_at,
+                'completed_at': task.completed_at
+                # Note: description is intentionally excluded for list view
+            }
+
         ui_tasks = {
-            'in_progress': [task.to_dict() for task in in_progress_tasks],
-            'open': [task.to_dict() for task in open_tasks],
-            'done': [task.to_dict() for task in done_tasks]
+            'in_progress': [task_to_list_dict(task) for task in in_progress_tasks],
+            'open': [task_to_list_dict(task) for task in open_tasks],
+            'done': [task_to_list_dict(task) for task in done_tasks]
         }
         
         # Calculate counts for sidebar
@@ -303,14 +359,53 @@ def delete_task(task_id):
     """Delete a task"""
     try:
         task = TaskDB.get_by_id(task_id)
-        
+
         if not task:
             return APIResponse.error('Task not found', 404)
-        
+
         task.delete()
-        
+
         return jsonify(APIResponse.success('Task deleted'))
-    
+
     except Exception as e:
         logger.error(f"Failed to delete task: {str(e)}")
         return APIResponse.error(f"Failed to delete task: {str(e)}", 500)
+
+
+@api_v2.route('/tasks/reorder', methods=['POST'])
+def reorder_tasks():
+    """Reorder tasks by updating their sort_key values"""
+    try:
+        data = request.get_json()
+
+        if not data or 'task_ids' not in data:
+            return APIResponse.error('task_ids array is required', 400)
+
+        task_ids = data['task_ids']
+
+        if not isinstance(task_ids, list):
+            return APIResponse.error('task_ids must be an array', 400)
+
+        if not task_ids:
+            return APIResponse.error('task_ids cannot be empty', 400)
+
+        # Validate that all task IDs exist
+        for task_id in task_ids:
+            if not isinstance(task_id, int):
+                return APIResponse.error(f'All task_ids must be integers, got {type(task_id)}', 400)
+
+            task = TaskDB.get_by_id(task_id)
+            if not task:
+                return APIResponse.error(f'Task {task_id} not found', 404)
+
+        # Reorder tasks using the database method
+        success = TaskDB.reorder_tasks(task_ids)
+
+        if not success:
+            return APIResponse.error('Failed to reorder tasks', 500)
+
+        return jsonify(APIResponse.success(f'Reordered {len(task_ids)} tasks'))
+
+    except Exception as e:
+        logger.error(f"Failed to reorder tasks: {str(e)}")
+        return APIResponse.error(f"Failed to reorder tasks: {str(e)}", 500)

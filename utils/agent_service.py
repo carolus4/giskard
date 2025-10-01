@@ -8,7 +8,7 @@ import uuid
 import time
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
-from models.task_db import TaskDB
+from utils.http_client import APIClient
 from config.ollama_config import get_chat_config, REQUEST_TIMEOUT
 from .agent_metrics import agent_metrics, RequestTimer
 
@@ -16,10 +16,11 @@ logger = logging.getLogger(__name__)
 
 class AgentService:
     """Service for orchestrating agent operations with Ollama and Task API"""
-    
-    def __init__(self):
+
+    def __init__(self, api_base_url: str = "http://localhost:5001"):
         self.config = get_chat_config()
         self.ollama_url = "http://localhost:11434/api/generate"
+        self.api_client = APIClient(api_base_url)
         # In-memory session storage for undo functionality (stateless per request)
         self._session_undo_tokens = {}
         
@@ -161,11 +162,10 @@ class AgentService:
                 action = undo_data['action']
                 
                 if action == 'create_task':
-                    # Delete the created task
+                    # Delete the created task via API
                     task_id = undo_data['task_id']
-                    task = TaskDB.get_by_id(task_id)
-                    if task:
-                        task.delete()
+                    try:
+                        self.api_client.delete_task(task_id)
                         del self._session_undo_tokens[undo_token]
                         agent_metrics.record_undo()
                         return {
@@ -173,62 +173,80 @@ class AgentService:
                             'message': f'Undid creation of task: {undo_data.get("title", "Unknown")}',
                             'undone_task_id': task_id
                         }
+                    except Exception as e:
+                        return {
+                            'success': False,
+                            'message': f'Failed to undo task creation: {str(e)}'
+                        }
                 
                 elif action == 'update_task':
-                    # Restore original values
+                    # Restore original values via API
                     task_id = undo_data['task_id']
-                    task = TaskDB.get_by_id(task_id)
-                    if task:
-                        original_values = undo_data['original_values']
-                        task.title = original_values['title']
-                        task.description = original_values['description']
-                        task.project = original_values['project']
-                        task.categories = original_values['categories']
-                        task.save()
+                    original_values = undo_data['original_values']
+                    try:
+                        self.api_client.update_task(
+                            task_id,
+                            title=original_values['title'],
+                            description=original_values['description'],
+                            project=original_values['project'],
+                            categories=original_values['categories']
+                        )
                         del self._session_undo_tokens[undo_token]
                         agent_metrics.record_undo()
                         return {
                             'success': True,
-                            'message': f'Undid update of task: {task.title}',
+                            'message': f'Undid update of task: {original_values["title"]}',
                             'undone_task_id': task_id
+                        }
+                    except Exception as e:
+                        return {
+                            'success': False,
+                            'message': f'Failed to undo task update: {str(e)}'
                         }
                 
                 elif action == 'delete_task':
-                    # Recreate the deleted task
+                    # Recreate the deleted task via API
                     task_data = undo_data['task_data']
-                    task = TaskDB(
-                        title=task_data['title'],
-                        description=task_data['description'],
-                        project=task_data['project'],
-                        categories=task_data['categories'],
-                        status=task_data['status'],
-                        sort_key=task_data['sort_key'],
-                        created_at=task_data['created_at']
-                    )
-                    task.save()
-                    del self._session_undo_tokens[undo_token]
-                    agent_metrics.record_undo()
-                    return {
-                        'success': True,
-                        'message': f'Undid deletion of task: {task.title}',
-                        'restored_task_id': task.id
-                    }
-                
-                elif action == 'update_task_status':
-                    # Restore original status
-                    task_id = undo_data['task_id']
-                    task = TaskDB.get_by_id(task_id)
-                    if task:
-                        task.status = undo_data['original_status']
-                        task.started_at = undo_data['original_started_at']
-                        task.completed_at = undo_data['original_completed_at']
-                        task.save()
+                    try:
+                        response_data = self.api_client.create_task(
+                            title=task_data['title'],
+                            description=task_data['description'],
+                            project=task_data['project'],
+                            categories=task_data['categories']
+                        )
+                        restored_task = response_data.get('task', {})
+                        restored_task_id = restored_task.get('id')
+
                         del self._session_undo_tokens[undo_token]
                         agent_metrics.record_undo()
                         return {
                             'success': True,
-                            'message': f'Undid status change of task: {task.title}',
+                            'message': f'Undid deletion of task: {task_data["title"]}',
+                            'restored_task_id': restored_task_id
+                        }
+                    except Exception as e:
+                        return {
+                            'success': False,
+                            'message': f'Failed to undo task deletion: {str(e)}'
+                        }
+                
+                elif action == 'update_task_status':
+                    # Restore original status via API
+                    task_id = undo_data['task_id']
+                    original_status = undo_data['original_status']
+                    try:
+                        self.api_client.update_task_status(task_id, original_status)
+                        del self._session_undo_tokens[undo_token]
+                        agent_metrics.record_undo()
+                        return {
+                            'success': True,
+                            'message': f'Undid status change of task to {original_status}',
                             'undone_task_id': task_id
+                        }
+                    except Exception as e:
+                        return {
+                            'success': False,
+                            'message': f'Failed to undo status change: {str(e)}'
                         }
                 
                 return {
@@ -439,46 +457,81 @@ Assistant:"""
                     'error': 'Task title is required',
                     'action': 'create_task'
                 }
-            
+
             # Check for idempotency (same task not re-added in session)
             # For MVP, we'll do a simple title-based check
-            existing_tasks = TaskDB.get_all()
-            for task in existing_tasks:
-                if task.title.lower() == title.lower() and task.status != 'done':
-                    return {
-                        'success': False,
-                        'error': f'Task "{title}" already exists',
-                        'action': 'create_task',
-                        'existing_task_id': task.id
-                    }
-            
-            # Create the task
+            try:
+                response_data = self.api_client.get_tasks()
+                existing_tasks = []
+                ui_tasks = response_data.get('tasks', {})
+                existing_tasks.extend(ui_tasks.get('open', []))
+                existing_tasks.extend(ui_tasks.get('in_progress', []))
+                # Don't check done tasks for idempotency
+
+                for task in existing_tasks:
+                    if task.get('title', '').lower() == title.lower():
+                        return {
+                            'success': False,
+                            'error': f'Task "{title}" already exists',
+                            'action': 'create_task',
+                            'existing_task_id': task.get('id')
+                        }
+            except Exception:
+                # If we can't fetch tasks, continue with creation (idempotency check failed)
+                pass
+
+            # Create the task via API
             description = arguments.get('description', '').strip()
             project = arguments.get('project')
             categories = arguments.get('categories', [])
-            
-            task = TaskDB.create(title, description, project, categories)
-            
+
+            response_data = self.api_client.create_task(title, description, project, categories)
+            task_data = response_data.get('task', {})
+            task_id = task_data.get('id')
+
+            if not task_id:
+                return {
+                    'success': False,
+                    'error': 'Failed to create task - no ID returned',
+                    'action': 'create_task'
+                }
+
             # Store undo information
             self._session_undo_tokens[undo_token] = {
                 'action': 'create_task',
-                'task_id': task.id,
+                'task_id': task_id,
                 'title': title,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
+            # Enqueue for classification (create temporary TaskDB instance)
+            from models.task_db import TaskDB
+            task = TaskDB(
+                id=task_id,
+                title=task_data.get('title', title),
+                description=task_data.get('description', description),
+                project=task_data.get('project'),
+                categories=task_data.get('categories', categories),
+                status=task_data.get('status', 'open'),
+                sort_key=task_data.get('sort_key'),
+                created_at=task_data.get('created_at'),
+                updated_at=task_data.get('updated_at'),
+                started_at=task_data.get('started_at'),
+                completed_at=task_data.get('completed_at')
+            )
+
             # Enqueue for classification
             from app import classification_manager
             classification_manager.enqueue_classification(task)
-            
+
             return {
                 'success': True,
                 'action': 'create_task',
-                'task_id': task.id,
+                'task_id': task_id,
                 'task_title': title,
                 'message': f'Created task: {title}'
             }
-            
+
         except Exception as e:
             logger.error(f"Create task execution failed: {str(e)}")
             return {
@@ -567,25 +620,17 @@ Assistant:"""
         """Execute get_tasks tool"""
         try:
             status_filter = arguments.get('status')
-            
-            if status_filter:
-                tasks = TaskDB.get_all(status_filter)
-                task_list = [task.to_dict() for task in tasks]
-            else:
-                open_tasks, in_progress_tasks, done_tasks = TaskDB.get_by_status()
-                task_list = {
-                    'open': [task.to_dict() for task in open_tasks],
-                    'in_progress': [task.to_dict() for task in in_progress_tasks],
-                    'done': [task.to_dict() for task in done_tasks]
-                }
-            
+
+            # Use API client to get tasks
+            response_data = self.api_client.get_tasks(status=status_filter)
+
             return {
                 'success': True,
                 'action': 'get_tasks',
-                'tasks': task_list,
+                'tasks': response_data.get('tasks', {}),
                 'message': f'Retrieved tasks{" with status " + status_filter if status_filter else ""}'
             }
-            
+
         except Exception as e:
             logger.error(f"Get tasks execution failed: {str(e)}")
             return {
@@ -604,54 +649,64 @@ Assistant:"""
                     'error': 'Task ID is required',
                     'action': 'update_task'
                 }
-            
-            task = TaskDB.get_by_id(task_id)
-            if not task:
+
+            # Check if task exists
+            try:
+                current_task = self.api_client.get_task(task_id)
+            except Exception:
                 return {
                     'success': False,
                     'error': f'Task {task_id} not found',
                     'action': 'update_task'
                 }
-            
+
             # Store original values for undo
             original_values = {
-                'title': task.title,
-                'description': task.description,
-                'project': task.project,
-                'categories': task.categories.copy() if task.categories else []
+                'title': current_task.get('title', ''),
+                'description': current_task.get('description', ''),
+                'project': current_task.get('project'),
+                'categories': current_task.get('categories', [])
             }
-            
+
             # Update fields if provided
             updated_fields = []
+            update_data = {}
+
             if 'title' in arguments:
-                task.title = arguments['title'].strip()
-                updated_fields.append('title')
+                title = arguments['title'].strip()
+                if title:
+                    update_data['title'] = title
+                    updated_fields.append('title')
+                else:
+                    return {
+                        'success': False,
+                        'error': 'Task title cannot be empty',
+                        'action': 'update_task'
+                    }
+
             if 'description' in arguments:
-                task.description = arguments['description'].strip()
+                update_data['description'] = arguments['description'].strip()
                 updated_fields.append('description')
+
             if 'project' in arguments:
-                task.project = arguments['project']
+                update_data['project'] = arguments['project']
                 updated_fields.append('project')
+
             if 'categories' in arguments:
-                task.categories = arguments['categories']
+                update_data['categories'] = arguments['categories']
                 updated_fields.append('categories')
-            
+
             if not updated_fields:
                 return {
                     'success': False,
                     'error': 'No fields to update',
                     'action': 'update_task'
                 }
-            
-            if not task.title:
-                return {
-                    'success': False,
-                    'error': 'Task title cannot be empty',
-                    'action': 'update_task'
-                }
-            
-            task.save()
-            
+
+            # Update task via API
+            response_data = self.api_client.update_task(task_id, **update_data)
+            updated_task = response_data.get('task', {})
+
             # Store undo information
             self._session_undo_tokens[undo_token] = {
                 'action': 'update_task',
@@ -660,19 +715,34 @@ Assistant:"""
                 'updated_fields': updated_fields,
                 'timestamp': datetime.now().isoformat()
             }
-            
-            # Enqueue for re-classification
+
+            # Enqueue for re-classification (create temporary TaskDB instance)
+            from models.task_db import TaskDB
+            task = TaskDB(
+                id=task_id,
+                title=updated_task.get('title', original_values['title']),
+                description=updated_task.get('description', original_values['description']),
+                project=updated_task.get('project', original_values['project']),
+                categories=updated_task.get('categories', original_values['categories']),
+                status=updated_task.get('status', current_task.get('status')),
+                sort_key=updated_task.get('sort_key'),
+                created_at=updated_task.get('created_at'),
+                updated_at=updated_task.get('updated_at'),
+                started_at=updated_task.get('started_at'),
+                completed_at=updated_task.get('completed_at')
+            )
+
             from app import classification_manager
             classification_manager.enqueue_classification(task)
-            
+
             return {
                 'success': True,
                 'action': 'update_task',
                 'task_id': task_id,
                 'updated_fields': updated_fields,
-                'message': f'Updated task: {task.title}'
+                'message': f'Updated task: {updated_task.get("title", "Unknown")}'
             }
-            
+
         except Exception as e:
             logger.error(f"Update task execution failed: {str(e)}")
             return {
@@ -691,35 +761,36 @@ Assistant:"""
                     'error': 'Task ID is required',
                     'action': 'delete_task'
                 }
-            
-            task = TaskDB.get_by_id(task_id)
-            if not task:
+
+            # Get current task data for undo
+            try:
+                current_task = self.api_client.get_task(task_id)
+                task_data = current_task
+                task_title = current_task.get('title', 'Unknown')
+            except Exception:
                 return {
                     'success': False,
                     'error': f'Task {task_id} not found',
                     'action': 'delete_task'
                 }
-            
-            # Store task data for undo
-            task_data = task.to_dict()
-            task_title = task.title
-            
-            task.delete()
-            
+
+            # Delete task via API
+            response_data = self.api_client.delete_task(task_id)
+
             # Store undo information
             self._session_undo_tokens[undo_token] = {
                 'action': 'delete_task',
                 'task_data': task_data,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
             return {
                 'success': True,
                 'action': 'delete_task',
                 'task_id': task_id,
                 'message': f'Deleted task: {task_title}'
             }
-            
+
         except Exception as e:
             logger.error(f"Delete task execution failed: {str(e)}")
             return {
@@ -733,49 +804,47 @@ Assistant:"""
         try:
             task_id = arguments.get('task_id')
             new_status = arguments.get('status')
-            
+
             if not task_id:
                 return {
                     'success': False,
                     'error': 'Task ID is required',
                     'action': 'update_task_status'
                 }
-            
+
             if not new_status:
                 return {
                     'success': False,
                     'error': 'Status is required',
                     'action': 'update_task_status'
                 }
-            
+
             if new_status not in ['open', 'in_progress', 'done']:
                 return {
                     'success': False,
                     'error': 'Invalid status. Must be: open, in_progress, or done',
                     'action': 'update_task_status'
                 }
-            
-            task = TaskDB.get_by_id(task_id)
-            if not task:
+
+            # Get current task data for undo
+            try:
+                current_task = self.api_client.get_task(task_id)
+            except Exception:
                 return {
                     'success': False,
                     'error': f'Task {task_id} not found',
                     'action': 'update_task_status'
                 }
-            
+
             # Store original status for undo
-            original_status = task.status
-            original_started_at = task.started_at
-            original_completed_at = task.completed_at
-            
-            # Update status using appropriate method
-            if new_status == 'done':
-                task.mark_done()
-            elif new_status == 'in_progress':
-                task.mark_in_progress()
-            elif new_status == 'open':
-                task.mark_open()
-            
+            original_status = current_task.get('status')
+            original_started_at = current_task.get('started_at')
+            original_completed_at = current_task.get('completed_at')
+
+            # Update status via API
+            response_data = self.api_client.update_task_status(task_id, new_status)
+            updated_task = response_data.get('task', {})
+
             # Store undo information
             self._session_undo_tokens[undo_token] = {
                 'action': 'update_task_status',
@@ -785,16 +854,16 @@ Assistant:"""
                 'original_completed_at': original_completed_at,
                 'timestamp': datetime.now().isoformat()
             }
-            
+
             return {
                 'success': True,
                 'action': 'update_task_status',
                 'task_id': task_id,
                 'old_status': original_status,
                 'new_status': new_status,
-                'message': f'Changed task status from {original_status} to {new_status}: {task.title}'
+                'message': f'Changed task status from {original_status} to {new_status}: {updated_task.get("title", "Unknown")}'
             }
-            
+
         except Exception as e:
             logger.error(f"Update task status execution failed: {str(e)}")
             return {
