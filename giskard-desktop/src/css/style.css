@@ -366,7 +366,7 @@ body {
     flex: 1;
     padding: 8px 12px;
     margin: 0;
-    line-height: 1.2;
+    line-height: 1.0;
     min-width: 0;
     width: 100%;
     word-wrap: break-word;
@@ -374,7 +374,7 @@ body {
     white-space: pre-wrap;
     resize: none;
     overflow: hidden;
-    min-height: 1.2em;
+    min-height: 1em;
     word-break: break-word;
     hyphens: auto;
     box-sizing: border-box;

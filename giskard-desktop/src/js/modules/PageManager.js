@@ -205,7 +205,10 @@ class PageManager {
 
                 // Force the height regardless of current height
                 titleTextarea.style.height = newHeight + 'px';
-                titleTextarea.style.minHeight = newHeight + 'px';
+                // Only override minHeight for multi-line content
+                if (lines > 1) {
+                    titleTextarea.style.minHeight = newHeight + 'px';
+                }
                 titleTextarea.style.maxHeight = 'none';
             };
 
@@ -317,7 +320,9 @@ class PageManager {
             this.currentTaskId = taskId;
 
             // Update sidebar active state
-            this._updateSidebarActiveState(pageName);
+            // For task-detail page, keep "task-list" highlighted since it's conceptually part of tasks
+            const sidebarPage = (pageName === 'task-detail') ? 'task-list' : pageName;
+            this._updateSidebarActiveState(sidebarPage);
 
             // Emit page change event
             document.dispatchEvent(new CustomEvent('page:changed', {
