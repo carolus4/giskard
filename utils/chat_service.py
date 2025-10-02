@@ -18,18 +18,18 @@ class ChatService:
     def send_message(self, message: str, conversation_history: List[Dict[str, Any]] = None) -> str:
         """
         Send a message to Ollama and get a response
-        
+
         Args:
             message: The user's message
             conversation_history: Previous conversation messages
-            
+
         Returns:
             The AI's response
         """
         try:
             # Build the conversation context
             prompt = self._build_prompt(message, conversation_history or [])
-            
+
             # Prepare the request payload
             payload = {
                 "model": self.config["model"],
@@ -37,37 +37,77 @@ class ChatService:
                 "stream": self.config["stream"],
                 "options": self.config["options"]
             }
-            
+
             logger.info(f"🤖 Sending chat request to Ollama with model: {self.config['model']}")
-            
+
             # Send request to Ollama
             response = requests.post(
-                self.ollama_url, 
-                json=payload, 
+                self.ollama_url,
+                json=payload,
                 timeout=REQUEST_TIMEOUT
             )
             response.raise_for_status()
-            
-            result = response.json()
-            ai_response = result.get('response', '').strip()
-            
-            if not ai_response:
-                return "I'm sorry, I didn't get a response. Please try again."
-            
-            logger.info("✅ Chat response received successfully")
-            return ai_response
-            
+
+            # Handle streaming response if enabled
+            if self.config["stream"]:
+                return self._handle_streaming_response(response)
+            else:
+                result = response.json()
+                ai_response = result.get('response', '').strip()
+
+                if not ai_response:
+                    return "I'm sorry, I didn't get a response. Please try again."
+
+                logger.info("✅ Chat response received successfully")
+                return ai_response
+
         except requests.exceptions.Timeout:
             logger.error("⏰ Chat request timed out")
             return "I'm having trouble connecting right now. Please check if Ollama is running and try again."
-            
+
         except requests.exceptions.ConnectionError:
             logger.error("🔌 Failed to connect to Ollama")
             return "I'm having trouble connecting right now. Please check if Ollama is running with gemma3:4b and try again."
-            
+
         except Exception as e:
             logger.error(f"❌ Chat request failed: {str(e)}")
             return f"I'm having trouble connecting right now. Please check if Ollama is running with {self.config['model']} and try again."
+
+    def _handle_streaming_response(self, response) -> str:
+        """
+        Handle streaming response from Ollama
+
+        Args:
+            response: The HTTP response object
+
+        Returns:
+            Complete response text
+        """
+        full_response = ""
+        try:
+            # Read the response line by line (streaming format)
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        try:
+                            data = json.loads(line[6:])
+                            if 'response' in data:
+                                full_response += data['response']
+                            if data.get('done', False):
+                                break
+                        except json.JSONDecodeError:
+                            continue
+
+            if not full_response:
+                return "I'm sorry, I didn't get a response. Please try again."
+
+            logger.info("✅ Streaming chat response received successfully")
+            return full_response.strip()
+
+        except Exception as e:
+            logger.error(f"❌ Error handling streaming response: {str(e)}")
+            return "I'm having trouble processing the response. Please try again."
     
     def _build_prompt(self, message: str, conversation_history: List[Dict[str, Any]]) -> str:
         """

@@ -23,18 +23,18 @@ def get_chat_config():
     if coaching_config:
         return {
             "model": coaching_config["model"],
-            "stream": False,
+            "stream": True,  # Enable streaming for better UX
             "options": {
                 "temperature": coaching_config["temperature"],
                 "top_p": coaching_config["top_p"],
                 "max_tokens": coaching_config["token_limit"]
             }
         }
-    
+
     # Fallback to default configuration
     return {
         "model": DEFAULT_MODEL,
-        "stream": False,
+        "stream": True,  # Enable streaming for better UX
         "options": {
             "temperature": 0.7,
             "top_p": 0.9,

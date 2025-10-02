@@ -6,17 +6,26 @@ class ChatManager {
         this.chatMessages = [];
         this.isTyping = false;
         this.currentConversation = null;
+        this.currentThreadId = null;
+        this.conversationHistory = [];
         this.modelName = 'gemma3:4b'; // Default fallback
-        
+        this.currentStreamingMessage = null;
+
         // Set up API base URL (same logic as APIClient)
         this.isTauri = window.__TAURI__ !== undefined;
         this.baseURL = this.isTauri ? 'http://localhost:5001/api' : '/api';
-        
+
         console.log('🤖 ChatManager: Tauri detected:', this.isTauri, 'Base URL:', this.baseURL);
-        
+
         this._bindEvents();
         this._initializeChat();
         this._subscribeToModelUpdates();
+
+        // Initialize conversation threads and load most recent (if any)
+        setTimeout(async () => {
+            await this._loadConversationThreads();
+            await this._loadMostRecentThread();
+        }, 100);
     }
 
     /**
@@ -123,7 +132,7 @@ class ChatManager {
         const message = this.chatInput?.value?.trim();
         if (!message || this.isTyping) return;
 
-        // Add user message to UI
+        // Add user message to UI immediately
         this._addMessage('user', message);
         this.chatInput.value = '';
         this._updateSendButton();
@@ -134,15 +143,20 @@ class ChatManager {
         this._updateTypingMessage('AI is processing your request...');
 
         try {
-            // Send to Ollama
-            const response = await this._sendToOllama(message);
-            this._addMessage('bot', response);
+            // Send to Ollama via the orchestrator
+            await this._sendToOllama(message);
+
+            // If this was the first message in a new conversation, ensure we have a thread ID
+            if (!this.currentThreadId) {
+                this.currentThreadId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                await this._loadConversationThreads(); // Refresh the threads list
+            }
         } catch (error) {
             console.error('Failed to get response from agent:', error);
-            
+
             // Provide more specific error messages
             let errorMessage = 'I encountered an error. Please try again.';
-            
+
             if (error.message.includes('timeout') || error.message.includes('timed out')) {
                 errorMessage = 'The AI is taking longer than expected to process your request. This can happen with complex tasks. Please try again with a simpler request or wait a moment.';
             } else if (error.message.includes('HTTP error')) {
@@ -152,7 +166,7 @@ class ChatManager {
             } else if (error.message.includes('Agent step failed')) {
                 errorMessage = 'I had trouble processing your request. Please try again.';
             }
-            
+
             this._addMessage('bot', errorMessage);
         } finally {
             this._hideTyping();
@@ -192,49 +206,43 @@ class ChatManager {
     }
 
     /**
-     * Handle new chat
+     * Handle new chat - clears current conversation and starts fresh
      */
     _handleNewChat() {
         console.log('✨ Starting new chat conversation...');
-        
+
         // Show brief clearing animation
         if (this.chatMessagesContainer) {
             this.chatMessagesContainer.style.opacity = '0.5';
         }
-        
-        // Clear message history (no confirmation needed)
-        this.chatMessages = [];
-        
+
         // Brief delay for visual feedback, then update UI
         setTimeout(() => {
+            // Clear current conversation state
+            this.chatMessages = [];
+            this.currentThreadId = null;
+
             // Re-render UI (will show welcome message)
             this._renderMessages();
-            
-            // Show suggestion buttons
+
+            // Show suggestion buttons for new conversation
             this._showSuggestions();
-            
+
             // Restore opacity
             if (this.chatMessagesContainer) {
                 this.chatMessagesContainer.style.opacity = '1';
             }
-            
-            // Save to localStorage immediately
-            try {
-                localStorage.setItem('giscard_chat_history', JSON.stringify(this.chatMessages));
-            } catch (error) {
-                console.error('❌ Failed to save to localStorage:', error);
-            }
-            
+
             // Reset input and scroll
             if (this.chatInput) {
                 this.chatInput.value = '';
                 this._updateSendButton();
             }
             this._scrollToBottom();
-            
+
             // Show success notification
             this._showNotification('New chat started! ✨', 'success');
-            
+
             console.log('✅ New chat conversation started successfully');
         }, 150);
     }
@@ -246,20 +254,29 @@ class ChatManager {
     async _sendToOllama(message) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for complex agent workflows
-        
+
         try {
-            // Generate session ID for this conversation
-            const sessionId = this._getOrCreateSessionId();
-            
-            const response = await fetch(`${this.baseURL}/agent/step`, {
+            // Use current thread ID or create new one if none exists
+            let threadId = this.currentThreadId;
+            if (!threadId) {
+                // Create a new thread for this conversation
+                threadId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            }
+
+            // Get conversation context for better responses
+            const conversationContext = this._getConversationContext();
+
+            const response = await fetch(`${this.baseURL}/agent/conversation`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     input_text: message,
-                    session_id: sessionId,
-                    domain: 'chat'
+                    session_id: threadId,
+                    thread_id: threadId,
+                    domain: 'chat',
+                    conversation_context: conversationContext
                 }),
                 signal: controller.signal
             });
@@ -271,30 +288,36 @@ class ChatManager {
             }
 
             const data = await response.json();
-            
+
             // Debug logging
-            console.log('🤖 Agent response:', data);
-            
+            console.log('🤖 Conversation response:', data);
+
             if (data.success) {
+                // Display each step progressively
+                await this._displayConversationSteps(data.steps);
+
                 // Handle events from the orchestrator
                 if (data.events && data.events.length > 0) {
                     console.log('🔧 Events:', data.events);
                     this._handleEvents(data.events);
                 }
-                
+
                 // Handle side effects (task creation, etc.) - maintain compatibility
                 if (data.side_effects && data.side_effects.length > 0) {
                     console.log('🔧 Side effects:', data.side_effects);
                     this._handleSideEffects(data.side_effects);
                 }
-                
-                // Note: Undo functionality has been removed for simplicity
-                
-                // Return the final message from response
-                return data.final_message || data.assistant_text || 'I processed your request successfully.';
+
+                // Update current thread and refresh conversation threads
+                if (!this.currentThreadId) {
+                    this.currentThreadId = threadId;
+                }
+                await this._loadConversationThreads();
+
+                console.log('✅ Conversation completed successfully');
             } else {
-                console.error('❌ Agent step failed:', data.error);
-                throw new Error(data.error || 'Agent step failed');
+                console.error('❌ Conversation failed:', data.error);
+                throw new Error(data.error || 'Conversation failed');
             }
         } catch (error) {
             clearTimeout(timeoutId);
@@ -306,14 +329,111 @@ class ChatManager {
     }
     
     /**
-     * Get or create session ID for this conversation
+     * Display conversation steps progressively
      */
-    _getOrCreateSessionId() {
-        if (!this.sessionId) {
-            this.sessionId = 'chat-session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    async _displayConversationSteps(steps) {
+        if (!steps || steps.length === 0) return;
+
+        console.log('📋 Displaying conversation steps:', steps.length);
+
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+
+            // Add a small delay between steps for better UX
+            if (i > 0) {
+                await new Promise(resolve => setTimeout(resolve, 800));
+            }
+
+            // Show typing indicator for non-final steps
+            if (!step.details?.is_final) {
+                this._showTyping();
+                this._updateTypingMessage(this._getStepDisplayMessage(step));
+            }
+
+            // Wait a moment for the typing indicator to be visible
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Hide typing and add the step as a bot message
+            this._hideTyping();
+
+            // Add step as a bot message with special formatting
+            this._addStepMessage(step);
         }
-        return this.sessionId;
     }
+
+    /**
+     * Add a conversation step as a message
+     */
+    _addStepMessage(step) {
+        const stepContent = this._formatStepContent(step);
+        const message = {
+            type: 'bot',
+            content: stepContent,
+            step: step,
+            timestamp: new Date().toISOString()
+        };
+
+        this.chatMessages.push(message);
+        const messageElement = this._renderMessage(message);
+
+        this._scrollToBottom();
+        this._saveChatHistory();
+    }
+
+    /**
+     * Format step content for display
+     */
+    _formatStepContent(step) {
+        const { step_type, content, details } = step;
+
+        // For final synthesizer step, just return the content
+        if (details?.is_final) {
+            return content;
+        }
+
+        // For other steps, format with emoji and context
+        const emoji = this._getStepEmoji(step_type);
+        let formattedContent = `${emoji} ${content}`;
+
+        // Add additional details for certain step types
+        if (step_type === 'planner_llm' && details) {
+            const actionsCount = details.actions_count || 0;
+            if (actionsCount > 0) {
+                formattedContent += `\n\n*Planning to execute ${actionsCount} action${actionsCount > 1 ? 's' : ''}*`;
+            }
+        } else if (step_type === 'action_exec' && details) {
+            const successful = details.successful_actions || 0;
+            const failed = details.failed_actions || 0;
+            if (successful > 0 || failed > 0) {
+                formattedContent += `\n\n*Executed: ${successful} successful, ${failed} failed*`;
+            }
+        }
+
+        return formattedContent;
+    }
+
+    /**
+     * Get emoji for step type
+     */
+    _getStepEmoji(stepType) {
+        const emojiMap = {
+            'workflow_start': '🚀',
+            'ingest_user_input': '📥',
+            'planner_llm': '🤔',
+            'action_exec': '⚡',
+            'synthesizer_llm': '💬'
+        };
+        return emojiMap[stepType] || '📋';
+    }
+
+    /**
+     * Get display message for typing indicator
+     */
+    _getStepDisplayMessage(step) {
+        const emoji = this._getStepEmoji(step.step_type);
+        return `${emoji} ${step.step_type.replace('_', ' ').toUpperCase()}...`;
+    }
+
 
     /**
      * Handle orchestrator events
@@ -523,25 +643,90 @@ class ChatManager {
         if (!this.chatMessagesContainer) return null;
 
         const messageEl = document.createElement('div');
-        messageEl.className = `message ${message.type}-message ${animate ? 'fade-in' : ''}`;
+        let baseClass = `message ${message.type}-message ${animate ? 'fade-in' : ''}`;
 
-        const time = new Date(message.timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+        // Add step-specific classes if this is a step message
+        if (message.step && message.step.step_type) {
+            baseClass += ` step-message ${message.step.step_type}`;
+        }
+
+        messageEl.className = baseClass;
+
+        const time = new Date(message.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
         });
 
-        messageEl.innerHTML = `
-            <div class="message-avatar">
-                <i class="fas ${message.type === 'user' ? 'fa-user' : 'fa-robot'}"></i>
-            </div>
-            <div class="message-content">
-                <p>${this._formatMessage(message.content)}</p>
-                <div class="message-time">${time}</div>
-            </div>
-        `;
+        // Render different content for step messages vs regular messages
+        if (message.step && message.step.step_type) {
+            messageEl.innerHTML = this._renderStepMessage(message, time);
+        } else {
+            messageEl.innerHTML = `
+                <div class="message-avatar">
+                    <i class="fas ${message.type === 'user' ? 'fa-user' : 'fa-robot'}"></i>
+                </div>
+                <div class="message-content">
+                    <p>${this._formatMessage(message.content)}</p>
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+        }
 
         this.chatMessagesContainer.appendChild(messageEl);
         return messageEl;
+    }
+
+    /**
+     * Render a step-specific message
+     */
+    _renderStepMessage(message, time) {
+        const step = message.step;
+        const content = this._formatMessage(message.content);
+
+        // For synthesizer_llm (final step), render normally
+        if (step.step_type === 'synthesizer_llm') {
+            return `
+                <div class="message-avatar">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="message-content">
+                    <p>${content}</p>
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+        }
+
+        // For other steps, add step details
+        const detailsHtml = step.details ? this._renderStepDetails(step.details) : '';
+
+        return `
+            <div class="message-avatar">
+                <i class="fas fa-cog"></i>
+            </div>
+            <div class="message-content">
+                <p>${content}</p>
+                ${detailsHtml}
+                <div class="message-time">${time}</div>
+            </div>
+        `;
+    }
+
+    /**
+     * Render step details section
+     */
+    _renderStepDetails(details) {
+        let detailsHtml = '<div class="step-details">';
+
+        if (details.actions_count !== undefined) {
+            detailsHtml += `<strong>Planning:</strong> ${details.actions_count} action${details.actions_count !== 1 ? 's' : ''} to execute`;
+        } else if (details.successful_actions !== undefined || details.failed_actions !== undefined) {
+            const successful = details.successful_actions || 0;
+            const failed = details.failed_actions || 0;
+            detailsHtml += `<strong>Execution:</strong> ${successful} successful, ${failed} failed`;
+        }
+
+        detailsHtml += '</div>';
+        return detailsHtml;
     }
 
     /**
@@ -700,7 +885,7 @@ class ChatManager {
     }
 
     /**
-     * Load chat history from localStorage
+     * Load chat history from localStorage (legacy support)
      */
     _loadChatHistory() {
         try {
@@ -714,6 +899,161 @@ class ChatManager {
             }
         } catch (error) {
             console.error('Failed to load chat history:', error);
+        }
+    }
+
+    /**
+     * Load conversation threads from backend
+     */
+    async _loadConversationThreads() {
+        try {
+            const response = await fetch(`${this.baseURL}/agent/threads`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.threads) {
+                    this.conversationHistory = data.threads;
+                    console.log('📚 Loaded conversation threads:', this.conversationHistory.length);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load conversation threads:', error);
+        }
+    }
+
+    /**
+     * Load messages for a specific thread
+     */
+    async _loadThreadMessages(threadId) {
+        try {
+            const response = await fetch(`${this.baseURL}/agent/threads/${threadId}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.steps) {
+                    // Convert backend steps to chat messages format
+                    this.chatMessages = data.steps.map(step => ({
+                        type: step.step_type === 'ingest_user_input' ? 'user' : 'bot',
+                        content: step.output_data?.final_message || step.content || step.input_data?.input_text || 'Step completed',
+                        timestamp: step.timestamp,
+                        step: step
+                    }));
+
+                    this.currentThreadId = threadId;
+                    this._renderMessages();
+                    this._hideSuggestions();
+                    console.log(`📖 Loaded ${this.chatMessages.length} messages for thread: ${threadId}`);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load thread messages:', error);
+        }
+    }
+
+    /**
+     * Create a new conversation thread
+     */
+    async _createNewThread(inputText) {
+        const threadId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        try {
+            // Create initial step in the thread
+            const response = await fetch(`${this.baseURL}/agent/conversation`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    input_text: inputText,
+                    session_id: threadId,
+                    domain: 'chat'
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    this.currentThreadId = threadId;
+                    await this._loadThreadMessages(threadId);
+                    await this._loadConversationThreads(); // Refresh threads list
+                    return threadId;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to create new thread:', error);
+        }
+        return threadId;
+    }
+
+    /**
+     * Get conversation context from previous messages in current thread
+     */
+    _getConversationContext() {
+        if (!this.currentThreadId || this.chatMessages.length === 0) {
+            return [];
+        }
+
+        // Return last 10 messages for context (excluding the current one being processed)
+        return this.chatMessages.slice(-10).map(msg => ({
+            type: msg.type,
+            content: msg.content,
+            timestamp: msg.timestamp
+        }));
+    }
+
+    /**
+     * Load the most recent conversation thread
+     */
+    async _loadMostRecentThread() {
+        if (this.conversationHistory.length === 0) {
+            // No conversation history, just show welcome message
+            this._renderMessages();
+            this._showSuggestions();
+            return;
+        }
+
+        try {
+            // Load the most recent thread (first in the sorted list)
+            const mostRecentThread = this.conversationHistory[0];
+            if (mostRecentThread && mostRecentThread.thread_id) {
+                await this._loadThreadMessages(mostRecentThread.thread_id);
+                console.log('📖 Loaded most recent conversation thread');
+            }
+        } catch (error) {
+            console.error('Failed to load most recent thread:', error);
+            // Fallback to showing welcome message if loading fails
+            this._renderMessages();
+            this._showSuggestions();
+        }
+    }
+
+    /**
+     * Handle streaming response from the agent
+     */
+    async _handleStreamingResponse(response, steps) {
+        if (!steps || steps.length === 0) return;
+
+        console.log('📡 Starting streaming response with', steps.length, 'steps');
+
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+
+            // Add a small delay between steps for better UX
+            if (i > 0) {
+                await new Promise(resolve => setTimeout(resolve, 800));
+            }
+
+            // Show typing indicator for non-final steps
+            if (!step.details?.is_final) {
+                this._showTyping();
+                this._updateTypingMessage(this._getStepDisplayMessage(step));
+            }
+
+            // Wait a moment for the typing indicator to be visible
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Hide typing and add the step as a bot message
+            this._hideTyping();
+
+            // Add step as a bot message with special formatting
+            this._addStepMessage(step);
         }
     }
 

@@ -1692,6 +1692,70 @@ body.dragging .insertion-line {
     text-align: right;
 }
 
+/* Step-specific message styling */
+.step-message {
+    position: relative;
+}
+
+.step-message::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 2px;
+}
+
+.step-message.planner_llm {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-left: 4px solid #667eea;
+}
+
+.step-message.action_exec {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 159, 64, 0.1) 100%);
+    border-left: 4px solid #ffc107;
+}
+
+.step-message.synthesizer_llm {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(139, 195, 74, 0.1) 100%);
+    border-left: 4px solid #4caf50;
+}
+
+.step-message.workflow_start,
+.step-message.ingest_user_input {
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1) 0%, rgba(103, 58, 183, 0.1) 100%);
+    border-left: 4px solid #9c27b0;
+}
+
+/* Step message content styling */
+.step-message .message-content p {
+    font-style: italic;
+    opacity: 0.9;
+}
+
+.step-message.synthesizer_llm .message-content p {
+    font-style: normal;
+    font-weight: 500;
+    opacity: 1;
+}
+
+/* Step details styling */
+.step-details {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    font-size: 0.85em;
+    color: #666;
+}
+
+.step-details strong {
+    color: #333;
+}
+
 /* Welcome Message */
 .welcome-message {
     margin-bottom: 32px;

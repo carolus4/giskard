@@ -45,15 +45,50 @@ def init_database():
             completed_at TEXT
         )
     ''')
-    
+
     # Create index for efficient sorting
     cursor.execute('''
         CREATE INDEX IF NOT EXISTS idx_tasks_sort_key ON tasks(sort_key)
     ''')
-    
+
     # Create index for status filtering
     cursor.execute('''
         CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)
+    ''')
+
+    # Create the agent_steps table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS agent_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_id TEXT NOT NULL,
+            step_number INTEGER NOT NULL,
+            step_type TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            input_data TEXT DEFAULT '{}',
+            output_data TEXT DEFAULT '{}',
+            rendered_prompt TEXT,
+            llm_input TEXT DEFAULT '{}',
+            llm_output TEXT,
+            error TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Create indexes for efficient querying
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_agent_steps_thread_id ON agent_steps(thread_id)
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_agent_steps_step_number ON agent_steps(step_number)
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_agent_steps_step_type ON agent_steps(step_type)
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_agent_steps_timestamp ON agent_steps(timestamp)
     ''')
     
     conn.commit()

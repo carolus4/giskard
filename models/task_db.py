@@ -1,5 +1,5 @@
 """
-Database models for tasks using SQLite
+Database models for tasks and agent steps using SQLite
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -211,3 +211,179 @@ class TaskDB:
     
     def __repr__(self) -> str:
         return f"TaskDB(id={self.id}, title='{self.title}', status='{self.status}')"
+
+
+class AgentStepDB:
+    """Database model for agent workflow steps"""
+
+    def __init__(self, id: Optional[int] = None, thread_id: str = "", step_number: int = 0,
+                 step_type: str = "", timestamp: Optional[str] = None,
+                 input_data: Optional[Dict[str, Any]] = None, output_data: Optional[Dict[str, Any]] = None,
+                 rendered_prompt: Optional[str] = None, llm_input: Optional[Dict[str, Any]] = None,
+                 llm_output: Optional[str] = None, error: Optional[str] = None):
+        self.id = id
+        self.thread_id = thread_id
+        self.step_number = step_number
+        self.step_type = step_type
+        self.timestamp = timestamp or datetime.now().isoformat()
+        self.input_data = input_data or {}
+        self.output_data = output_data or {}
+        self.rendered_prompt = rendered_prompt
+        self.llm_input = llm_input or {}
+        self.llm_output = llm_output
+        self.error = error
+
+    def save(self) -> 'AgentStepDB':
+        """Save agent step to database (create or update)"""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+
+            if self.id is None:
+                # Create new step
+                cursor.execute('''
+                    INSERT INTO agent_steps (thread_id, step_number, step_type, timestamp,
+                                           input_data, output_data, rendered_prompt, llm_input,
+                                           llm_output, error)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (self.thread_id, self.step_number, self.step_type, self.timestamp,
+                      json.dumps(self.input_data), json.dumps(self.output_data),
+                      self.rendered_prompt, json.dumps(self.llm_input),
+                      self.llm_output, self.error))
+
+                self.id = cursor.lastrowid
+            else:
+                # Update existing step
+                cursor.execute('''
+                    UPDATE agent_steps SET thread_id=?, step_number=?, step_type=?,
+                                          timestamp=?, input_data=?, output_data=?,
+                                          rendered_prompt=?, llm_input=?, llm_output=?, error=?
+                    WHERE id=?
+                ''', (self.thread_id, self.step_number, self.step_type, self.timestamp,
+                      json.dumps(self.input_data), json.dumps(self.output_data),
+                      self.rendered_prompt, json.dumps(self.llm_input),
+                      self.llm_output, self.error, self.id))
+
+            conn.commit()
+        return self
+
+    def delete(self) -> bool:
+        """Delete agent step from database"""
+        if self.id is None:
+            return False
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('DELETE FROM agent_steps WHERE id=?', (self.id,))
+            deleted = cursor.rowcount > 0
+
+            conn.commit()
+        return deleted
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert agent step to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'thread_id': self.thread_id,
+            'step_number': self.step_number,
+            'step_type': self.step_type,
+            'timestamp': self.timestamp,
+            'input_data': self.input_data,
+            'output_data': self.output_data,
+            'rendered_prompt': self.rendered_prompt,
+            'llm_input': self.llm_input,
+            'llm_output': self.llm_output,
+            'error': self.error
+        }
+
+    @classmethod
+    def get_by_id(cls, step_id: int) -> Optional['AgentStepDB']:
+        """Get agent step by ID"""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT id, thread_id, step_number, step_type, timestamp, input_data,
+                       output_data, rendered_prompt, llm_input, llm_output, error
+                FROM agent_steps WHERE id=?
+            ''', (step_id,))
+
+            row = cursor.fetchone()
+
+            if row:
+                return cls(
+                    id=row[0],
+                    thread_id=row[1],
+                    step_number=row[2],
+                    step_type=row[3],
+                    timestamp=row[4],
+                    input_data=json.loads(row[5]) if row[5] else {},
+                    output_data=json.loads(row[6]) if row[6] else {},
+                    rendered_prompt=row[7],
+                    llm_input=json.loads(row[8]) if row[8] else {},
+                    llm_output=row[9],
+                    error=row[10]
+                )
+            return None
+
+    @classmethod
+    def get_by_thread_id(cls, thread_id: str) -> List['AgentStepDB']:
+        """Get all steps for a specific thread"""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT id, thread_id, step_number, step_type, timestamp, input_data,
+                       output_data, rendered_prompt, llm_input, llm_output, error
+                FROM agent_steps WHERE thread_id=?
+                ORDER BY step_number ASC
+            ''', (thread_id,))
+
+            rows = cursor.fetchall()
+            steps = []
+            for row in rows:
+                steps.append(cls(
+                    id=row[0],
+                    thread_id=row[1],
+                    step_number=row[2],
+                    step_type=row[3],
+                    timestamp=row[4],
+                    input_data=json.loads(row[5]) if row[5] else {},
+                    output_data=json.loads(row[6]) if row[6] else {},
+                    rendered_prompt=row[7],
+                    llm_input=json.loads(row[8]) if row[8] else {},
+                    llm_output=row[9],
+                    error=row[10]
+                ))
+            return steps
+
+    @classmethod
+    def get_next_step_number(cls, thread_id: str) -> int:
+        """Get the next step number for a thread"""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT MAX(step_number) FROM agent_steps WHERE thread_id=?', (thread_id,))
+            result = cursor.fetchone()
+            return (result[0] or 0) + 1
+
+    @classmethod
+    def create(cls, thread_id: str, step_number: int, step_type: str,
+               input_data: Optional[Dict[str, Any]] = None, output_data: Optional[Dict[str, Any]] = None,
+               rendered_prompt: Optional[str] = None, llm_input: Optional[Dict[str, Any]] = None,
+               llm_output: Optional[str] = None, error: Optional[str] = None) -> 'AgentStepDB':
+        """Create a new agent step"""
+        step = cls(
+            thread_id=thread_id,
+            step_number=step_number,
+            step_type=step_type,
+            input_data=input_data or {},
+            output_data=output_data or {},
+            rendered_prompt=rendered_prompt,
+            llm_input=llm_input or {},
+            llm_output=llm_output,
+            error=error
+        )
+        return step.save()
+
+    def __repr__(self) -> str:
+        return f"AgentStepDB(id={self.id}, thread_id='{self.thread_id}', step={self.step_number}, type='{self.step_type}')"

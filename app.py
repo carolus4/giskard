@@ -70,8 +70,9 @@ app = Flask(__name__)
 # Enable CORS for Tauri desktop app (any localhost port)
 CORS(app, origins=[
     "http://127.0.0.1:1430", "http://localhost:1430",  # Original port
-    "http://127.0.0.1:1431", "http://localhost:1431",  # New port  
+    "http://127.0.0.1:1431", "http://localhost:1431",  # New port
     "http://127.0.0.1:1432", "http://localhost:1432",  # Future ports
+    "http://127.0.0.1:5001", "http://localhost:5001",  # API server port
     "tauri://localhost"
 ], supports_credentials=True)
 
