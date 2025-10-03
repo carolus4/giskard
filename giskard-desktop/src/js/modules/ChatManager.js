@@ -391,47 +391,71 @@ class ChatManager {
             return content;
         }
 
-        // For other steps, format with emoji and context
-        const emoji = this._getStepEmoji(step_type);
-        let formattedContent = `${emoji} ${content}`;
+        // For planner steps, show clean format
+        if (step_type === 'planner_llm') {
+            return `Planner: ${content}`;
+        }
 
-        // Add additional details for certain step types
-        if (step_type === 'planner_llm' && details) {
-            const actionsCount = details.actions_count || 0;
-            if (actionsCount > 0) {
-                formattedContent += `\n\n*Planning to execute ${actionsCount} action${actionsCount > 1 ? 's' : ''}*`;
-            }
-        } else if (step_type === 'action_exec' && details) {
-            const successful = details.successful_actions || 0;
-            const failed = details.failed_actions || 0;
-            if (successful > 0 || failed > 0) {
-                formattedContent += `\n\n*Executed: ${successful} successful, ${failed} failed*`;
+        // For action execution steps, show clean format
+        if (step_type === 'action_exec') {
+            const actionName = this._getActionNameFromContent(content);
+            if (details?.successful_actions > 0) {
+                return `Action: ${actionName} successful`;
+            } else if (details?.failed_actions > 0) {
+                return `Action: ${actionName} failed`;
+            } else {
+                return `Action: calling ${actionName}`;
             }
         }
 
-        return formattedContent;
+        // For synthesizer steps, show clean format
+        if (step_type === 'synthesizer_llm') {
+            return `Synthesizer: thinking...`;
+        }
+
+        // For other steps, show clean format
+        return `${this._getStepDisplayName(step_type)}: ${content}`;
     }
 
     /**
-     * Get emoji for step type
+     * Get action name from content
      */
-    _getStepEmoji(stepType) {
-        const emojiMap = {
-            'workflow_start': '🚀',
-            'ingest_user_input': '📥',
-            'planner_llm': '🤔',
-            'action_exec': '⚡',
-            'synthesizer_llm': '💬'
+    _getActionNameFromContent(content) {
+        // Extract action name from content like "Executed fetch_tasks" or "Calling fetch_tasks"
+        const match = content.match(/(?:Executed|Calling|Executing)\s+(\w+)/i);
+        return match ? match[1] : 'action';
+    }
+
+    /**
+     * Get clean step display name
+     */
+    _getStepDisplayName(stepType) {
+        const nameMap = {
+            'workflow_start': 'Workflow',
+            'ingest_user_input': 'Input',
+            'planner_llm': 'Planner',
+            'action_exec': 'Action',
+            'synthesizer_llm': 'Synthesizer'
         };
-        return emojiMap[stepType] || '📋';
+        return nameMap[stepType] || stepType;
     }
 
     /**
      * Get display message for typing indicator
      */
     _getStepDisplayMessage(step) {
-        const emoji = this._getStepEmoji(step.step_type);
-        return `${emoji} ${step.step_type.replace('_', ' ').toUpperCase()}...`;
+        const stepName = this._getStepDisplayName(step.step_type);
+        
+        if (step.step_type === 'planner_llm') {
+            return 'Planner: thinking...';
+        } else if (step.step_type === 'action_exec') {
+            const actionName = this._getActionNameFromContent(step.content);
+            return `Action: calling ${actionName}`;
+        } else if (step.step_type === 'synthesizer_llm') {
+            return 'Synthesizer: thinking...';
+        } else {
+            return `${stepName}: thinking...`;
+        }
     }
 
 
@@ -624,9 +648,6 @@ class ChatManager {
         welcomeDiv.className = 'welcome-message';
         welcomeDiv.innerHTML = `
             <div class="message bot-message">
-                <div class="message-avatar">
-                    <i class="fas fa-robot"></i>
-                </div>
                 <div class="message-content">
                     <p>Hey there! I'm your productivity coach. I can help you organize tasks, set priorities, and stay motivated. What would you like to work on today?</p>
                 </div>
@@ -652,24 +673,29 @@ class ChatManager {
 
         messageEl.className = baseClass;
 
-        const time = new Date(message.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        // Timestamps removed for cleaner interface
 
         // Render different content for step messages vs regular messages
         if (message.step && message.step.step_type) {
-            messageEl.innerHTML = this._renderStepMessage(message, time);
+            messageEl.innerHTML = this._renderStepMessage(message);
         } else {
-            messageEl.innerHTML = `
-                <div class="message-avatar">
-                    <i class="fas ${message.type === 'user' ? 'fa-user' : 'fa-robot'}"></i>
-                </div>
-                <div class="message-content">
-                    <p>${this._formatMessage(message.content)}</p>
-                    <div class="message-time">${time}</div>
-                </div>
-            `;
+            if (message.type === 'user') {
+                messageEl.innerHTML = `
+                    <div class="message-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="message-content">
+                        <p>${this._formatMessage(message.content)}</p>
+                    </div>
+                `;
+            } else {
+                // Bot messages - no avatar, just content
+                messageEl.innerHTML = `
+                    <div class="message-content">
+                        <p>${this._formatMessage(message.content)}</p>
+                    </div>
+                `;
+            }
         }
 
         this.chatMessagesContainer.appendChild(messageEl);
@@ -679,34 +705,23 @@ class ChatManager {
     /**
      * Render a step-specific message
      */
-    _renderStepMessage(message, time) {
+    _renderStepMessage(message) {
         const step = message.step;
         const content = this._formatMessage(message.content);
 
-        // For synthesizer_llm (final step), render normally
+        // For synthesizer_llm (final step), render as plain text
         if (step.step_type === 'synthesizer_llm') {
             return `
-                <div class="message-avatar">
-                    <i class="fas fa-robot"></i>
-                </div>
                 <div class="message-content">
                     <p>${content}</p>
-                    <div class="message-time">${time}</div>
                 </div>
             `;
         }
 
-        // For other steps, add step details
-        const detailsHtml = step.details ? this._renderStepDetails(step.details) : '';
-
+        // For other steps, just show the content without details
         return `
-            <div class="message-avatar">
-                <i class="fas fa-cog"></i>
-            </div>
             <div class="message-content">
                 <p>${content}</p>
-                ${detailsHtml}
-                <div class="message-time">${time}</div>
             </div>
         `;
     }
@@ -730,13 +745,136 @@ class ChatManager {
     }
 
     /**
-     * Format message content (basic markdown-like formatting)
+     * Format message content using proper markdown parsing
      */
     _formatMessage(content) {
-        return content
-            .replace(/\n/g, '<br>')
+        if (!content) return '';
+        
+        // Use a simple but robust markdown parser
+        return this._parseMarkdown(content);
+    }
+
+    /**
+     * Simple markdown parser that handles common formatting
+     */
+    _parseMarkdown(text) {
+        // Split into lines for processing
+        const lines = text.split('\n');
+        const result = [];
+        let inCodeBlock = false;
+        let inList = false;
+        let listType = null;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmedLine = line.trim();
+
+            // Handle code blocks
+            if (trimmedLine.startsWith('```')) {
+                if (inCodeBlock) {
+                    result.push('</pre></code>');
+                    inCodeBlock = false;
+                } else {
+                    result.push('<pre><code>');
+                    inCodeBlock = true;
+                }
+                continue;
+            }
+
+            if (inCodeBlock) {
+                result.push(this._escapeHtml(line) + '\n');
+                continue;
+            }
+
+            // Handle headers
+            if (trimmedLine.startsWith('### ')) {
+                this._closeList(result, inList, listType);
+                inList = false;
+                result.push(`<h3>${this._parseInlineMarkdown(trimmedLine.slice(4))}</h3>`);
+            } else if (trimmedLine.startsWith('## ')) {
+                this._closeList(result, inList, listType);
+                inList = false;
+                result.push(`<h2>${this._parseInlineMarkdown(trimmedLine.slice(3))}</h2>`);
+            } else if (trimmedLine.startsWith('# ')) {
+                this._closeList(result, inList, listType);
+                inList = false;
+                result.push(`<h1>${this._parseInlineMarkdown(trimmedLine.slice(2))}</h1>`);
+            }
+            // Handle unordered lists
+            else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+                if (!inList || listType !== 'ul') {
+                    this._closeList(result, inList, listType);
+                    result.push('<ul>');
+                    inList = true;
+                    listType = 'ul';
+                }
+                result.push(`<li>${this._parseInlineMarkdown(trimmedLine.slice(2))}</li>`);
+            }
+            // Handle ordered lists
+            else if (/^\d+\.\s/.test(trimmedLine)) {
+                if (!inList || listType !== 'ol') {
+                    this._closeList(result, inList, listType);
+                    result.push('<ol>');
+                    inList = true;
+                    listType = 'ol';
+                }
+                const listContent = trimmedLine.replace(/^\d+\.\s/, '');
+                result.push(`<li>${this._parseInlineMarkdown(listContent)}</li>`);
+            }
+            // Handle empty lines
+            else if (trimmedLine === '') {
+                this._closeList(result, inList, listType);
+                inList = false;
+                result.push('<br>');
+            }
+            // Handle regular paragraphs
+            else {
+                this._closeList(result, inList, listType);
+                inList = false;
+                result.push(`<p>${this._parseInlineMarkdown(line)}</p>`);
+            }
+        }
+
+        // Close any remaining list
+        this._closeList(result, inList, listType);
+
+        return result.join('');
+    }
+
+    /**
+     * Parse inline markdown (bold, italic, code, links)
+     */
+    _parseInlineMarkdown(text) {
+        return text
+            // Bold: **text** -> <strong>text</strong>
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>');
+            // Italic: *text* -> <em>text</em>
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            // Inline code: `code` -> <code>code</code>
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            // Links: [text](url) -> <a href="url">text</a>
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    }
+
+    /**
+     * Close list if open
+     */
+    _closeList(result, inList, listType) {
+        if (inList) {
+            result.push(`</${listType}>`);
+        }
+    }
+
+    /**
+     * Escape HTML characters
+     */
+    _escapeHtml(text) {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /**
