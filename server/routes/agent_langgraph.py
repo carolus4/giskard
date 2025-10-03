@@ -288,13 +288,17 @@ def conversation_stream():
             llm_output=response
         )
 
+        # Get the assistant text for display
+        assistant_text = planner_output.get('assistant_text', '')
+        display_content = assistant_text if assistant_text else f"🤔 Planning actions based on: '{input_text}'"
+        
         steps_data.append({
             'step_number': initial_state['current_step'],
             'step_type': 'planner_llm',
             'status': 'completed',
-            'content': f"🤔 Planning actions based on: '{input_text}'",
+            'content': display_content,
             'details': {
-                'assistant_text': planner_output.get('assistant_text', ''),
+                'assistant_text': assistant_text,
                 'actions_count': len(initial_state['actions_to_execute'])
             },
             'timestamp': datetime.now().isoformat()
