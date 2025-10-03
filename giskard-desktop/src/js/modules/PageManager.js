@@ -825,6 +825,12 @@ class PageManager {
      * @param {boolean} immediate - Whether to skip debouncing and save immediately
      */
     async _debouncedUpdateTask(taskId, taskData, immediate = false) {
+        // Validate taskId before proceeding
+        if (!taskId || taskId === 'new') {
+            console.warn('⚠️ Skipping debounced update - invalid taskId:', taskId);
+            return;
+        }
+
         // Clear any existing timeout for this task
         if (this.updateTimeouts.has(taskId)) {
             clearTimeout(this.updateTimeouts.get(taskId));
@@ -863,10 +869,23 @@ class PageManager {
      */
     async _executeTaskUpdate(taskId, taskData) {
         try {
+            // Validate taskId before proceeding
+            if (!taskId || taskId === 'new') {
+                console.warn('⚠️ Skipping task update - invalid taskId:', taskId);
+                return;
+            }
+
+            // Convert string taskId to number for API validation
+            const numericTaskId = parseInt(taskId, 10);
+            if (isNaN(numericTaskId) || numericTaskId <= 0) {
+                console.error('❌ Invalid taskId format:', taskId);
+                return;
+            }
+
             // Use APIClient to update task immediately (for persistence)
             const apiClient = new (await import('./APIClient.js')).default();
 
-            const result = await apiClient.updateTask(taskId, {
+            const result = await apiClient.updateTask(numericTaskId, {
                 title: taskData.title,
                 description: taskData.description,
                 project: taskData.project,

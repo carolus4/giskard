@@ -1932,9 +1932,11 @@ body.dragging .insertion-line {
     gap: 8px;
     font-size: 12px;
     color: #666;
+    margin: 16px 0;
+    padding: 8px 0;
 }
 
-.typing-indicator span:first-child {
+.typing-indicator .typing-message {
     font-style: italic;
 }
 

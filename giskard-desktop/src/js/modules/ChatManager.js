@@ -50,7 +50,7 @@ class ChatManager {
         this.chatMessagesContainer = document.getElementById('chat-messages');
         this.chatInput = document.getElementById('chat-input');
         this.sendButton = document.getElementById('send-message-btn');
-        this.typingIndicator = document.getElementById('typing-indicator');
+        this.typingIndicator = null; // Will be created dynamically
         this.chatSuggestions = document.getElementById('chat-suggestions');
         
         // Load chat history if exists
@@ -140,7 +140,11 @@ class ChatManager {
 
         // Show typing indicator with informative message
         this._showTyping();
-        this._updateTypingMessage('AI is processing your request...');
+        this._updateTypingMessage('Thinking');
+        
+        // Ensure the typing indicator is visible for a minimum time
+        const typingStartTime = Date.now();
+        const minTypingDuration = 800; // Minimum 800ms to ensure visibility
 
         try {
             // Send to Ollama via the orchestrator
@@ -221,6 +225,9 @@ class ChatManager {
             // Clear current conversation state
             this.chatMessages = [];
             this.currentThreadId = null;
+            
+            // Ensure typing indicator is hidden when starting new chat
+            this._hideTyping();
 
             // Re-render UI (will show welcome message)
             this._renderMessages();
@@ -344,14 +351,17 @@ class ChatManager {
                 await new Promise(resolve => setTimeout(resolve, 800));
             }
 
-            // Show typing indicator for non-final steps
-            if (!step.details?.is_final) {
+            // Always show typing indicator for processing steps (except when it's the final step and we want to show the result immediately)
+            const isLastStep = i === steps.length - 1;
+            const shouldShowTyping = !isLastStep || !step.details?.is_final;
+            
+            if (shouldShowTyping) {
                 this._showTyping();
                 this._updateTypingMessage(this._getStepDisplayMessage(step));
+                
+                // Wait longer for the typing indicator to be visible and give user feedback
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
-
-            // Wait a moment for the typing indicator to be visible
-            await new Promise(resolve => setTimeout(resolve, 500));
 
             // Hide typing and add the step as a bot message
             this._hideTyping();
@@ -439,6 +449,7 @@ class ChatManager {
         };
         return nameMap[stepType] || stepType;
     }
+
 
     /**
      * Get display message for typing indicator
@@ -624,10 +635,7 @@ class ChatManager {
         // Clear all messages
         this.chatMessagesContainer.innerHTML = '';
         
-        // Show welcome message if no chat messages
-        if (this.chatMessages.length === 0) {
-            this._renderWelcomeMessage();
-        }
+        // No welcome message - just show empty chat
 
         // Render all chat messages
         this.chatMessages.forEach(message => {
@@ -635,27 +643,6 @@ class ChatManager {
         });
     }
 
-    /**
-     * Render the welcome message
-     */
-    _renderWelcomeMessage() {
-        if (!this.chatMessagesContainer) {
-            console.error('❌ chatMessagesContainer not found in _renderWelcomeMessage!');
-            return;
-        }
-
-        const welcomeDiv = document.createElement('div');
-        welcomeDiv.className = 'welcome-message';
-        welcomeDiv.innerHTML = `
-            <div class="message bot-message">
-                <div class="message-content">
-                    <p>Hey there! I'm your productivity coach. I can help you organize tasks, set priorities, and stay motivated. What would you like to work on today?</p>
-                </div>
-            </div>
-        `;
-        
-        this.chatMessagesContainer.appendChild(welcomeDiv);
-    }
 
     /**
      * Render single message
@@ -685,14 +672,14 @@ class ChatManager {
                         <i class="fas fa-user"></i>
                     </div>
                     <div class="message-content">
-                        <p>${this._formatMessage(message.content)}</p>
+                        ${this._formatMessage(message.content)}
                     </div>
                 `;
             } else {
                 // Bot messages - no avatar, just content
                 messageEl.innerHTML = `
                     <div class="message-content">
-                        <p>${this._formatMessage(message.content)}</p>
+                        ${this._formatMessage(message.content)}
                     </div>
                 `;
             }
@@ -713,7 +700,7 @@ class ChatManager {
         if (step.step_type === 'synthesizer_llm') {
             return `
                 <div class="message-content">
-                    <p>${content}</p>
+                    ${content}
                 </div>
             `;
         }
@@ -721,7 +708,7 @@ class ChatManager {
         // For other steps, just show the content without details
         return `
             <div class="message-content">
-                <p>${content}</p>
+                ${content}
             </div>
         `;
     }
@@ -881,20 +868,51 @@ class ChatManager {
      * Show typing indicator
      */
     _showTyping() {
-        this.isTyping = true;
-        if (this.typingIndicator) {
+        try {
+            this.isTyping = true;
+            
+            // Ensure chatMessagesContainer exists
+            if (!this.chatMessagesContainer) {
+                console.warn('⚠️ chatMessagesContainer not found, cannot show typing indicator');
+                return;
+            }
+            
+            // Create typing indicator if it doesn't exist
+            if (!this.typingIndicator) {
+                this.typingIndicator = document.createElement('div');
+                this.typingIndicator.className = 'typing-indicator';
+                this.typingIndicator.innerHTML = `
+                    <span class="typing-message">Giskard is thinking</span>
+                    <div class="dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                `;
+                this.chatMessagesContainer.appendChild(this.typingIndicator);
+            }
+            
             this.typingIndicator.style.display = 'flex';
+            this._scrollToBottom();
+            
+            console.log('✅ Typing indicator shown');
+        } catch (error) {
+            console.error('❌ Failed to show typing indicator:', error);
         }
-        this._scrollToBottom();
     }
 
     /**
      * Hide typing indicator
      */
     _hideTyping() {
-        this.isTyping = false;
-        if (this.typingIndicator) {
-            this.typingIndicator.style.display = 'none';
+        try {
+            this.isTyping = false;
+            if (this.typingIndicator) {
+                this.typingIndicator.style.display = 'none';
+                console.log('✅ Typing indicator hidden');
+            }
+        } catch (error) {
+            console.error('❌ Failed to hide typing indicator:', error);
         }
     }
 
@@ -902,11 +920,20 @@ class ChatManager {
      * Update typing indicator message
      */
     _updateTypingMessage(message) {
-        if (this.typingIndicator) {
-            const messageElement = this.typingIndicator.querySelector('.typing-message');
-            if (messageElement) {
-                messageElement.textContent = message;
+        try {
+            if (this.typingIndicator) {
+                const messageElement = this.typingIndicator.querySelector('.typing-message');
+                if (messageElement) {
+                    messageElement.textContent = message;
+                    console.log('✅ Typing message updated to:', message);
+                } else {
+                    console.warn('⚠️ Typing message element not found');
+                }
+            } else {
+                console.warn('⚠️ Typing indicator not found when updating message');
             }
+        } catch (error) {
+            console.error('❌ Failed to update typing message:', error);
         }
     }
 
@@ -1068,17 +1095,33 @@ class ChatManager {
                 const data = await response.json();
                 if (data.success && data.steps) {
                     // Convert backend steps to chat messages format
-                    this.chatMessages = data.steps.map(step => ({
-                        type: step.step_type === 'ingest_user_input' ? 'user' : 'bot',
-                        content: step.output_data?.final_message || step.content || step.input_data?.input_text || 'Step completed',
-                        timestamp: step.timestamp,
-                        step: step
-                    }));
+                    this.chatMessages = data.steps.map(step => {
+                        const isUserMessage = step.step_type === 'ingest_user_input';
+                        
+                        // For user messages, use the input text
+                        if (isUserMessage) {
+                            return {
+                                type: 'user',
+                                content: step.input_data?.input_text || 'User message',
+                                timestamp: step.timestamp
+                            };
+                        }
+                        
+                        // For bot messages, use the same formatting logic as live chat
+                        const formattedContent = this._formatStepContent(step);
+                        return {
+                            type: 'bot',
+                            content: formattedContent,
+                            timestamp: step.timestamp,
+                            step: step
+                        };
+                    });
 
                     this.currentThreadId = threadId;
                     this._renderMessages();
                     this._hideSuggestions();
                     console.log(`📖 Loaded ${this.chatMessages.length} messages for thread: ${threadId}`);
+                    console.log('📋 Message types:', this.chatMessages.map(msg => ({ type: msg.type, hasStep: !!msg.step })));
                 }
             }
         } catch (error) {
