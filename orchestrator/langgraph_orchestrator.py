@@ -173,8 +173,8 @@ class LangGraphOrchestrator:
                 }
 
             self._log_node(state, "planner_llm", input_data, output_data,
-                          rendered_prompt=planner_prompt, llm_input={"messages": [msg.content for msg in messages]},
-                          llm_output=response)
+                          rendered_prompt=planner_prompt, llm_input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
+                          llm_output=response, llm_model=self.llm.model)
             return state
 
         except Exception as e:
@@ -288,8 +288,8 @@ class LangGraphOrchestrator:
             }
 
             self._log_node(state, "synthesizer_llm", input_data, output_data,
-                          rendered_prompt=full_prompt, llm_input={"messages": [msg.content for msg in messages]},
-                          llm_output=response)
+                          rendered_prompt=full_prompt, llm_input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
+                          llm_output=response, llm_model=self.llm.model)
             return state
 
         except Exception as e:
@@ -304,7 +304,7 @@ class LangGraphOrchestrator:
                 "synthesis_success": False
             }
 
-            self._log_node(state, "synthesizer_llm", input_data, output_data, error=str(e))
+            self._log_node(state, "synthesizer_llm", input_data, output_data, error=str(e), llm_model=self.llm.model)
             return state
     
     def run(self, input_text: str, session_id: str = None, domain: str = None) -> Dict[str, Any]:

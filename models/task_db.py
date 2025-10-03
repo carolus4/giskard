@@ -220,7 +220,7 @@ class AgentStepDB:
                  step_type: str = "", timestamp: Optional[str] = None,
                  input_data: Optional[Dict[str, Any]] = None, output_data: Optional[Dict[str, Any]] = None,
                  rendered_prompt: Optional[str] = None, llm_input: Optional[Dict[str, Any]] = None,
-                 llm_output: Optional[str] = None, error: Optional[str] = None):
+                 llm_output: Optional[str] = None, llm_model: Optional[str] = None, error: Optional[str] = None):
         self.id = id
         self.thread_id = thread_id
         self.step_number = step_number
@@ -231,6 +231,7 @@ class AgentStepDB:
         self.rendered_prompt = rendered_prompt
         self.llm_input = llm_input or {}
         self.llm_output = llm_output
+        self.llm_model = llm_model
         self.error = error
 
     def save(self) -> 'AgentStepDB':
@@ -243,12 +244,12 @@ class AgentStepDB:
                 cursor.execute('''
                     INSERT INTO agent_steps (thread_id, step_number, step_type, timestamp,
                                            input_data, output_data, rendered_prompt, llm_input,
-                                           llm_output, error)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                           llm_output, llm_model, error)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (self.thread_id, self.step_number, self.step_type, self.timestamp,
                       json.dumps(self.input_data), json.dumps(self.output_data),
                       self.rendered_prompt, json.dumps(self.llm_input),
-                      self.llm_output, self.error))
+                      self.llm_output, self.llm_model, self.error))
 
                 self.id = cursor.lastrowid
             else:
@@ -256,12 +257,12 @@ class AgentStepDB:
                 cursor.execute('''
                     UPDATE agent_steps SET thread_id=?, step_number=?, step_type=?,
                                           timestamp=?, input_data=?, output_data=?,
-                                          rendered_prompt=?, llm_input=?, llm_output=?, error=?
+                                          rendered_prompt=?, llm_input=?, llm_output=?, llm_model=?, error=?
                     WHERE id=?
                 ''', (self.thread_id, self.step_number, self.step_type, self.timestamp,
                       json.dumps(self.input_data), json.dumps(self.output_data),
                       self.rendered_prompt, json.dumps(self.llm_input),
-                      self.llm_output, self.error, self.id))
+                      self.llm_output, self.llm_model, self.error, self.id))
 
             conn.commit()
         return self
@@ -293,6 +294,7 @@ class AgentStepDB:
             'rendered_prompt': self.rendered_prompt,
             'llm_input': self.llm_input,
             'llm_output': self.llm_output,
+            'llm_model': self.llm_model,
             'error': self.error
         }
 
@@ -304,7 +306,7 @@ class AgentStepDB:
 
             cursor.execute('''
                 SELECT id, thread_id, step_number, step_type, timestamp, input_data,
-                       output_data, rendered_prompt, llm_input, llm_output, error
+                       output_data, rendered_prompt, llm_input, llm_output, llm_model, error
                 FROM agent_steps WHERE id=?
             ''', (step_id,))
 
@@ -322,7 +324,8 @@ class AgentStepDB:
                     rendered_prompt=row[7],
                     llm_input=json.loads(row[8]) if row[8] else {},
                     llm_output=row[9],
-                    error=row[10]
+                    llm_model=row[10],
+                    error=row[11]
                 )
             return None
 
@@ -334,7 +337,7 @@ class AgentStepDB:
 
             cursor.execute('''
                 SELECT id, thread_id, step_number, step_type, timestamp, input_data,
-                       output_data, rendered_prompt, llm_input, llm_output, error
+                       output_data, rendered_prompt, llm_input, llm_output, llm_model, error
                 FROM agent_steps WHERE thread_id=?
                 ORDER BY step_number ASC
             ''', (thread_id,))
@@ -353,7 +356,8 @@ class AgentStepDB:
                     rendered_prompt=row[7],
                     llm_input=json.loads(row[8]) if row[8] else {},
                     llm_output=row[9],
-                    error=row[10]
+                    llm_model=row[10],
+                    error=row[11]
                 ))
             return steps
 
@@ -370,7 +374,7 @@ class AgentStepDB:
     def create(cls, thread_id: str, step_number: int, step_type: str,
                input_data: Optional[Dict[str, Any]] = None, output_data: Optional[Dict[str, Any]] = None,
                rendered_prompt: Optional[str] = None, llm_input: Optional[Dict[str, Any]] = None,
-               llm_output: Optional[str] = None, error: Optional[str] = None) -> 'AgentStepDB':
+               llm_output: Optional[str] = None, llm_model: Optional[str] = None, error: Optional[str] = None) -> 'AgentStepDB':
         """Create a new agent step"""
         step = cls(
             thread_id=thread_id,
@@ -381,6 +385,7 @@ class AgentStepDB:
             rendered_prompt=rendered_prompt,
             llm_input=llm_input or {},
             llm_output=llm_output,
+            llm_model=llm_model,
             error=error
         )
         return step.save()

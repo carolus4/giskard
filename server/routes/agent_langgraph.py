@@ -16,6 +16,17 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 agent_langgraph = Blueprint('agent_langgraph', __name__)
 
+
+def convert_conversation_context_to_messages(conversation_context):
+    """Convert conversation context from frontend to LangChain messages"""
+    messages = []
+    for msg in conversation_context:
+        if msg.get('type') == 'user':
+            messages.append(HumanMessage(content=msg.get('content', '')))
+        elif msg.get('type') == 'bot':
+            messages.append(AIMessage(content=msg.get('content', '')))
+    return messages
+
 # Initialize orchestrator
 orchestrator = LangGraphOrchestrator()
 
@@ -201,12 +212,15 @@ def conversation_stream():
         input_text = data.get('input_text', '').strip()
         session_id = data.get('session_id')
         domain = data.get('domain', 'chat')
+        conversation_context = data.get('conversation_context', [])
+        thread_id = data.get('thread_id', session_id)
 
         if not input_text:
             return APIResponse.error('input_text is required')
 
         # Generate thread_id if not provided
-        thread_id = session_id or f"chat-{int(time.time())}"
+        if not thread_id:
+            thread_id = f"chat-{int(time.time())}"
 
         # Get the orchestrator to run step by step
         steps_data = []
@@ -266,10 +280,13 @@ def conversation_stream():
         from config.prompts import get_planner_prompt
         planner_prompt = get_planner_prompt()
 
-        # Create messages for LLM
+        # Create messages for LLM with conversation context
         system_msg = SystemMessage(content=planner_prompt)
         user_msg = HumanMessage(content=input_text)
-        messages = [system_msg, user_msg]
+        
+        # Include conversation context if available
+        context_messages = convert_conversation_context_to_messages(conversation_context)
+        messages = [system_msg] + context_messages + [user_msg]
 
         # Call LLM for planning
         response = orchestrator.llm.invoke(messages)
@@ -299,10 +316,11 @@ def conversation_stream():
             thread_id=thread_id,
             step_number=initial_state['current_step'],
             step_type='planner_llm',
-            input_data={'input_text': input_text, 'messages_count': 1},
+            input_data={'input_text': input_text, 'messages_count': len(messages), 'conversation_context_length': len(conversation_context)},
             output_data={'llm_response': response, 'planner_output': planner_output, 'actions_to_execute': initial_state['actions_to_execute']},
             rendered_prompt=planner_prompt,
-            llm_input={'messages': [msg.content for msg in messages]},
+            llm_input={'messages': [{'type': msg.__class__.__name__, 'content': msg.content} for msg in messages]},
+            llm_model='gemma3:4b',
             llm_output=response
         )
 
@@ -367,9 +385,12 @@ def conversation_stream():
         action_results_str = json.dumps(initial_state['action_results'], indent=2)
         full_prompt = get_synthesizer_prompt(input_text, action_results_str)
 
-        # Create messages for synthesis
+        # Create messages for synthesis with conversation context
         system_msg = SystemMessage(content=full_prompt)
-        messages = [system_msg]
+        
+        # Include conversation context if available
+        context_messages = convert_conversation_context_to_messages(conversation_context)
+        messages = [system_msg] + context_messages
 
         # Call LLM for final response
         response = orchestrator.llm.invoke(messages)
@@ -383,10 +404,11 @@ def conversation_stream():
             thread_id=thread_id,
             step_number=initial_state['current_step'],
             step_type='synthesizer_llm',
-            input_data={'action_results': initial_state['action_results'], 'input_text': input_text},
+            input_data={'action_results': initial_state['action_results'], 'input_text': input_text, 'conversation_context_length': len(conversation_context)},
             output_data={'final_message': response, 'synthesis_success': True},
             rendered_prompt=full_prompt,
-            llm_input={'messages': [msg.content for msg in messages]},
+            llm_input={'messages': [{'type': msg.__class__.__name__, 'content': msg.content} for msg in messages]},
+            llm_model='gemma3:4b',
             llm_output=response
         )
 

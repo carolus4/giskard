@@ -69,6 +69,7 @@ def init_database():
             rendered_prompt TEXT,
             llm_input TEXT DEFAULT '{}',
             llm_output TEXT,
+            llm_model TEXT,
             error TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
@@ -89,6 +90,10 @@ def init_database():
 
     cursor.execute('''
         CREATE INDEX IF NOT EXISTS idx_agent_steps_timestamp ON agent_steps(timestamp)
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_agent_steps_llm_model ON agent_steps(llm_model)
     ''')
     
     conn.commit()
