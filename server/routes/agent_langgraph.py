@@ -78,18 +78,16 @@ def visualize_graph():
         # Get the graph structure
         graph_info = {
             "nodes": [
-                {"id": "ingest_user_input", "label": "Ingest User Input", "type": "input"},
                 {"id": "planner_llm", "label": "Planner LLM", "type": "llm"},
                 {"id": "action_exec", "label": "Action Execution", "type": "action"},
                 {"id": "synthesizer_llm", "label": "Synthesizer LLM", "type": "llm"}
             ],
             "edges": [
-                {"from": "ingest_user_input", "to": "planner_llm"},
                 {"from": "planner_llm", "to": "action_exec"},
                 {"from": "action_exec", "to": "synthesizer_llm"},
                 {"from": "synthesizer_llm", "to": "END"}
             ],
-            "description": "LangGraph-based agent workflow with 4 sequential nodes"
+            "description": "LangGraph-based agent workflow with 3 sequential nodes"
         }
         
         return APIResponse.success('Graph structure retrieved', graph_info)
@@ -225,7 +223,7 @@ def conversation_stream():
         # Get the orchestrator to run step by step
         steps_data = []
 
-        # Create initial state and log workflow start
+        # Create initial state
         initial_state = {
             'messages': [],
             'input_text': input_text,
@@ -239,41 +237,7 @@ def conversation_stream():
             'final_message': None
         }
 
-        # Log workflow start
-        AgentStepDB.create(
-            thread_id=thread_id,
-            step_number=initial_state['current_step'],
-            step_type='workflow_start',
-            input_data={'input_text': input_text, 'session_id': session_id, 'domain': domain}
-        )
-
-        steps_data.append({
-            'step_number': initial_state['current_step'],
-            'step_type': 'workflow_start',
-            'status': 'completed',
-            'content': f"Processing: {input_text}",
-            'timestamp': datetime.now().isoformat()
-        })
-
-        # Step 1: Ingest user input
-        initial_state['current_step'] += 1
-        AgentStepDB.create(
-            thread_id=thread_id,
-            step_number=initial_state['current_step'],
-            step_type='ingest_user_input',
-            input_data={'input_text': input_text},
-            output_data={'messages_count': 1, 'user_message_added': True}
-        )
-
-        steps_data.append({
-            'step_number': initial_state['current_step'],
-            'step_type': 'ingest_user_input',
-            'status': 'completed',
-            'content': f"Received your message: '{input_text}'",
-            'timestamp': datetime.now().isoformat()
-        })
-
-        # Step 2: Planner LLM (thinking/planning phase)
+        # Step 1: Planner LLM (thinking/planning phase)
         initial_state['current_step'] += 1
 
         # Load planner prompt and create LLM input
@@ -336,7 +300,7 @@ def conversation_stream():
             'timestamp': datetime.now().isoformat()
         })
 
-        # Step 3: Execute actions
+        # Step 2: Execute actions
         if initial_state['actions_to_execute']:
             initial_state['current_step'] += 1
 
@@ -377,7 +341,7 @@ def conversation_stream():
                 'timestamp': datetime.now().isoformat()
             })
 
-        # Step 4: Synthesize final response
+        # Step 3: Synthesize final response
         initial_state['current_step'] += 1
 
         # Load synthesizer prompt
