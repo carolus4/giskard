@@ -355,10 +355,11 @@ def conversation_stream():
 
         # Create messages for synthesis with conversation context
         system_msg = SystemMessage(content=full_prompt)
+        user_msg = HumanMessage(content=input_text)
         
         # Include conversation context if available
         context_messages = convert_conversation_context_to_messages(conversation_context)
-        messages = [system_msg] + context_messages
+        messages = [system_msg] + context_messages + [user_msg]
 
         # Call LLM for final response
         response = orchestrator.llm.invoke(messages)

@@ -43,48 +43,34 @@ class GraphNodes:
             raise
     
     def planner_llm(self, state: AgentState) -> AgentState:
-        """Node 2: Call LLM to plan actions"""
+        """Node 2: Use router-based planner to select tool and arguments"""
         try:
-            # Load planner prompt from registry
-            from config.prompts import get_planner_prompt
-            planner_prompt = get_planner_prompt()
+            # Import the router planner
+            from orchestrator.tools.router import RouterPlanner
             
-            # Prepare the prompt with user input
-            full_prompt = f"{planner_prompt}\n\nUser: \"{state.input_text}\"\nResponse:"
+            # Create router planner instance
+            router_planner = RouterPlanner()
             
-            # Call Ollama
-            response = self._call_ollama(full_prompt)
+            # Plan actions using the router
+            router_output = router_planner.plan_actions(state.input_text)
             
             # Emit llm_message event
             llm_event = LLMMessageEvent(
                 type=AgentEventType.LLM_MESSAGE,
                 node="planner",
-                content=response
+                content=f"Router selected tool: {router_output.get('tool_name', 'unknown')}"
             )
             state.add_event(llm_event)
             
-            # Parse the JSON response
-            try:
-                # Clean up the response - remove markdown code blocks if present
-                cleaned_response = response.strip()
-                if cleaned_response.startswith("```json"):
-                    cleaned_response = cleaned_response[7:]  # Remove ```json
-                if cleaned_response.endswith("```"):
-                    cleaned_response = cleaned_response[:-3]  # Remove ```
-                cleaned_response = cleaned_response.strip()
-                
-                planner_output = json.loads(cleaned_response)
-                state.planner_output = planner_output
-                state.actions_to_execute = planner_output.get("actions", [])
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse planner JSON: {str(e)}")
-                logger.error(f"Response was: {response}")
-                # Fallback to no_op if parsing fails
-                state.planner_output = {
-                    "assistant_text": "I'm sorry, I had trouble understanding your request.",
-                    "actions": [{"name": "no_op", "args": {}}]
-                }
-                state.actions_to_execute = [{"name": "no_op", "args": {}}]
+            # Store router output
+            state.planner_output = router_output
+            
+            # Convert router output to actions format for compatibility
+            # The router now returns a single tool call instead of multiple actions
+            state.actions_to_execute = [{
+                "name": router_output.get("tool_name", "no_op"),
+                "args": router_output.get("tool_args", {})
+            }]
             
             return state
             
@@ -99,8 +85,13 @@ class GraphNodes:
             return state
     
     def action_exec(self, state: AgentState) -> AgentState:
-        """Node 3: Execute actions"""
+        """Node 3: Execute actions using tool-based approach"""
         try:
+            from orchestrator.tools.router import RouterPlanner
+            
+            # Create router planner instance for tool execution
+            router_planner = RouterPlanner()
+            
             action_results = []
             
             for action in state.actions_to_execute:
@@ -115,16 +106,19 @@ class GraphNodes:
                 )
                 state.add_event(action_call_event)
                 
-                # Execute the action
-                success, result = self.action_executor.execute_action(action_name, action_args)
+                # Execute the tool using the router planner
+                tool_result = router_planner.execute_tool(action_name, action_args)
+                
+                # Determine success based on result content
+                success = not tool_result.startswith("❌")
                 
                 # Emit action_result event
                 action_result_event = ActionResultEvent(
                     type=AgentEventType.ACTION_RESULT,
                     name=action_name,
                     ok=success,
-                    result=result if success else None,
-                    error=result.get("error") if not success else None
+                    result={"message": tool_result} if success else None,
+                    error=tool_result if not success else None
                 )
                 state.add_event(action_result_event)
                 
@@ -132,8 +126,8 @@ class GraphNodes:
                 action_results.append({
                     "name": action_name,
                     "ok": success,
-                    "result": result if success else None,
-                    "error": result.get("error") if not success else None
+                    "result": {"message": tool_result} if success else None,
+                    "error": tool_result if not success else None
                 })
             
             state.action_results = action_results
