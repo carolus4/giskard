@@ -4,12 +4,15 @@ LangGraph-based orchestrator for Giskard agent
 from typing import Dict, Any, List, Optional, TypedDict, Annotated
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_ollama import OllamaLLM
 import json
 import logging
 from datetime import datetime
 from .actions.actions import ActionExecutor
+from .tools.router import Router
+from .tools.tool_registry import ToolRegistry
 from models.task_db import AgentStepDB
 
 logger = logging.getLogger(__name__)
@@ -23,9 +26,10 @@ class AgentState(TypedDict):
     domain: Optional[str]
     thread_id: Optional[str]
     current_step: int
-    planner_output: Optional[Dict[str, Any]]
-    actions_to_execute: List[Dict[str, Any]]
-    action_results: List[Dict[str, Any]]
+    router_output: Optional[Dict[str, Any]]
+    tool_name: Optional[str]
+    tool_args: Optional[Dict[str, Any]]
+    tool_result: Optional[str]
     final_message: Optional[str]
 
 
@@ -35,6 +39,10 @@ class LangGraphOrchestrator:
     def __init__(self):
         self.llm = OllamaLLM(model="gemma3:4b", base_url="http://localhost:11434")
         self.action_executor = ActionExecutor()
+        self.router = Router()
+        self.tool_registry = ToolRegistry()
+        self.tools = self.tool_registry.get_tools()
+        self.tool_node = ToolNode(self.tools)
         self.graph = self._build_graph()
         # Set a reasonable timeout for the entire workflow (90 seconds)
         self.workflow_timeout = 90
@@ -74,15 +82,15 @@ class LangGraphOrchestrator:
         
         # Add nodes
         workflow.add_node("ingest_user_input", self._ingest_user_input)
-        workflow.add_node("planner_llm", self._planner_llm)
-        workflow.add_node("action_exec", self._action_exec)
+        workflow.add_node("router_llm", self._router_llm)
+        workflow.add_node("tool_exec", self._tool_exec)
         workflow.add_node("synthesizer_llm", self._synthesizer_llm)
         
         # Define the flow
         workflow.set_entry_point("ingest_user_input")
-        workflow.add_edge("ingest_user_input", "planner_llm")
-        workflow.add_edge("planner_llm", "action_exec")
-        workflow.add_edge("action_exec", "synthesizer_llm")
+        workflow.add_edge("ingest_user_input", "router_llm")
+        workflow.add_edge("router_llm", "tool_exec")
+        workflow.add_edge("tool_exec", "synthesizer_llm")
         workflow.add_edge("synthesizer_llm", END)
         
         return workflow.compile()
@@ -108,8 +116,8 @@ class LangGraphOrchestrator:
         self._log_node(state, "ingest_user_input", input_data, output_data)
         return state
     
-    def _planner_llm(self, state: AgentState) -> AgentState:
-        """Node 2: Plan actions using LLM"""
+    def _router_llm(self, state: AgentState) -> AgentState:
+        """Node 2: Route to appropriate tool using structured router"""
         # Increment step counter
         state["current_step"] += 1
 
@@ -119,138 +127,87 @@ class LangGraphOrchestrator:
         }
 
         try:
-            # Load planner prompt from registry
-            from config.prompts import get_planner_prompt
-            planner_prompt = get_planner_prompt()
+            # Use the structured router to get tool decision
+            router_output = self.router.plan_actions(state["input_text"])
+            
+            # Store router output in state
+            state["router_output"] = router_output
+            state["tool_name"] = router_output["tool_name"]
+            state["tool_args"] = router_output["tool_args"]
 
-            # Create system message with planner prompt
-            system_msg = SystemMessage(content=planner_prompt)
-            user_msg = HumanMessage(content=state["input_text"])
+            # Add assistant message to conversation
+            state["messages"].append(AIMessage(content=router_output["assistant_text"]))
 
-            # Call LLM
-            messages = [system_msg, user_msg]
-            response = self.llm.invoke(messages)
+            output_data = {
+                "router_output": router_output,
+                "tool_name": state["tool_name"],
+                "tool_args": state["tool_args"],
+                "routing_success": True
+            }
 
-            # Add AI message to conversation
-            state["messages"].append(AIMessage(content=response))
-
-            # Parse JSON response
-            try:
-                # Clean response
-                cleaned_response = response.strip()
-                if cleaned_response.startswith("```json"):
-                    cleaned_response = cleaned_response[7:]
-                if cleaned_response.endswith("```"):
-                    cleaned_response = cleaned_response[:-3]
-                cleaned_response = cleaned_response.strip()
-
-                planner_output = json.loads(cleaned_response)
-                state["planner_output"] = planner_output
-                state["actions_to_execute"] = planner_output.get("actions", [])
-
-                output_data = {
-                    "llm_response": response,
-                    "planner_output": planner_output,
-                    "actions_to_execute": state["actions_to_execute"],
-                    "parsing_success": True
-                }
-
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse planner JSON: {str(e)}")
-                logger.error(f"Response was: {response}")
-                # Fallback
-                state["planner_output"] = {
-                    "assistant_text": "I'm sorry, I had trouble understanding your request.",
-                    "actions": [{"name": "no_op", "args": {}}]
-                }
-                state["actions_to_execute"] = [{"name": "no_op", "args": {}}]
-
-                output_data = {
-                    "llm_response": response,
-                    "parsing_success": False,
-                    "error": str(e),
-                    "fallback_used": True
-                }
-
-            self._log_node(state, "planner_llm", input_data, output_data,
-                          rendered_prompt=planner_prompt, llm_input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
-                          llm_output=response, llm_model=self.llm.model)
+            self._log_node(state, "router_llm", input_data, output_data)
             return state
 
         except Exception as e:
-            logger.error(f"Error in planner_llm: {str(e)}")
+            logger.error(f"Error in router_llm: {str(e)}")
             # Fallback
-            state["planner_output"] = {
+            state["router_output"] = {
                 "assistant_text": "I'm sorry, I encountered an error processing your request.",
-                "actions": [{"name": "no_op", "args": {}}]
+                "tool_name": "no_op",
+                "tool_args": {}
             }
-            state["actions_to_execute"] = [{"name": "no_op", "args": {}}]
+            state["tool_name"] = "no_op"
+            state["tool_args"] = {}
 
             output_data = {
                 "error": str(e),
                 "fallback_used": True
             }
 
-            self._log_node(state, "planner_llm", input_data, output_data,
-                          error=str(e))
+            self._log_node(state, "router_llm", input_data, output_data, error=str(e))
             return state
     
-    def _action_exec(self, state: AgentState) -> AgentState:
-        """Node 3: Execute actions"""
+    def _tool_exec(self, state: AgentState) -> AgentState:
+        """Node 3: Execute tool using ToolNode"""
         # Increment step counter
         state["current_step"] += 1
 
         input_data = {
-            "actions_to_execute": state["actions_to_execute"]
+            "tool_name": state["tool_name"],
+            "tool_args": state["tool_args"]
         }
 
         try:
-            action_results = []
+            # Execute the tool using the router's execute_tool method
+            tool_result = self.router.execute_tool(state["tool_name"], state["tool_args"])
+            state["tool_result"] = tool_result
 
-            for action in state["actions_to_execute"]:
-                action_name = action.get("name", "no_op")
-                action_args = action.get("args", {})
-
-                logger.info(f"Executing action: {action_name} with args: {action_args}")
-
-                # Execute the action
-                success, result = self.action_executor.execute_action(action_name, action_args)
-
-                # Store result
-                action_results.append({
-                    "name": action_name,
-                    "ok": success,
-                    "result": result if success else None,
-                    "error": result.get("error") if not success else None
-                })
-
-            state["action_results"] = action_results
+            # Add tool result to conversation
+            state["messages"].append(AIMessage(content=tool_result))
 
             output_data = {
-                "action_results": action_results,
-                "actions_executed": len(action_results),
-                "successful_actions": len([r for r in action_results if r["ok"]]),
-                "failed_actions": len([r for r in action_results if not r["ok"]])
+                "tool_name": state["tool_name"],
+                "tool_args": state["tool_args"],
+                "tool_result": tool_result,
+                "execution_success": True
             }
 
-            self._log_node(state, "action_exec", input_data, output_data)
+            self._log_node(state, "tool_exec", input_data, output_data)
             return state
 
         except Exception as e:
-            logger.error(f"Error in action_exec: {str(e)}")
-            state["action_results"] = [{
-                "name": "error",
-                "ok": False,
-                "result": None,
-                "error": str(e)
-            }]
+            logger.error(f"Error in tool_exec: {str(e)}")
+            error_msg = f"❌ Error executing {state['tool_name']}: {str(e)}"
+            state["tool_result"] = error_msg
+            state["messages"].append(AIMessage(content=error_msg))
 
             output_data = {
                 "error": str(e),
-                "action_results": state["action_results"]
+                "tool_result": error_msg,
+                "execution_success": False
             }
 
-            self._log_node(state, "action_exec", input_data, output_data, error=str(e))
+            self._log_node(state, "tool_exec", input_data, output_data, error=str(e))
             return state
     
     def _synthesizer_llm(self, state: AgentState) -> AgentState:
@@ -259,16 +216,16 @@ class LangGraphOrchestrator:
         state["current_step"] += 1
 
         input_data = {
-            "action_results": state["action_results"],
-            "planner_output": state.get("planner_output"),
+            "tool_result": state.get("tool_result"),
+            "router_output": state.get("router_output"),
             "input_text": state["input_text"]
         }
 
         try:
             # Load synthesizer prompt from registry
             from config.prompts import get_synthesizer_prompt
-            action_results_str = json.dumps(state["action_results"], indent=2)
-            full_prompt = get_synthesizer_prompt(state["input_text"], action_results_str)
+            tool_result_str = state.get("tool_result", "No result")
+            full_prompt = get_synthesizer_prompt(state["input_text"], tool_result_str)
 
             # Create messages
             system_msg = SystemMessage(content=full_prompt)
@@ -289,7 +246,7 @@ class LangGraphOrchestrator:
 
             self._log_node(state, "synthesizer_llm", input_data, output_data,
                           rendered_prompt=full_prompt, llm_input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
-                          llm_output=response, llm_model=self.llm.model)
+                          llm_output=response)
             return state
 
         except Exception as e:
@@ -304,7 +261,7 @@ class LangGraphOrchestrator:
                 "synthesis_success": False
             }
 
-            self._log_node(state, "synthesizer_llm", input_data, output_data, error=str(e), llm_model=self.llm.model)
+            self._log_node(state, "synthesizer_llm", input_data, output_data, error=str(e))
             return state
     
     def run(self, input_text: str, session_id: str = None, domain: str = None) -> Dict[str, Any]:
@@ -326,9 +283,10 @@ class LangGraphOrchestrator:
             domain=domain,
             thread_id=thread_id,
             current_step=next_step,
-            planner_output=None,
-            actions_to_execute=[],
-            action_results=[],
+            router_output=None,
+            tool_name=None,
+            tool_args=None,
+            tool_result=None,
             final_message=None
         )
 
