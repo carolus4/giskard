@@ -304,7 +304,7 @@ def conversation_stream():
         # Create Langfuse trace context for the entire conversation
         from config.langfuse_config import langfuse_config
         langfuse_trace_context = langfuse_config.create_trace_context(
-            name="giskard-message",
+            name="chat.turn",
             trace_id=trace_id,
             user_id=session_id,
             input_data={"input_text": input_text, "session_id": session_id, "domain": domain}
@@ -352,20 +352,33 @@ def conversation_stream():
         else:
             client = langfuse_config.client
         
+        # Create root span for the entire chat turn
+        root_span = None
+        if client and langfuse_trace_context:
+            try:
+                root_span = client.start_span(
+                    trace_context=langfuse_trace_context,
+                    name="chat.turn",
+                    input={"input_text": input_text, "session_id": session_id, "domain": domain}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to create Langfuse root span: {e}")
+                root_span = None
+
         # Create planner span
         planner_span = None
         planner_generation = None
-        if client and langfuse_trace_context:
+        if client and root_span:
             try:
                 planner_span = client.start_span(
                     trace_context=langfuse_trace_context,
-                    name="planner-node",
+                    name="plan",
                     input={"input_text": input_text, "messages_count": len(messages)}
                 )
                 
                 # Create planner generation
                 planner_generation = planner_span.start_observation(
-                    name="planner-action",
+                    name="planner.llm",
                     as_type="generation",
                     input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]}
                 )
@@ -450,19 +463,44 @@ def conversation_stream():
         if initial_state['actions_to_execute']:
             initial_state['current_step'] += 1
 
-            # Execute actions with Langfuse tracing
-            action_span = client.start_span(
-                trace_context=langfuse_trace_context,
-                name="action-node",
-                input={"actions_to_execute": initial_state['actions_to_execute']}
-            )
-            
             action_results = []
             for action in initial_state['actions_to_execute']:
                 action_name = action.get("name", "no_op")
                 action_args = action.get("args", {})
 
+                # Create individual tool execution span for each action
+                tool_span = None
+                if client and root_span:
+                    try:
+                        tool_span = client.start_span(
+                            trace_context=langfuse_trace_context,
+                            name=f"tool.execute.{action_name}",
+                            input={"tool_name": action_name, "tool_args": action_args}
+                        )
+                        
+                        # Add tool request event
+                        tool_span.create_event(
+                            name="tool.request",
+                            input={"tool_name": action_name, "tool_args": action_args}
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to create Langfuse tool span for {action_name}: {e}")
+                        tool_span = None
+
+                # Execute the action
                 success, result = orchestrator.action_executor.execute_action(action_name, action_args)
+
+                # Add tool response event and end span
+                if tool_span:
+                    try:
+                        tool_span.create_event(
+                            name="tool.response",
+                            input={"success": success, "result": result if success else None, "error": result.get("error") if not success else None}
+                        )
+                        tool_span.update(output={"success": success, "result": result if success else None})
+                        tool_span.end()
+                    except Exception as e:
+                        logger.warning(f"Failed to update Langfuse tool span for {action_name}: {e}")
 
                 action_results.append({
                     "name": action_name,
@@ -470,10 +508,6 @@ def conversation_stream():
                     "result": result if success else None,
                     "error": result.get("error") if not success else None
                 })
-            
-            # Update action span with results
-            action_span.update(output=action_results)
-            action_span.end()
 
             initial_state['action_results'] = action_results
 
@@ -518,16 +552,16 @@ def conversation_stream():
         # Call LLM for final response with Langfuse tracing
         synthesizer_span = None
         synthesizer_generation = None
-        if client and langfuse_trace_context:
+        if client and root_span:
             try:
                 synthesizer_span = client.start_span(
                     trace_context=langfuse_trace_context,
-                    name="synthesizer-node",
+                    name="synthesize",
                     input={"action_results": initial_state['action_results'], "input_text": input_text}
                 )
                 
                 synthesizer_generation = synthesizer_span.start_observation(
-                    name="synthesizer-generation",
+                    name="synthesizer.llm",
                     as_type="generation",
                     input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]}
                 )
@@ -583,6 +617,14 @@ def conversation_stream():
             },
             'timestamp': datetime.now().isoformat()
         })
+
+        # End root span
+        if root_span:
+            try:
+                root_span.update(output={"final_message": response, "total_steps": len(steps_data)})
+                root_span.end()
+            except Exception as e:
+                logger.warning(f"Failed to end Langfuse root span: {e}")
 
         # Complete the trace
         if langfuse_trace_context and client:

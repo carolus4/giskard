@@ -626,9 +626,12 @@ class PageManager {
         const deleteBtn = document.getElementById('detail-delete-btn');
         const saveBtn = document.getElementById('save-task-btn');
 
+        // Extract task data from API response (nested under 'task' key)
+        const task = taskData.task || taskData;
+
         if (titleInput) {
             // Show title without project prefix (project will be shown as badge)
-            titleInput.value = taskData.title || 'Untitled Task';
+            titleInput.value = task.title || 'Untitled Task';
 
             // Trigger auto-resize for the textarea immediately after setting value
             if (this._autoResizeTextarea) {
@@ -643,13 +646,14 @@ class PageManager {
         if (categoriesContainer) {
             console.log('🔍 Categories debug:', {
                 taskData: taskData,
-                categories: taskData.categories,
-                project: taskData.project,
-                categoriesType: typeof taskData.categories,
-                categoriesLength: taskData.categories?.length,
+                task: task,
+                categories: task.categories,
+                project: task.project,
+                categoriesType: typeof task.categories,
+                categoriesLength: task.categories?.length,
                 container: categoriesContainer
             });
-            this._renderCategoriesAndProjectInDetail(categoriesContainer, taskData.categories || [], taskData.project);
+            this._renderCategoriesAndProjectInDetail(categoriesContainer, task.categories || [], task.project);
         } else {
             console.log('❌ Categories container not found!');
         }
@@ -659,7 +663,7 @@ class PageManager {
         
         if (descriptionInput) {
             // Unescape newlines for display in textarea
-            const description = taskData.description || '';
+            const description = task.description || '';
             descriptionInput.value = description.replace(/\\n/g, '\n');
             
             // Add click handler to ensure textarea stays expanded
@@ -703,11 +707,11 @@ class PageManager {
         if (moreActionsBtn) moreActionsBtn.style.display = 'flex';
 
         // Update status selector
-        this._updateStatusSelector(taskData.status);
+        this._updateStatusSelector(task.status);
         
         // Update title header styling
         if (titleHeader) {
-            titleHeader.classList.toggle('completed', taskData.status === 'done');
+            titleHeader.classList.toggle('completed', task.status === 'done');
         }
 
         // Update keyboard shortcut display (Cmd+Enter to go back to task list)

@@ -46,20 +46,28 @@ def test_simple_trace():
         
         print("✅ Created trace context")
         
+        # Create root span
+        root_span = client.start_span(
+            trace_context=trace_context,
+            name="chat.turn",
+            input={"input_text": "Test message", "session_id": user_id}
+        )
+        print("✅ Created root span: chat.turn")
+        
         # Create planner span
         planner_span = client.start_span(
             trace_context=trace_context,
-            name="planner-node",
+            name="plan",
             input={"input_text": "Test message"}
         )
-        print("✅ Created planner span: planner-node")
+        print("✅ Created planner span: plan")
         
         # Create planner generation
         planner_generation = planner_span.start_generation(
-            name="planner-action",
+            name="planner.llm",
             input={"messages": [{"type": "HumanMessage", "content": "Test message"}]}
         )
-        print("✅ Created planner generation: planner-action")
+        print("✅ Created planner generation: planner.llm")
         
         # Simulate LLM response
         response = "Test planner response"
@@ -73,17 +81,17 @@ def test_simple_trace():
         # Create synthesizer span
         synthesizer_span = client.start_span(
             trace_context=trace_context,
-            name="synthesizer-node",
+            name="synthesize",
             input={"action_results": [], "input_text": "Test message"}
         )
-        print("✅ Created synthesizer span: synthesizer-node")
+        print("✅ Created synthesizer span: synthesize")
         
         # Create synthesizer generation
         synthesizer_generation = synthesizer_span.start_generation(
-            name="synthesizer-generation",
+            name="synthesizer.llm",
             input={"messages": [{"type": "SystemMessage", "content": "Test prompt"}]}
         )
-        print("✅ Created synthesizer generation: synthesizer-generation")
+        print("✅ Created synthesizer generation: synthesizer.llm")
         
         # Simulate LLM response
         response = "Test synthesizer response"
@@ -94,6 +102,11 @@ def test_simple_trace():
         synthesizer_generation.end()
         synthesizer_span.end()
         
+        # End root span
+        root_span.update(output={"final_message": "Test synthesizer response", "total_steps": 2})
+        root_span.end()
+        print("✅ Ended root span")
+        
         # Update trace
         client.update_current_trace(output={"final_message": "Test synthesizer response", "total_steps": 2})
         print("✅ Updated trace with final output")
@@ -103,11 +116,11 @@ def test_simple_trace():
         print("✅ Flushed events to Langfuse")
         
         print(f"\n🎯 Expected trace hierarchy in Langfuse dashboard:")
-        print(f"📊 giskard-message (trace)")
-        print(f"├── 🔍 planner-node (span)")
-        print(f"│   └── ⚡ planner-action (generation)")
-        print(f"└── 🎯 synthesizer-node (span)")
-        print(f"    └── ⚡ synthesizer-generation (generation)")
+        print(f"📊 chat.turn (trace)")
+        print(f"├── 🔍 plan (span)")
+        print(f"│   └── ⚡ planner.llm (generation)")
+        print(f"└── 🎯 synthesize (span)")
+        print(f"    └── ⚡ synthesizer.llm (generation)")
         
         print(f"\n📝 Check your Langfuse dashboard at: {langfuse_config.host}")
         print(f"   Look for trace ID: {trace_id}")

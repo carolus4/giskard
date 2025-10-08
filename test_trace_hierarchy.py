@@ -33,7 +33,7 @@ def test_trace_hierarchy():
     
     # Create main trace
     trace = langfuse_config.create_trace(
-        name="giskard-message",
+        name="chat.turn",
         trace_id=trace_id,
         user_id=user_id,
         input_data={"input_text": "Test message", "session_id": user_id}
@@ -43,12 +43,12 @@ def test_trace_hierarchy():
         print("❌ Failed to create trace")
         return False
     
-    print("✅ Created main trace: giskard-message")
+    print("✅ Created main trace: chat.turn")
     
     # Create planner span
     planner_span = langfuse_config.create_span(
         trace,
-        name="planner-node",
+        name="plan",
         span_type="agent",
         input_data={"input_text": "Test message"}
     )
@@ -57,12 +57,12 @@ def test_trace_hierarchy():
         print("❌ Failed to create planner span")
         return False
     
-    print("✅ Created planner span: planner-node (agent)")
+    print("✅ Created planner span: plan (agent)")
     
     # Create planner generation
     planner_generation = langfuse_config.create_generation(
         planner_span,
-        name="planner-action",
+        name="planner.llm",
         input_data={"messages": [{"type": "HumanMessage", "content": "Test message"}]},
         output_data={"response": "Test planner response"}
     )
@@ -71,26 +71,26 @@ def test_trace_hierarchy():
         print("❌ Failed to create planner generation")
         return False
     
-    print("✅ Created planner generation: planner-action")
+    print("✅ Created planner generation: planner.llm")
     
     # Create action span (optional)
     action_span = langfuse_config.create_span(
         trace,
-        name="action-node",
+        name="tool.execute.test_action",
         span_type="retriever",
         input_data={"actions": [{"name": "test_action", "args": {}}]}
     )
     
     if action_span:
         action_span.update(output=[{"name": "test_action", "ok": True, "result": "Test result"}])
-        print("✅ Created action span: action-node (retriever)")
+        print("✅ Created action span: tool.execute.test_action (retriever)")
     else:
         print("⚠️  Action span not created (this is optional)")
     
     # Create synthesizer span
     synthesizer_span = langfuse_config.create_span(
         trace,
-        name="synthesizer-node",
+        name="synthesize",
         span_type="generation",
         input_data={"action_results": [{"name": "test_action", "ok": True}]}
     )
@@ -99,12 +99,12 @@ def test_trace_hierarchy():
         print("❌ Failed to create synthesizer span")
         return False
     
-    print("✅ Created synthesizer span: synthesizer-node (generation)")
+    print("✅ Created synthesizer span: synthesize (generation)")
     
     # Create synthesizer generation
     synthesizer_generation = langfuse_config.create_generation(
         synthesizer_span,
-        name="synthesizer-generation",
+        name="synthesizer.llm",
         input_data={"messages": [{"type": "SystemMessage", "content": "Test prompt"}]},
         output_data={"response": "Test synthesizer response"}
     )
@@ -113,7 +113,7 @@ def test_trace_hierarchy():
         print("❌ Failed to create synthesizer generation")
         return False
     
-    print("✅ Created synthesizer generation: synthesizer-generation")
+    print("✅ Created synthesizer generation: synthesizer.llm")
     
     # Complete the trace
     trace.update(output={"final_message": "Test synthesizer response", "total_steps": 3})
@@ -124,12 +124,12 @@ def test_trace_hierarchy():
     print("✅ Flushed events to Langfuse")
     
     print(f"\n🎯 Expected trace hierarchy in Langfuse dashboard:")
-    print(f"📊 giskard-message (trace)")
-    print(f"├── 🔍 planner-node (agent)")
-    print(f"│   └── ⚡ planner-action (generation)")
-    print(f"├── 🔧 action-node (retriever) [optional]")
-    print(f"└── 🎯 synthesizer-node (generation)")
-    print(f"    └── ⚡ synthesizer-generation (generation)")
+    print(f"📊 chat.turn (trace)")
+    print(f"├── 🔍 plan (span)")
+    print(f"│   └── ⚡ planner.llm (generation)")
+    print(f"├── 🔧 tool.execute.test_action (span) [optional]")
+    print(f"└── 🎯 synthesize (span)")
+    print(f"    └── ⚡ synthesizer.llm (generation)")
     
     print(f"\n📝 Check your Langfuse dashboard at: {langfuse_config.host}")
     print(f"   Look for trace ID: {trace_id}")
