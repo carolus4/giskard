@@ -23,8 +23,8 @@ class APIClient {
     constructor() {
         /** @type {string} Base URL for all API endpoints */
         // Check if we're running in Tauri (desktop app) vs browser
-        this.isTauri = window.__TAURI__ !== undefined;
-        this.baseURL = this.isTauri ? 'http://localhost:5001/api' : '/api';
+        this.isTauri = false; // Temporarily disable Tauri commands to fix task loading
+        this.baseURL = 'http://localhost:5001/api'; // Always use full URL for Tauri app
         
         // Debug Tauri detection
         console.log('🔍 APIClient Tauri detection:', {
@@ -134,8 +134,12 @@ class APIClient {
                 ...options
             };
 
+            console.log('🔍 Fetch config:', config);
             const response = await fetch(url, config);
+            console.log('📡 Response status:', response.status, response.statusText);
+            
             const data = await response.json();
+            console.log('📦 Response data keys:', Object.keys(data));
 
             if (!response.ok) {
                 throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);

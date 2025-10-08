@@ -15,6 +15,7 @@ from .tools.router import Router
 from .tools.tool_registry import ToolRegistry
 from .config.router_config import RouterConfigManager
 from models.task_db import AgentStepDB
+from config.langfuse_config import langfuse_config
 
 logger = logging.getLogger(__name__)
 
@@ -130,8 +131,12 @@ class Orchestrator:
             }
 
             try:
-                # Use the idiomatic router to get tool decision
-                router_output = self.router.plan_actions(state["input_text"])
+                # Use the idiomatic router to get tool decision with Langfuse tracing
+                router_output = self.router.plan_actions(
+                    state["input_text"], 
+                    trace_id=state.get("trace_id"),
+                    user_id=state.get("session_id")
+                )
                 
                 # Store router output in state
                 state["router_output"] = router_output
@@ -242,8 +247,20 @@ class Orchestrator:
                 system_msg = SystemMessage(content=full_prompt)
                 messages = [system_msg]
 
-                # Call LLM using the router's LLM instance
-                response = self.router.llm.invoke(messages)
+                # Get Langfuse callback handler for synthesizer
+                langfuse_handler = langfuse_config.get_callback_handler(
+                    trace_id=state.get("trace_id"),
+                    user_id=state.get("session_id")
+                )
+
+                # Call LLM using the router's LLM instance with Langfuse tracing
+                if langfuse_handler:
+                    response = self.router.llm.invoke(
+                        messages,
+                        config={"callbacks": [langfuse_handler]}
+                    )
+                else:
+                    response = self.router.llm.invoke(messages)
 
                 # Add AI message to conversation
                 state["messages"].append(AIMessage(content=response))
@@ -389,6 +406,9 @@ class Orchestrator:
             
             # Success - convert to response format
             final_state = result["final_state"]
+
+            # Flush Langfuse events
+            langfuse_config.flush()
 
             return {
                 "success": True,

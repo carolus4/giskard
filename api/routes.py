@@ -209,7 +209,7 @@ def get_tasks():
                 'filtered_done_count': len(done_tasks)
             }
         
-        return jsonify(response_data)
+        return jsonify(APIResponse.success("Tasks loaded successfully", response_data))
         
     except Exception as e:
         logger.error(f"Failed to load tasks: {str(e)}")
@@ -263,7 +263,7 @@ def get_task(task_id):
         if not task:
             return APIResponse.error('Task not found', 404)
         
-        return jsonify(task.to_dict())
+        return jsonify(APIResponse.success("Task retrieved successfully", {'task': task.to_dict()}))
     
     except Exception as e:
         logger.error(f"Failed to get task: {str(e)}")

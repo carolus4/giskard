@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
 Giskard API - Backend API for Tauri desktop app
+
+CORS Configuration:
+- Dynamically allows any localhost port (127.0.0.1:* and localhost:*)
+- Supports Tauri protocol (tauri://localhost)
+- Maintains security by restricting to localhost only
+- Includes comprehensive logging for debugging CORS issues
 """
 
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from api.routes import api
-# from server.routes.agent import agent  # Temporarily disabled due to import error
-from server.routes.agent_langgraph import agent_langgraph
+from server.routes.agent import agent
 from database import init_database
 from utils.classification_manager import ClassificationManager
 import subprocess
@@ -15,6 +20,7 @@ import time
 import requests
 import logging
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -67,19 +73,59 @@ def _ensure_ollama_running():
 # Create Flask app
 app = Flask(__name__)
 
-# Enable CORS for Tauri desktop app (any localhost port)
+# Custom CORS handler for dynamic localhost ports
+def is_localhost_origin(origin):
+    """Check if origin is from localhost (any port) or Tauri protocol"""
+    if not origin:
+        logger.debug("CORS: No origin header provided")
+        return False
+    
+    # Allow Tauri protocol
+    if origin.startswith("tauri://"):
+        logger.debug(f"CORS: Allowing Tauri origin: {origin}")
+        return True
+    
+    # Allow localhost with any port
+    localhost_patterns = [
+        r'^http://127\.0\.0\.1:\d+$',
+        r'^http://localhost:\d+$',
+        r'^https://127\.0\.0\.1:\d+$',
+        r'^https://localhost:\d+$'
+    ]
+    
+    for pattern in localhost_patterns:
+        if re.match(pattern, origin):
+            logger.debug(f"CORS: Allowing localhost origin: {origin}")
+            return True
+    
+    logger.warning(f"CORS: Rejecting origin: {origin}")
+    return False
+
+# Enable CORS with custom origin validation
+# Use a list of common localhost patterns
 CORS(app, origins=[
-    "http://127.0.0.1:1430", "http://localhost:1430",  # Original port
-    "http://127.0.0.1:1431", "http://localhost:1431",  # New port
-    "http://127.0.0.1:1432", "http://localhost:1432",  # Future ports
-    "http://127.0.0.1:5001", "http://localhost:5001",  # API server port
+    r"http://127\.0\.0\.1:\d+",
+    r"http://localhost:\d+", 
+    r"https://127\.0\.0\.1:\d+",
+    r"https://localhost:\d+",
     "tauri://localhost"
 ], supports_credentials=True)
 
+# Add CORS headers for all responses
+@app.after_request
+def after_request(response):
+    """Add CORS headers to all responses"""
+    origin = request.headers.get('Origin')
+    if origin and is_localhost_origin(origin):
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+    return response
+
 # Register API blueprints
 app.register_blueprint(api)  # Clean API
-# app.register_blueprint(agent)  # Agent orchestrator - temporarily disabled
-app.register_blueprint(agent_langgraph, url_prefix='/api/agent')  # LangGraph agent
+app.register_blueprint(agent, url_prefix='/api/agent')  # Agent orchestrator
 
 # Initialize database
 init_database()

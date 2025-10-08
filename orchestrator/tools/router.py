@@ -13,6 +13,7 @@ from langchain_core.runnables import RunnableLambda, RunnablePassthrough, Runnab
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_ollama import OllamaLLM
 from .tool_registry import ToolRegistry
+from config.langfuse_config import langfuse_config
 
 logger = logging.getLogger(__name__)
 
@@ -185,19 +186,33 @@ class Router:
                 tool_args={}
             )
     
-    def plan_actions(self, user_input: str) -> Dict[str, Any]:
+    def plan_actions(self, user_input: str, trace_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Plan actions using the idiomatic router approach
+        Plan actions using the idiomatic router approach with Langfuse tracing
         
         Args:
             user_input: The user's input text
+            trace_id: Optional trace ID for Langfuse tracing
+            user_id: Optional user ID for Langfuse tracing
             
         Returns:
             Dictionary with assistant_text, tool_name, and tool_args
         """
         try:
-            # Execute the router chain
-            decision = self.router_chain.invoke({"input": user_input})
+            # Get Langfuse callback handler if available
+            langfuse_handler = langfuse_config.get_callback_handler(trace_id, user_id)
+            
+            # Prepare the input for the chain
+            chain_input = {"input": user_input}
+            
+            # Execute the router chain with Langfuse tracing
+            if langfuse_handler:
+                decision = self.router_chain.invoke(
+                    chain_input, 
+                    config={"callbacks": [langfuse_handler]}
+                )
+            else:
+                decision = self.router_chain.invoke(chain_input)
             
             # Convert to dictionary format for compatibility
             return {

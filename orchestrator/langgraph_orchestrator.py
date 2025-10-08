@@ -14,6 +14,7 @@ from .actions.actions import ActionExecutor
 from .tools.router import Router
 from .tools.tool_registry import ToolRegistry
 from models.task_db import AgentStepDB
+from config.langfuse_config import langfuse_config
 
 logger = logging.getLogger(__name__)
 
@@ -127,8 +128,12 @@ class LangGraphOrchestrator:
         }
 
         try:
-            # Use the structured router to get tool decision
-            router_output = self.router.plan_actions(state["input_text"])
+            # Use the structured router to get tool decision with Langfuse tracing
+            router_output = self.router.plan_actions(
+                state["input_text"],
+                trace_id=state.get("trace_id"),
+                user_id=state.get("session_id")
+            )
             
             # Store router output in state
             state["router_output"] = router_output
@@ -231,8 +236,20 @@ class LangGraphOrchestrator:
             system_msg = SystemMessage(content=full_prompt)
             messages = [system_msg]
 
-            # Call LLM
-            response = self.llm.invoke(messages)
+            # Get Langfuse callback handler for synthesizer
+            langfuse_handler = langfuse_config.get_callback_handler(
+                trace_id=state.get("trace_id"),
+                user_id=state.get("session_id")
+            )
+
+            # Call LLM with Langfuse tracing
+            if langfuse_handler:
+                response = self.llm.invoke(
+                    messages,
+                    config={"callbacks": [langfuse_handler]}
+                )
+            else:
+                response = self.llm.invoke(messages)
 
             # Add AI message to conversation
             state["messages"].append(AIMessage(content=response))
@@ -348,6 +365,9 @@ class LangGraphOrchestrator:
             
             # Success - convert to response format
             final_state = result["final_state"]
+
+            # Flush Langfuse events
+            langfuse_config.flush()
 
             return {
                 "success": True,

@@ -216,12 +216,13 @@ class TaskDB:
 class AgentStepDB:
     """Database model for agent workflow steps"""
 
-    def __init__(self, id: Optional[int] = None, trace_id: str = "", step_number: int = 0,
+    def __init__(self, id: Optional[int] = None, session_id: str = "", trace_id: str = "", step_number: int = 0,
                  step_type: str = "", timestamp: Optional[str] = None,
                  input_data: Optional[Dict[str, Any]] = None, output_data: Optional[Dict[str, Any]] = None,
                  rendered_prompt: Optional[str] = None, llm_input: Optional[Dict[str, Any]] = None,
                  llm_output: Optional[str] = None, llm_model: Optional[str] = None, error: Optional[str] = None):
         self.id = id
+        self.session_id = session_id
         self.trace_id = trace_id
         self.step_number = step_number
         self.step_type = step_type
@@ -242,11 +243,11 @@ class AgentStepDB:
             if self.id is None:
                 # Create new step
                 cursor.execute('''
-                    INSERT INTO agent_steps (trace_id, step_number, step_type, timestamp,
+                    INSERT INTO agent_steps (session_id, trace_id, step_number, step_type, timestamp,
                                            input_data, output_data, rendered_prompt, llm_input,
                                            llm_output, llm_model, error)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (self.trace_id, self.step_number, self.step_type, self.timestamp,
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (self.session_id, self.trace_id, self.step_number, self.step_type, self.timestamp,
                       json.dumps(self.input_data), json.dumps(self.output_data),
                       self.rendered_prompt, json.dumps(self.llm_input),
                       self.llm_output, self.llm_model, self.error))
@@ -255,11 +256,11 @@ class AgentStepDB:
             else:
                 # Update existing step
                 cursor.execute('''
-                    UPDATE agent_steps SET trace_id=?, step_number=?, step_type=?,
+                    UPDATE agent_steps SET session_id=?, trace_id=?, step_number=?, step_type=?,
                                           timestamp=?, input_data=?, output_data=?,
                                           rendered_prompt=?, llm_input=?, llm_output=?, llm_model=?, error=?
                     WHERE id=?
-                ''', (self.trace_id, self.step_number, self.step_type, self.timestamp,
+                ''', (self.session_id, self.trace_id, self.step_number, self.step_type, self.timestamp,
                       json.dumps(self.input_data), json.dumps(self.output_data),
                       self.rendered_prompt, json.dumps(self.llm_input),
                       self.llm_output, self.llm_model, self.error, self.id))
@@ -285,6 +286,7 @@ class AgentStepDB:
         """Convert agent step to dictionary for API responses"""
         return {
             'id': self.id,
+            'session_id': self.session_id,
             'trace_id': self.trace_id,
             'step_number': self.step_number,
             'step_type': self.step_type,
@@ -371,12 +373,13 @@ class AgentStepDB:
             return (result[0] or 0) + 1
 
     @classmethod
-    def create(cls, trace_id: str, step_number: int, step_type: str,
+    def create(cls, session_id: str = "", trace_id: str = "", step_number: int = 0, step_type: str = "",
                input_data: Optional[Dict[str, Any]] = None, output_data: Optional[Dict[str, Any]] = None,
                rendered_prompt: Optional[str] = None, llm_input: Optional[Dict[str, Any]] = None,
                llm_output: Optional[str] = None, llm_model: Optional[str] = None, error: Optional[str] = None) -> 'AgentStepDB':
         """Create a new agent step"""
         step = cls(
+            session_id=session_id,
             trace_id=trace_id,
             step_number=step_number,
             step_type=step_type,

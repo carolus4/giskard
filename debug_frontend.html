@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Frontend</title>
+</head>
+<body>
+    <h1>Debug Frontend Task Loading</h1>
+    <div id="debug-output"></div>
+    <div id="task-list-container"></div>
+    
+    <script>
+        async function debugTaskLoading() {
+            const output = document.getElementById('debug-output');
+            const container = document.getElementById('task-list-container');
+            
+            try {
+                output.innerHTML += '<p>🔍 Testing API call...</p>';
+                
+                const response = await fetch('http://localhost:5001/api/tasks');
+                const data = await response.json();
+                
+                output.innerHTML += `<p>✅ API Response: ${response.status}</p>`;
+                output.innerHTML += `<p>Success: ${data.success}</p>`;
+                output.innerHTML += `<p>Message: ${data.message}</p>`;
+                
+                if (data.tasks) {
+                    const openTasks = data.tasks.open || [];
+                    const inProgressTasks = data.tasks.in_progress || [];
+                    
+                    output.innerHTML += `<p>Open tasks: ${openTasks.length}</p>`;
+                    output.innerHTML += `<p>In progress: ${inProgressTasks.length}</p>`;
+                    
+                    // Render tasks
+                    const allTasks = [...inProgressTasks, ...openTasks];
+                    output.innerHTML += `<p>Total tasks to render: ${allTasks.length}</p>`;
+                    
+                    allTasks.forEach((task, index) => {
+                        const taskDiv = document.createElement('div');
+                        taskDiv.innerHTML = `
+                            <div style="border: 1px solid #ccc; margin: 5px; padding: 10px;">
+                                <strong>${task.title}</strong> (ID: ${task.id})
+                                <br>Status: ${task.status}
+                                <br>Project: ${task.project || 'None'}
+                                <br>Categories: ${(task.categories || []).join(', ')}
+                            </div>
+                        `;
+                        container.appendChild(taskDiv);
+                    });
+                } else {
+                    output.innerHTML += '<p>❌ No tasks data in response</p>';
+                }
+                
+            } catch (error) {
+                output.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Run debug when page loads
+        window.addEventListener('load', debugTaskLoading);
+    </script>
+</body>
+</html>

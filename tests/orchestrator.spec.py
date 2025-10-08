@@ -192,7 +192,7 @@ class TestAgentAPI(unittest.TestCase):
                 }
         
         # Mock the runtime
-        with patch('server.routes.agentV2.OrchestratorRuntime') as mock_runtime_class:
+        with patch('server.routes.agent.OrchestratorRuntime') as mock_runtime_class:
             mock_runtime = MagicMock()
             mock_runtime_class.return_value = mock_runtime
             mock_runtime.execute.return_value = {

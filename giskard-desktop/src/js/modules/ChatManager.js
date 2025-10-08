@@ -6,7 +6,7 @@ class ChatManager {
         this.chatMessages = [];
         this.isTyping = false;
         this.currentConversation = null;
-        this.currentThreadId = null;
+        this.currentSessionId = null;
         this.conversationHistory = [];
         this.modelName = 'gemma3:4b'; // Default fallback
         this.currentStreamingMessage = null;
@@ -23,8 +23,8 @@ class ChatManager {
 
         // Initialize conversation threads and load most recent (if any)
         setTimeout(async () => {
-            await this._loadConversationThreads();
-            await this._loadMostRecentThread();
+            await this._loadConversationSessions();
+            await this._loadMostRecentSession();
         }, 100);
     }
 
@@ -153,7 +153,7 @@ class ChatManager {
             // If this was the first message in a new conversation, ensure we have a thread ID
             if (!this.currentThreadId) {
                 this.currentThreadId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                await this._loadConversationThreads(); // Refresh the threads list
+                await this._loadConversationSessions(); // Refresh the threads list
             }
         } catch (error) {
             console.error('Failed to get response from agent:', error);
@@ -224,7 +224,7 @@ class ChatManager {
         setTimeout(() => {
             // Clear current conversation state
             this.chatMessages = [];
-            this.currentThreadId = null;
+            this.currentSessionId = null;
             
             // Ensure typing indicator is hidden when starting new chat
             this._hideTyping();
@@ -264,10 +264,10 @@ class ChatManager {
 
         try {
             // Use current thread ID or create new one if none exists
-            let threadId = this.currentThreadId;
-            if (!threadId) {
-                // Create a new thread for this conversation
-                threadId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            let sessionId = this.currentSessionId;
+            if (!sessionId) {
+                // Create a new session for this conversation
+                sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             }
 
             // Get conversation context for better responses
@@ -280,8 +280,7 @@ class ChatManager {
                 },
                 body: JSON.stringify({
                     input_text: message,
-                    session_id: threadId,
-                    trace_id: threadId,
+                    session_id: sessionId,
                     domain: 'chat',
                     conversation_context: conversationContext
                 }),
@@ -315,11 +314,11 @@ class ChatManager {
                     this._handleSideEffects(data.side_effects);
                 }
 
-                // Update current thread and refresh conversation threads
-                if (!this.currentThreadId) {
-                    this.currentThreadId = threadId;
+                // Update current session and refresh conversation sessions
+                if (!this.currentSessionId) {
+                    this.currentSessionId = data.session_id || sessionId;
                 }
-                await this._loadConversationThreads();
+                await this._loadConversationSessions();
 
                 console.log('✅ Conversation completed successfully');
             } else {
@@ -395,6 +394,11 @@ class ChatManager {
      */
     _formatStepContent(step) {
         const { step_type, content, details } = step;
+        
+        // Handle missing content
+        if (!content) {
+            return `Step: ${step_type}`;
+        }
 
         // For final synthesizer step, just return the content
         if (details?.is_final) {
@@ -432,6 +436,7 @@ class ChatManager {
      */
     _getActionNameFromContent(content) {
         // Extract action name from content like "Executed fetch_tasks" or "Calling fetch_tasks"
+        if (!content) return 'action';
         const match = content.match(/(?:Executed|Calling|Executing)\s+(\w+)/i);
         return match ? match[1] : 'action';
     }
@@ -1070,72 +1075,68 @@ class ChatManager {
     /**
      * Load conversation threads from backend
      */
-    async _loadConversationThreads() {
+    async _loadConversationSessions() {
         try {
-            const response = await fetch(`${this.baseURL}/agent/threads`);
+            const response = await fetch(`${this.baseURL}/agent/sessions`);
             if (response.ok) {
                 const data = await response.json();
-                if (data.success && data.threads) {
-                    this.conversationHistory = data.threads;
-                    console.log('📚 Loaded conversation threads:', this.conversationHistory.length);
+                if (data.success && data.sessions) {
+                    this.conversationHistory = data.sessions;
+                    console.log('📚 Loaded conversation sessions:', this.conversationHistory.length);
                 }
             }
         } catch (error) {
-            console.error('Failed to load conversation threads:', error);
+            console.error('Failed to load conversation sessions:', error);
         }
     }
 
     /**
      * Load messages for a specific thread
      */
-    async _loadThreadMessages(threadId) {
+    async _loadSessionMessages(sessionId) {
         try {
-            const response = await fetch(`${this.baseURL}/agent/threads/${threadId}`);
+            const response = await fetch(`${this.baseURL}/agent/sessions/${sessionId}`);
             if (response.ok) {
                 const data = await response.json();
-                if (data.success && data.steps) {
-                    // Convert backend steps to chat messages format
-                    this.chatMessages = data.steps.map(step => {
-                        const isUserMessage = step.step_type === 'ingest_user_input';
-                        
-                        // For user messages, use the input text
-                        if (isUserMessage) {
-                            return {
-                                type: 'user',
-                                content: step.input_data?.input_text || 'User message',
-                                timestamp: step.timestamp
-                            };
-                        }
-                        
-                        // For bot messages, use the same formatting logic as live chat
-                        const formattedContent = this._formatStepContent(step);
-                        return {
-                            type: 'bot',
-                            content: formattedContent,
-                            timestamp: step.timestamp,
-                            step: step
+                if (data.success && data.traces) {
+                    // Convert backend traces to chat messages format
+                    this.chatMessages = data.traces.map(trace => {
+                        // Create user message
+                        const userMessage = {
+                            type: 'user',
+                            content: trace.user_message,
+                            timestamp: trace.created_at
                         };
-                    });
+                        
+                        // Create bot message if there's a response
+                        const botMessage = trace.assistant_response ? {
+                            type: 'bot',
+                            content: trace.assistant_response,
+                            timestamp: trace.completed_at || trace.created_at
+                        } : null;
+                        
+                        // Return both messages if bot message exists
+                        return botMessage ? [userMessage, botMessage] : [userMessage];
+                    }).flat();
 
-                    this.currentThreadId = threadId;
+                    this.currentSessionId = sessionId;
                     this._renderMessages();
                     this._hideSuggestions();
-                    console.log(`📖 Loaded ${this.chatMessages.length} messages for thread: ${threadId}`);
-                    console.log('📋 Message types:', this.chatMessages.map(msg => ({ type: msg.type, hasStep: !!msg.step })));
+                    console.log(`📖 Loaded ${this.chatMessages.length} messages for session: ${sessionId}`);
                 }
             }
         } catch (error) {
-            console.error('Failed to load thread messages:', error);
+            console.error('Failed to load session messages:', error);
         }
     }
 
     /**
      * Create a new conversation thread
      */
-    async _createNewThread(inputText) {
-        const threadId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    async _createNewSession(inputText) {
+        const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         try {
-            // Create initial step in the thread
+            // Create initial conversation in the session
             const response = await fetch(`${this.baseURL}/agent/conversation`, {
                 method: 'POST',
                 headers: {
@@ -1143,7 +1144,7 @@ class ChatManager {
                 },
                 body: JSON.stringify({
                     input_text: inputText,
-                    session_id: threadId,
+                    session_id: sessionId,
                     domain: 'chat'
                 })
             });
@@ -1151,23 +1152,23 @@ class ChatManager {
             if (response.ok) {
                 const data = await response.json();
                 if (data.success) {
-                    this.currentThreadId = threadId;
-                    await this._loadThreadMessages(threadId);
-                    await this._loadConversationThreads(); // Refresh threads list
-                    return threadId;
+                    this.currentSessionId = sessionId;
+                    await this._loadSessionMessages(sessionId);
+                    await this._loadConversationSessions(); // Refresh sessions list
+                    return sessionId;
                 }
             }
         } catch (error) {
-            console.error('Failed to create new thread:', error);
+            console.error('Failed to create new session:', error);
         }
-        return threadId;
+        return sessionId;
     }
 
     /**
      * Get conversation context from previous messages in current thread
      */
     _getConversationContext() {
-        if (!this.currentThreadId || this.chatMessages.length === 0) {
+        if (!this.currentSessionId || this.chatMessages.length === 0) {
             return [];
         }
 
@@ -1182,7 +1183,7 @@ class ChatManager {
     /**
      * Load the most recent conversation thread
      */
-    async _loadMostRecentThread() {
+    async _loadMostRecentSession() {
         if (this.conversationHistory.length === 0) {
             // No conversation history, just show welcome message
             this._renderMessages();
@@ -1191,14 +1192,14 @@ class ChatManager {
         }
 
         try {
-            // Load the most recent thread (first in the sorted list)
-            const mostRecentThread = this.conversationHistory[0];
-            if (mostRecentThread && mostRecentThread.trace_id) {
-                await this._loadThreadMessages(mostRecentThread.trace_id);
-                console.log('📖 Loaded most recent conversation thread');
+            // Load the most recent session (first in the sorted list)
+            const mostRecentSession = this.conversationHistory[0];
+            if (mostRecentSession && mostRecentSession.session_id) {
+                await this._loadSessionMessages(mostRecentSession.session_id);
+                console.log('📖 Loaded most recent conversation session');
             }
         } catch (error) {
-            console.error('Failed to load most recent thread:', error);
+            console.error('Failed to load most recent session:', error);
             // Fallback to showing welcome message if loading fails
             this._renderMessages();
             this._showSuggestions();

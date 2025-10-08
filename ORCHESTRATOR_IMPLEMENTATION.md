@@ -12,7 +12,7 @@ Successfully implemented a minimal LangGraph-style orchestrator with clean separ
 2. **✅ Clean separation**: Dedicated orchestrator directory structure
 3. **✅ Minimal events**: 6 event types covering the complete flow
 4. **✅ Safe rollout**: No existing endpoints modified
-5. **✅ 4-node flow**: ingest_user_input → planner_llm → action_exec → synthesizer_llm
+5. **✅ Node flow**:  planner_llm → action_exec → synthesizer_llm
 6. **✅ Action wrappers**: Light wrappers around existing services
 7. **✅ Comprehensive tests**: Full test coverage
 8. **✅ Event sequences**: Stable event flow with proper error handling
@@ -34,7 +34,7 @@ orchestrator/
     └── synthesizer.txt   # Synthesizer LLM prompt
 
 server/routes/
-└── agentV2.py           # /api/agent/v2/step endpoint
+└── agent.py             # /api/agent/step endpoint
 
 tests/
 └── orchestrator.spec.py  # Comprehensive test suite
