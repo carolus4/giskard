@@ -12,14 +12,14 @@ from typing import Optional
 # Add the parent directory to the path so we can import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.simple_prompt_loader import SimplePromptLoader
+from config.prompt_loader import PromptLoader
 
 
-class SimplePromptManager:
-    """Simple prompt manager for text-only prompts"""
+class PromptManager:
+    """Prompt manager for text-only prompts"""
     
     def __init__(self):
-        self.loader = SimplePromptLoader("prompts")
+        self.loader = PromptLoader("prompts")
     
     def list_prompts(self):
         """List all available prompts with their versions"""
@@ -140,7 +140,7 @@ class SimplePromptManager:
 
 def main():
     """Main CLI interface"""
-    manager = SimplePromptManager()
+    manager = PromptManager()
     
     if len(sys.argv) < 2:
         print("Simple Prompt Manager - Text-Only Versions")

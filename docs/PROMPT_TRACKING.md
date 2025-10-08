@@ -97,16 +97,16 @@ All data is stored in JSON files in the `data/` directory:
 ### Using the Prompt Registry
 
 ```python
-from config.simple_prompt_registry import simple_prompt_registry
+from config.prompt_registry import prompt_registry
 
 # Get a prompt
-coaching_prompt = simple_prompt_registry.get_prompt_config("coaching_system")
+coaching_prompt = prompt_registry.get_prompt_config("coaching_system")
 
 # Create a new prompt (save text file)
-file_path = simple_prompt_registry.save_prompt("my_prompt", "1.0", "Your prompt text here")
+file_path = prompt_registry.save_prompt("my_prompt", "1.0", "Your prompt text here")
 
-# Add metadata (normally done in config/simple_prompt_registry.py)
-simple_prompt_registry.add_prompt_metadata("my_prompt", {
+# Add metadata (normally done in config/prompt_registry.py)
+prompt_registry.add_prompt_metadata("my_prompt", {
     "goal": "Do something useful",
     "model": "llama3.1:8b",
     "temperature": 0.7,

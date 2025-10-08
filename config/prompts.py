@@ -3,12 +3,12 @@ Centralized prompt templates for the Giskard application
 Uses simplified prompt system that focuses on versioning prompt text only
 """
 
-from .simple_prompt_registry import simple_prompt_registry
+from .prompt_registry import prompt_registry
 
 
 def get_coaching_prompt(task_context: str = "") -> str:
     """Get the coaching system prompt with task context"""
-    prompt_text = simple_prompt_registry.get_latest_prompt_text("coaching_system")
+    prompt_text = prompt_registry.get_latest_prompt_text("coaching_system")
     if prompt_text:
         return prompt_text.format(task_context=task_context)
     
@@ -39,7 +39,7 @@ Remember: You now have access to both task titles AND descriptions, so you can p
 
 def get_classification_prompt(task_text: str) -> str:
     """Get the task classification prompt with task text"""
-    prompt_text = simple_prompt_registry.get_latest_prompt_text("task_classification")
+    prompt_text = prompt_registry.get_latest_prompt_text("task_classification")
     if prompt_text:
         return prompt_text.format(task_text=task_text)
     
@@ -74,7 +74,7 @@ def get_planner_prompt() -> str:
     # Get current datetime in ISO format
     current_datetime = datetime.now().isoformat()
     
-    prompt_text = simple_prompt_registry.get_latest_prompt_text("planner")
+    prompt_text = prompt_registry.get_latest_prompt_text("planner")
     if prompt_text:
         # Add current datetime context to the prompt
         return f"{prompt_text}\n\nCurrent datetime: {current_datetime}"
@@ -105,7 +105,7 @@ Respond with JSON in this format:
 
 def get_synthesizer_prompt(user_input: str, action_results: str) -> str:
     """Get the synthesizer prompt with user input and action results"""
-    prompt_text = simple_prompt_registry.get_latest_prompt_text("synthesizer")
+    prompt_text = prompt_registry.get_latest_prompt_text("synthesizer")
     if prompt_text:
         return prompt_text.replace("{user_input}", user_input).replace("{action_results}", action_results)
     

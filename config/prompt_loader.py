@@ -20,8 +20,8 @@ class PromptVersion:
     created_at: Optional[datetime] = None
 
 
-class SimplePromptLoader:
-    """Simple prompt loader that only manages prompt text versions"""
+class PromptLoader:
+    """Prompt loader that manages prompt text versions"""
     
     def __init__(self, prompts_dir: str = "prompts"):
         self.prompts_dir = prompts_dir
@@ -142,5 +142,5 @@ class SimplePromptLoader:
         self._load_all_prompts()
 
 
-# Global simple prompt loader instance
-simple_prompt_loader = SimplePromptLoader()
+# Global prompt loader instance
+prompt_loader = PromptLoader()

@@ -36,7 +36,7 @@ Current task context:
 {task_context}
 ```
 
-**Configuration is in code** - Model settings, temperature, token limits, etc. are defined in `config/simple_prompt_registry.py` where they belong as application logic.
+**Configuration is in code** - Model settings, temperature, token limits, etc. are defined in `config/prompt_registry.py` where they belong as application logic.
 
 ## Managing Prompts
 
@@ -88,7 +88,7 @@ code prompts/coaching_system_v1.0.txt
 - Edit the `.txt` files directly - they support natural formatting with newlines
 - No JSON to worry about - just plain text
 - Consider creating a new version instead of modifying existing ones
-- Configuration changes go in `config/simple_prompt_registry.py`
+- Configuration changes go in `config/prompt_registry.py`
 
 ## Version Management
 

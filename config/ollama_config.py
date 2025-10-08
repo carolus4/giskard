@@ -2,7 +2,7 @@
 Ollama configuration settings
 """
 
-from .simple_prompt_registry import simple_prompt_registry
+from .prompt_registry import prompt_registry
 
 # Default Ollama settings
 OLLAMA_BASE_URL = "http://localhost:11434/api/generate"
@@ -14,12 +14,12 @@ REQUEST_TIMEOUT = 100  # Reduced back to 30 seconds with better handling
 
 def get_prompt_config(prompt_name: str, version: str = None):
     """Get prompt configuration from registry"""
-    return simple_prompt_registry.get_prompt_config(prompt_name, version)
+    return prompt_registry.get_prompt_config(prompt_name, version)
 
 
 def get_chat_config():
     """Get chat configuration using the latest coaching prompt"""
-    coaching_config = simple_prompt_registry.get_prompt_config("coaching_system")
+    coaching_config = prompt_registry.get_prompt_config("coaching_system")
     if coaching_config:
         return {
             "model": coaching_config["model"],
@@ -45,7 +45,7 @@ def get_chat_config():
 
 def get_classification_config():
     """Get classification configuration using the latest classification prompt"""
-    classification_config = simple_prompt_registry.get_prompt_config("task_classification")
+    classification_config = prompt_registry.get_prompt_config("task_classification")
     if classification_config:
         return {
             "model": classification_config["model"],

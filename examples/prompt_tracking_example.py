@@ -11,7 +11,7 @@ import json
 # Add the parent directory to the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.simple_prompt_registry import simple_prompt_registry
+from config.prompt_registry import prompt_registry
 from utils.prompt_performance_tracker import performance_tracker, PerformanceMetrics
 
 
@@ -20,7 +20,7 @@ def simulate_prompt_execution(prompt_name: str, input_data: str, output: str,
     """Simulate a prompt execution with performance tracking"""
     
     # Get the latest version of the prompt
-    prompt_config = simple_prompt_registry.get_prompt_config(prompt_name)
+    prompt_config = prompt_registry.get_prompt_config(prompt_name)
     if not prompt_config:
         print(f"Prompt '{prompt_name}' not found!")
         return
@@ -62,9 +62,9 @@ def demonstrate_prompt_tracking():
     
     # Show available prompts
     print("\n1. Available Prompts:")
-    prompts = simple_prompt_registry.list_prompts()
+    prompts = prompt_registry.list_prompts()
     for prompt_name in prompts:
-        versions = simple_prompt_registry.get_prompt_versions(prompt_name)
+        versions = prompt_registry.get_prompt_versions(prompt_name)
         print(f"  {prompt_name}: {len(versions)} version(s)")
         for version in versions:
             print(f"    v{version.version}")
@@ -162,15 +162,15 @@ Provide 3 creative writing prompts that match their context and interests."""
     
     # Save the prompt text file
     try:
-        file_path = simple_prompt_registry.save_prompt("creative_writing", "1.0", creative_prompt_text)
+        file_path = prompt_registry.save_prompt("creative_writing", "1.0", creative_prompt_text)
         print(f"✓ Created custom prompt text file: {file_path}")
-        print("Note: Add metadata to config/simple_prompt_registry.py manually")
+        print("Note: Add metadata to config/prompt_registry.py manually")
     except Exception as e:
         print(f"Error creating prompt: {e}")
         return
     
     # Add metadata to the registry (this would normally be done manually in the config file)
-    simple_prompt_registry.add_prompt_metadata("creative_writing", {
+    prompt_registry.add_prompt_metadata("creative_writing", {
         "goal": "Generate creative and engaging story ideas and writing prompts",
         "model": "gemma3:4b",
         "temperature": 0.9,

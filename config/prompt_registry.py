@@ -7,17 +7,17 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import json
 import os
-from .simple_prompt_loader import SimplePromptLoader, PromptVersion
+from .prompt_loader import PromptLoader, PromptVersion
 
 
-class SimplePromptRegistry:
-    """Simplified registry that only manages prompt text versions"""
+class PromptRegistry:
+    """Registry that manages prompt text versions and metadata"""
     
     def __init__(self, data_dir: str = "data", prompts_dir: str = "prompts"):
         self.data_dir = data_dir
         self.prompts_dir = prompts_dir
         self.performance_file = os.path.join(data_dir, "prompt_performance.json")
-        self.prompt_loader = SimplePromptLoader(prompts_dir)
+        self.prompt_loader = PromptLoader(prompts_dir)
         self._performance_log: List[Dict[str, Any]] = []
         self._load_performance_data()
         
@@ -161,5 +161,5 @@ class SimplePromptRegistry:
         self._prompt_metadata[name] = metadata
 
 
-# Global simplified registry instance
-simple_prompt_registry = SimplePromptRegistry()
+# Global prompt registry instance
+prompt_registry = PromptRegistry()

@@ -6,11 +6,11 @@ This document outlines the improvements made to make the LangChain router implem
 
 ## Key Improvements Made
 
-### 1. **Consolidated Router Implementation** (`orchestrator/tools/idiomatic_router.py`)
+### 1. **Consolidated Router Implementation** (`orchestrator/tools/router.py`)
 
 **Before**: Two separate router classes (`StructuredRouter` and `RouterPlanner`) with duplicated functionality.
 
-**After**: Single `IdiomaticRouter` class that:
+**After**: Single `Router` class that:
 - Uses proper LCEL (LangChain Expression Language) patterns
 - Implements structured output with Pydantic models
 - Uses `RunnableLambda` for custom logic
@@ -176,10 +176,10 @@ orchestrator = IdiomaticOrchestrator(config_manager)
 ### Direct Router Usage
 
 ```python
-from orchestrator.tools.idiomatic_router import IdiomaticRouter
+from orchestrator.tools.router import Router
 
 # Initialize router
-router = IdiomaticRouter()
+router = Router()
 
 # Plan actions
 decision = router.plan_actions("What are my current tasks?")
@@ -198,8 +198,8 @@ from orchestrator.tools.structured_router import StructuredRouter
 router = StructuredRouter()
 
 # After
-from orchestrator.tools.idiomatic_router import IdiomaticRouter
-router = IdiomaticRouter()
+from orchestrator.tools.router import Router
+router = Router()
 ```
 
 ### 2. **Update Orchestrator Usage**

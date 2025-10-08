@@ -11,13 +11,13 @@ from datetime import datetime, timedelta
 # Add the parent directory to the path so we can import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.simple_prompt_registry import simple_prompt_registry
+from config.prompt_registry import prompt_registry
 from utils.prompt_performance_tracker import performance_tracker, PerformanceMetrics
 
 
 def list_prompts():
     """List all available prompts"""
-    prompts = simple_prompt_registry.list_prompts()
+    prompts = prompt_registry.list_prompts()
     if not prompts:
         print("No prompts found in registry.")
         return
@@ -25,7 +25,7 @@ def list_prompts():
     print("Available prompts:")
     print("-" * 50)
     for prompt_name in prompts:
-        versions = simple_prompt_registry.get_prompt_versions(prompt_name)
+        versions = prompt_registry.get_prompt_versions(prompt_name)
         print(f"{prompt_name}:")
         for version in versions:
             print(f"  v{version.version}")
@@ -35,7 +35,7 @@ def list_prompts():
 
 def show_prompt_details(prompt_name: str, version: str = None):
     """Show detailed information about a specific prompt"""
-    prompt_config = simple_prompt_registry.get_prompt_config(prompt_name, version)
+    prompt_config = prompt_registry.get_prompt_config(prompt_name, version)
     if not prompt_config:
         print(f"Prompt '{prompt_name}' not found.")
         return
@@ -133,7 +133,7 @@ def create_new_prompt():
     print("Create New Prompt")
     print("=" * 30)
     print("Note: This creates a new prompt text file. Metadata (model, temperature, etc.)")
-    print("should be added to config/simple_prompt_registry.py manually.")
+    print("should be added to config/prompt_registry.py manually.")
     print()
     
     name = input("Prompt name: ").strip()
@@ -158,10 +158,10 @@ def create_new_prompt():
     
     # Save the prompt text file
     try:
-        file_path = simple_prompt_registry.save_prompt(name, version, prompt_text)
+        file_path = prompt_registry.save_prompt(name, version, prompt_text)
         print(f"\nPrompt text saved successfully: {file_path}")
         print("\nNext steps:")
-        print("1. Add metadata to config/simple_prompt_registry.py in the _prompt_metadata dict")
+        print("1. Add metadata to config/prompt_registry.py in the _prompt_metadata dict")
         print("2. Include goal, model, temperature, token_limit, and top_p settings")
     except Exception as e:
         print(f"Error creating prompt: {e}")
