@@ -162,62 +162,6 @@ def get_session_traces(session_id):
         return APIResponse.error(f"Failed to retrieve session traces: {str(e)}", 500)
 
 
-@agent.route('/steps', methods=['GET'])
-def get_all_steps():
-    """Get all agent steps (paginated)"""
-    try:
-        # Get pagination parameters
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 50))
-        offset = (page - 1) * per_page
-
-        # Get total count
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT COUNT(*) FROM agent_steps')
-            total = cursor.fetchone()[0]
-
-        # Get paginated results
-        cursor.execute('''
-            SELECT id, trace_id, step_number, step_type, timestamp, input_data,
-                   output_data, rendered_prompt, llm_input, llm_output, error
-            FROM agent_steps
-            ORDER BY timestamp DESC
-            LIMIT ? OFFSET ?
-        ''', (per_page, offset))
-
-        rows = cursor.fetchall()
-        steps = []
-        for row in rows:
-                steps.append({
-                    "id": row[0],
-                    "trace_id": row[1],
-                "step_number": row[2],
-                "step_type": row[3],
-                "timestamp": row[4],
-                "input_data": row[5] if row[5] else {},
-                "output_data": row[6] if row[6] else {},
-                "rendered_prompt": row[7],
-                "llm_input": row[8] if row[8] else {},
-                "llm_output": row[9],
-                "error": row[10]
-            })
-
-        return APIResponse.success('Steps retrieved', {
-            "steps": steps,
-            "pagination": {
-                "page": page,
-                "per_page": per_page,
-                "total": total,
-                "pages": (total + per_page - 1) // per_page
-            }
-        })
-
-    except Exception as e:
-        logger.error(f"Failed to retrieve steps: {str(e)}")
-        return APIResponse.error(f"Failed to retrieve steps: {str(e)}", 500)
-
-
 @agent.route('/conversation-test', methods=['POST'])
 def conversation_test():
     """Test endpoint to isolate the issue"""
@@ -331,12 +275,27 @@ def conversation_stream():
         # Step 1: Planner LLM (thinking/planning phase)
         initial_state['current_step'] += 1
 
-        # Load planner prompt and create LLM input
-        from config.prompts import get_planner_prompt
-        planner_prompt = get_planner_prompt()
+        # Load planner prompt using new prompt management system
+        from config.prompt_manager import get_prompt, get_compiled_prompt
+        
+        # Get the prompt (tries Langfuse first, falls back to local)
+        prompt_data = get_prompt("planner", label="production")
+        langfuse_prompt = prompt_data.get("langfuse_prompt")  # Get the actual Langfuse prompt object
+        
+        # Compile the prompt with template variables
+        # Get tool descriptions for the planner
+        from orchestrator.tools.tool_registry import ToolRegistry
+        tool_registry = ToolRegistry("http://localhost:5001")
+        tool_descriptions = tool_registry.get_tool_descriptions()
+        
+        compiled_prompt = get_compiled_prompt(
+            "planner", 
+            label="production",
+            tool_descriptions=tool_descriptions
+        )
 
         # Create messages for LLM with conversation context
-        system_msg = SystemMessage(content=planner_prompt)
+        system_msg = SystemMessage(content=compiled_prompt)
         user_msg = HumanMessage(content=input_text)
         
         # Include conversation context if available
@@ -365,7 +324,7 @@ def conversation_stream():
                 logger.warning(f"Failed to create Langfuse root span: {e}")
                 root_span = None
 
-        # Create planner span
+        # Create planner span with proper prompt integration
         planner_span = None
         planner_generation = None
         if client and root_span:
@@ -376,11 +335,12 @@ def conversation_stream():
                     input={"input_text": input_text, "messages_count": len(messages)}
                 )
                 
-                # Create planner generation
+                # Create planner generation with prompt reference
                 planner_generation = planner_span.start_observation(
                     name="planner.llm",
                     as_type="generation",
-                    input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]}
+                    input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
+                    prompt=langfuse_prompt  # Pass the actual Langfuse prompt object
                 )
             except Exception as e:
                 logger.warning(f"Failed to create Langfuse planner span: {e}")
@@ -437,7 +397,7 @@ def conversation_stream():
             step_type='planner_llm',
             input_data={'input_text': input_text, 'messages_count': len(messages), 'conversation_context_length': len(conversation_context)},
             output_data={'llm_response': response, 'planner_output': planner_output, 'actions_to_execute': initial_state['actions_to_execute']},
-            rendered_prompt=planner_prompt,
+            rendered_prompt=compiled_prompt,
             llm_input={'messages': [{'type': msg.__class__.__name__, 'content': msg.content} for msg in messages]},
             llm_model='gemma3:4b',
             llm_output=response
@@ -536,10 +496,21 @@ def conversation_stream():
         # Step 3: Synthesize final response
         initial_state['current_step'] += 1
 
-        # Load synthesizer prompt
-        from config.prompts import get_synthesizer_prompt
+        # Load synthesizer prompt using new prompt management system
+        from config.prompt_manager import get_prompt, get_compiled_prompt
+        
+        # Get the prompt (tries Langfuse first, falls back to local)
+        synthesizer_prompt_data = get_prompt("synthesizer", label="production")
+        synthesizer_langfuse_prompt = synthesizer_prompt_data.get("langfuse_prompt")  # Get the actual Langfuse prompt object
+        
+        # Compile the prompt with template variables
         action_results_str = json.dumps(initial_state['action_results'], indent=2)
-        full_prompt = get_synthesizer_prompt(input_text, action_results_str)
+        full_prompt = get_compiled_prompt(
+            "synthesizer", 
+            label="production",
+            user_input=input_text,
+            action_results=action_results_str
+        )
 
         # Create messages for synthesis with conversation context
         system_msg = SystemMessage(content=full_prompt)
@@ -563,7 +534,8 @@ def conversation_stream():
                 synthesizer_generation = synthesizer_span.start_observation(
                     name="synthesizer.llm",
                     as_type="generation",
-                    input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]}
+                    input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
+                    prompt=synthesizer_langfuse_prompt  # Pass the actual Langfuse prompt object
                 )
             except Exception as e:
                 logger.warning(f"Failed to create Langfuse synthesizer span: {e}")

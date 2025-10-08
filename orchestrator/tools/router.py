@@ -14,6 +14,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_ollama import OllamaLLM
 from .tool_registry import ToolRegistry
 from config.langfuse_config import langfuse_config
+from config.prompt_manager import get_compiled_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,8 @@ class Router:
                  model_name: str = "gemma3:4b",
                  base_url: str = "http://localhost:11434",
                  api_base_url: str = "http://localhost:5001",
-                 prompt_file: str = "prompts/router_v1.1.txt"):
+                 prompt_name: str = "router",
+                 prompt_label: str = "production"):
         """
         Initialize the router with proper dependency injection
         
@@ -43,12 +45,14 @@ class Router:
             model_name: Ollama model name
             base_url: Ollama base URL
             api_base_url: API base URL for tool registry
-            prompt_file: Path to the prompt template file
+            prompt_name: Name of the prompt (for Langfuse or local file)
+            prompt_label: Langfuse label (e.g., "staging", "production")
         """
         self.model_name = model_name
         self.base_url = base_url
         self.api_base_url = api_base_url
-        self.prompt_file = prompt_file
+        self.prompt_name = prompt_name
+        self.prompt_label = prompt_label
         
         # Initialize components
         self.llm = OllamaLLM(model=model_name, base_url=base_url)
@@ -63,11 +67,14 @@ class Router:
         # Load and format the prompt template
         self.prompt_template = self._load_prompt_template()
         
-        # Create the prompt with proper formatting
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompt_template),
-            ("human", "{input}")
-        ])
+        # Create a custom prompt function that handles the compiled template
+        def create_messages(input_data):
+            return [
+                SystemMessage(content=self.prompt_template),
+                HumanMessage(content=input_data["input"])
+            ]
+        
+        self.prompt = RunnableLambda(create_messages)
         
         # Create the parser for structured output
         self.parser = PydanticOutputParser(pydantic_object=RouterDecision)
@@ -81,26 +88,18 @@ class Router:
         )
     
     def _load_prompt_template(self) -> str:
-        """Load and format the router prompt template"""
-        prompt_file = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
-            self.prompt_file
-        )
-        
+        """Load and format the router prompt template using new prompt management"""
         try:
-            with open(prompt_file, 'r') as f:
-                template = f.read()
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Router prompt file not found at: {prompt_file}")
-        
-        # Format the template with current context
-        current_datetime = datetime.now().isoformat()
-        tool_descriptions = self.tool_registry.get_tool_descriptions()
-        
-        return template.format(
-            current_datetime=current_datetime,
-            tool_descriptions=tool_descriptions
-        )
+            # Use the new prompt management system
+            compiled_prompt = get_compiled_prompt(
+                name=self.prompt_name,
+                label=self.prompt_label,
+                tool_descriptions=self.tool_registry.get_tool_descriptions()
+            )
+            return compiled_prompt
+        except Exception as e:
+            logger.error(f"Failed to load prompt '{self.prompt_name}': {e}")
+            raise
     
     def _parse_llm_response(self, response: Union[str, AIMessage]) -> Dict[str, Any]:
         """

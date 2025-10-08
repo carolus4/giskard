@@ -75,7 +75,14 @@ class ToolRegistry:
             ),
             StructuredTool.from_function(
                 name="fetch_tasks",
-                description="Get tasks with optional filtering by status and completion dates",
+                description= """
+Get tasks with optional filtering
+
+Args:
+    status: Filter by status ("open", "in_progress", "done")
+    completed_at_gte: Filter tasks completed on or after this date (ISO format)
+    completed_at_lt: Filter tasks completed before this date (ISO format)
+                """,
                 func=self._fetch_tasks_wrapper,
             ),
             StructuredTool.from_function(
