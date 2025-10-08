@@ -60,7 +60,7 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS agent_steps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            thread_id TEXT NOT NULL,
+            trace_id TEXT NOT NULL,
             step_number INTEGER NOT NULL,
             step_type TEXT NOT NULL,
             timestamp TEXT NOT NULL,
@@ -77,7 +77,7 @@ def init_database():
 
     # Create indexes for efficient querying
     cursor.execute('''
-        CREATE INDEX IF NOT EXISTS idx_agent_steps_thread_id ON agent_steps(thread_id)
+        CREATE INDEX IF NOT EXISTS idx_agent_steps_trace_id ON agent_steps(trace_id)
     ''')
 
     cursor.execute('''

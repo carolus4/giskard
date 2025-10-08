@@ -59,7 +59,7 @@ class AgentState(TypedDict):
     input_text: str
     session_id: Optional[str]
     domain: Optional[str]
-    thread_id: Optional[str]
+    trace_id: Optional[str]
     current_step: int
     router_output: Optional[Dict[str, Any]]
     tool_name: Optional[str]

@@ -24,20 +24,20 @@ def migrate_agent_logs():
 
         print(f"📊 Found {len(logs)} log entries to migrate")
 
-        # Group logs by session_id (which will become thread_id)
-        thread_groups = {}
+        # Group logs by session_id (which will become trace_id)
+        trace_groups = {}
         for log in logs:
-            session_id = log.get('input', {}).get('session_id', 'legacy-thread')
-            if session_id not in thread_groups:
-                thread_groups[session_id] = []
-            thread_groups[session_id].append(log)
+            session_id = log.get('input', {}).get('session_id', 'legacy-trace')
+            if session_id not in trace_groups:
+                trace_groups[session_id] = []
+            trace_groups[session_id].append(log)
 
         migrated_count = 0
 
-        for thread_id, thread_logs in thread_groups.items():
-            print(f"🔄 Migrating thread {thread_id} ({len(thread_logs)} steps)")
+        for trace_id, trace_logs in trace_groups.items():
+            print(f"🔄 Migrating trace {trace_id} ({len(trace_logs)} steps)")
 
-            for i, log in enumerate(thread_logs):
+            for i, log in enumerate(trace_logs):
                 try:
                     # Extract data from old format
                     step_type = log.get('node', 'unknown')
@@ -46,7 +46,7 @@ def migrate_agent_logs():
 
                     # Create database entry
                     AgentStepDB.create(
-                        thread_id=thread_id,
+                        trace_id=trace_id,
                         step_number=i + 1,
                         step_type=step_type,
                         input_data=input_data,
@@ -56,7 +56,7 @@ def migrate_agent_logs():
                     migrated_count += 1
 
                 except Exception as e:
-                    print(f"⚠️  Failed to migrate step {i+1} in thread {thread_id}: {e}")
+                    print(f"⚠️  Failed to migrate step {i+1} in trace {trace_id}: {e}")
 
         print(f"✅ Successfully migrated {migrated_count} log entries")
         return True

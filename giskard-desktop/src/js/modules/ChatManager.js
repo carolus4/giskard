@@ -281,7 +281,7 @@ class ChatManager {
                 body: JSON.stringify({
                     input_text: message,
                     session_id: threadId,
-                    thread_id: threadId,
+                    trace_id: threadId,
                     domain: 'chat',
                     conversation_context: conversationContext
                 }),
@@ -1193,8 +1193,8 @@ class ChatManager {
         try {
             // Load the most recent thread (first in the sorted list)
             const mostRecentThread = this.conversationHistory[0];
-            if (mostRecentThread && mostRecentThread.thread_id) {
-                await this._loadThreadMessages(mostRecentThread.thread_id);
+            if (mostRecentThread && mostRecentThread.trace_id) {
+                await this._loadThreadMessages(mostRecentThread.trace_id);
                 console.log('📖 Loaded most recent conversation thread');
             }
         } catch (error) {

@@ -17,13 +17,13 @@ def demo_database_logging():
     # Create some sample steps to demonstrate the system
     print("📝 Creating sample conversation steps...")
 
-    # Simulate a conversation thread
-    thread_id = "demo-conversation-456"
+    # Simulate a conversation trace
+    trace_id = "demo-conversation-456"
 
     steps_data = [
         {
             "step_type": "workflow_start",
-            "input_data": {"input_text": "What tasks should I work on?", "session_id": thread_id},
+            "input_data": {"input_text": "What tasks should I work on?", "session_id": trace_id},
             "output_data": {}
         },
         {
@@ -57,15 +57,15 @@ def demo_database_logging():
     # Create steps in database
     for i, step_data in enumerate(steps_data):
         step = AgentStepDB.create(
-            thread_id=thread_id,
+            trace_id=trace_id,
             step_number=i + 1,
             **step_data
         )
         print(f"  ✅ Created step {i+1}: {step.step_type}")
 
     print()
-    print("📊 Thread Overview:")
-    steps = AgentStepDB.get_by_thread_id(thread_id)
+    print("📊 Trace Overview:")
+    steps = AgentStepDB.get_by_trace_id(trace_id)
 
     for step in steps:
         print(f"  Step {step.step_number}: {step.step_type} - {step.timestamp}")
@@ -75,7 +75,7 @@ def demo_database_logging():
 
     for step in steps:
         print(f"\n--- Step {step.step_number}: {step.step_type} ---")
-        print(f"Thread ID: {step.thread_id}")
+        print(f"Trace ID: {step.trace_id}")
         print(f"Timestamp: {step.timestamp}")
         print(f"Input: {step.input_data}")
         print(f"Output: {step.output_data}")
@@ -94,9 +94,9 @@ def demo_database_logging():
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT thread_id, COUNT(*) as step_count, MIN(timestamp) as first, MAX(timestamp) as last
+            SELECT trace_id, COUNT(*) as step_count, MIN(timestamp) as first, MAX(timestamp) as last
             FROM agent_steps
-            GROUP BY thread_id
+            GROUP BY trace_id
             ORDER BY last DESC
         ''')
 
@@ -110,7 +110,7 @@ def demo_database_logging():
         cursor = conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM agent_steps')
         total_steps = cursor.fetchone()[0]
-        cursor.execute('SELECT COUNT(DISTINCT thread_id) FROM agent_steps')
+        cursor.execute('SELECT COUNT(DISTINCT trace_id) FROM agent_steps')
         total_threads = cursor.fetchone()[0]
 
     print(f"  Total steps: {total_steps}")

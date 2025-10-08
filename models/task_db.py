@@ -216,13 +216,13 @@ class TaskDB:
 class AgentStepDB:
     """Database model for agent workflow steps"""
 
-    def __init__(self, id: Optional[int] = None, thread_id: str = "", step_number: int = 0,
+    def __init__(self, id: Optional[int] = None, trace_id: str = "", step_number: int = 0,
                  step_type: str = "", timestamp: Optional[str] = None,
                  input_data: Optional[Dict[str, Any]] = None, output_data: Optional[Dict[str, Any]] = None,
                  rendered_prompt: Optional[str] = None, llm_input: Optional[Dict[str, Any]] = None,
                  llm_output: Optional[str] = None, llm_model: Optional[str] = None, error: Optional[str] = None):
         self.id = id
-        self.thread_id = thread_id
+        self.trace_id = trace_id
         self.step_number = step_number
         self.step_type = step_type
         self.timestamp = timestamp or datetime.now().isoformat()
@@ -242,11 +242,11 @@ class AgentStepDB:
             if self.id is None:
                 # Create new step
                 cursor.execute('''
-                    INSERT INTO agent_steps (thread_id, step_number, step_type, timestamp,
+                    INSERT INTO agent_steps (trace_id, step_number, step_type, timestamp,
                                            input_data, output_data, rendered_prompt, llm_input,
                                            llm_output, llm_model, error)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (self.thread_id, self.step_number, self.step_type, self.timestamp,
+                ''', (self.trace_id, self.step_number, self.step_type, self.timestamp,
                       json.dumps(self.input_data), json.dumps(self.output_data),
                       self.rendered_prompt, json.dumps(self.llm_input),
                       self.llm_output, self.llm_model, self.error))
@@ -255,11 +255,11 @@ class AgentStepDB:
             else:
                 # Update existing step
                 cursor.execute('''
-                    UPDATE agent_steps SET thread_id=?, step_number=?, step_type=?,
+                    UPDATE agent_steps SET trace_id=?, step_number=?, step_type=?,
                                           timestamp=?, input_data=?, output_data=?,
                                           rendered_prompt=?, llm_input=?, llm_output=?, llm_model=?, error=?
                     WHERE id=?
-                ''', (self.thread_id, self.step_number, self.step_type, self.timestamp,
+                ''', (self.trace_id, self.step_number, self.step_type, self.timestamp,
                       json.dumps(self.input_data), json.dumps(self.output_data),
                       self.rendered_prompt, json.dumps(self.llm_input),
                       self.llm_output, self.llm_model, self.error, self.id))
@@ -285,7 +285,7 @@ class AgentStepDB:
         """Convert agent step to dictionary for API responses"""
         return {
             'id': self.id,
-            'thread_id': self.thread_id,
+            'trace_id': self.trace_id,
             'step_number': self.step_number,
             'step_type': self.step_type,
             'timestamp': self.timestamp,
@@ -305,7 +305,7 @@ class AgentStepDB:
             cursor = conn.cursor()
 
             cursor.execute('''
-                SELECT id, thread_id, step_number, step_type, timestamp, input_data,
+                SELECT id, trace_id, step_number, step_type, timestamp, input_data,
                        output_data, rendered_prompt, llm_input, llm_output, llm_model, error
                 FROM agent_steps WHERE id=?
             ''', (step_id,))
@@ -315,7 +315,7 @@ class AgentStepDB:
             if row:
                 return cls(
                     id=row[0],
-                    thread_id=row[1],
+                    trace_id=row[1],
                     step_number=row[2],
                     step_type=row[3],
                     timestamp=row[4],
@@ -330,24 +330,24 @@ class AgentStepDB:
             return None
 
     @classmethod
-    def get_by_thread_id(cls, thread_id: str) -> List['AgentStepDB']:
-        """Get all steps for a specific thread"""
+    def get_by_trace_id(cls, trace_id: str) -> List['AgentStepDB']:
+        """Get all steps for a specific trace"""
         with get_connection() as conn:
             cursor = conn.cursor()
 
             cursor.execute('''
-                SELECT id, thread_id, step_number, step_type, timestamp, input_data,
+                SELECT id, trace_id, step_number, step_type, timestamp, input_data,
                        output_data, rendered_prompt, llm_input, llm_output, llm_model, error
-                FROM agent_steps WHERE thread_id=?
+                FROM agent_steps WHERE trace_id=?
                 ORDER BY step_number ASC
-            ''', (thread_id,))
+            ''', (trace_id,))
 
             rows = cursor.fetchall()
             steps = []
             for row in rows:
                 steps.append(cls(
                     id=row[0],
-                    thread_id=row[1],
+                    trace_id=row[1],
                     step_number=row[2],
                     step_type=row[3],
                     timestamp=row[4],
@@ -362,22 +362,22 @@ class AgentStepDB:
             return steps
 
     @classmethod
-    def get_next_step_number(cls, thread_id: str) -> int:
-        """Get the next step number for a thread"""
+    def get_next_step_number(cls, trace_id: str) -> int:
+        """Get the next step number for a trace"""
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT MAX(step_number) FROM agent_steps WHERE thread_id=?', (thread_id,))
+            cursor.execute('SELECT MAX(step_number) FROM agent_steps WHERE trace_id=?', (trace_id,))
             result = cursor.fetchone()
             return (result[0] or 0) + 1
 
     @classmethod
-    def create(cls, thread_id: str, step_number: int, step_type: str,
+    def create(cls, trace_id: str, step_number: int, step_type: str,
                input_data: Optional[Dict[str, Any]] = None, output_data: Optional[Dict[str, Any]] = None,
                rendered_prompt: Optional[str] = None, llm_input: Optional[Dict[str, Any]] = None,
                llm_output: Optional[str] = None, llm_model: Optional[str] = None, error: Optional[str] = None) -> 'AgentStepDB':
         """Create a new agent step"""
         step = cls(
-            thread_id=thread_id,
+            trace_id=trace_id,
             step_number=step_number,
             step_type=step_type,
             input_data=input_data or {},
@@ -391,4 +391,4 @@ class AgentStepDB:
         return step.save()
 
     def __repr__(self) -> str:
-        return f"AgentStepDB(id={self.id}, thread_id='{self.thread_id}', step={self.step_number}, type='{self.step_type}')"
+        return f"AgentStepDB(id={self.id}, trace_id='{self.trace_id}', step={self.step_number}, type='{self.step_type}')"

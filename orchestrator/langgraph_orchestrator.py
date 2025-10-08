@@ -24,7 +24,7 @@ class AgentState(TypedDict):
     input_text: str
     session_id: Optional[str]
     domain: Optional[str]
-    thread_id: Optional[str]
+    trace_id: Optional[str]
     current_step: int
     router_output: Optional[Dict[str, Any]]
     tool_name: Optional[str]
@@ -51,13 +51,13 @@ class LangGraphOrchestrator:
                   output_data: Dict[str, Any] = None, rendered_prompt: str = None,
                   llm_input: Dict[str, Any] = None, llm_output: str = None, error: str = None):
         """Log each node execution to database"""
-        # Ensure thread_id and step_number are set
-        thread_id = state.get("thread_id") or state.get("session_id") or "default-thread"
+        # Ensure trace_id and step_number are set
+        trace_id = state.get("trace_id") or state.get("session_id") or "default-trace"
         step_number = state.get("current_step", 1)
 
         # Create database entry
         AgentStepDB.create(
-            thread_id=thread_id,
+            trace_id=trace_id,
             step_number=step_number,
             step_type=step_type,
             input_data=input_data,
@@ -69,7 +69,7 @@ class LangGraphOrchestrator:
         )
 
         # Also log to console for debugging
-        logger.info(f"[{step_type}] Thread: {thread_id}, Step: {step_number}")
+        logger.info(f"[{step_type}] Trace: {trace_id}, Step: {step_number}")
         if output_data:
             logger.info(f"[{step_type}] Output: {json.dumps(output_data, indent=2)}")
         if error:
@@ -269,11 +269,11 @@ class LangGraphOrchestrator:
         import threading
         import time
 
-        # Generate thread_id if not provided
-        thread_id = session_id or f"chat-{int(time.time())}"
+        # Generate trace_id if not provided
+        trace_id = session_id or f"chat-{int(time.time())}"
 
-        # Get next step number for this thread
-        next_step = AgentStepDB.get_next_step_number(thread_id)
+        # Get next step number for this trace
+        next_step = AgentStepDB.get_next_step_number(trace_id)
 
         # Log workflow start
         initial_state = AgentState(
@@ -281,7 +281,7 @@ class LangGraphOrchestrator:
             input_text=input_text,
             session_id=session_id,
             domain=domain,
-            thread_id=thread_id,
+            trace_id=trace_id,
             current_step=next_step,
             router_output=None,
             tool_name=None,
@@ -337,11 +337,11 @@ class LangGraphOrchestrator:
                     "success": False,
                     "message": f"Agent step failed: {result['error']}",
                     "final_message": "I'm sorry, I encountered an error processing your request. Please try again.",
-                    "thread_id": thread_id,
+                    "trace_id": trace_id,
                     "state_patch": {
                         "session_id": session_id,
                         "domain": domain,
-                        "thread_id": thread_id,
+                        "trace_id": trace_id,
                         "current_step": next_step
                     }
                 }
@@ -353,12 +353,12 @@ class LangGraphOrchestrator:
                 "success": True,
                 "message": "Agent step completed",
                 "final_message": final_state["final_message"],
-                "thread_id": final_state["thread_id"],
+                "trace_id": final_state["trace_id"],
                 "current_step": final_state["current_step"],
                 "state_patch": {
                     "session_id": session_id,
                     "domain": domain,
-                    "thread_id": final_state["thread_id"],
+                    "trace_id": final_state["trace_id"],
                     "current_step": final_state["current_step"],
                     "messages": [msg.content for msg in final_state["messages"]]
                 }
@@ -370,11 +370,11 @@ class LangGraphOrchestrator:
                 "success": False,
                 "message": f"Agent step failed: {str(e)}",
                 "final_message": "I'm sorry, I encountered an error processing your request. Please try again.",
-                "thread_id": thread_id,
+                "trace_id": trace_id,
                 "state_patch": {
                     "session_id": session_id,
                     "domain": domain,
-                    "thread_id": thread_id,
+                    "trace_id": trace_id,
                     "current_step": next_step
                 }
             }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Demo script showing the new agent logging system with thread_id and step tracking
+Demo script showing the new agent logging system with trace_id and step tracking
 """
 import sys
 import os
@@ -31,20 +31,20 @@ def demo_logging_system():
         result = orchestrator.run(test_input, session_id)
 
         print("✅ Orchestrator completed successfully")
-        print(f"📊 Thread ID: {result.get('thread_id')}")
+        print(f"📊 Trace ID: {result.get('trace_id')}")
         print(f"🔢 Current Step: {result.get('current_step')}")
         print()
 
         # Show the steps that were logged
-        if result.get('thread_id'):
-            steps = AgentStepDB.get_by_thread_id(result['thread_id'])
-            print(f"📋 Database now contains {len(steps)} steps for this thread:")
+        if result.get('trace_id'):
+            steps = AgentStepDB.get_by_trace_id(result['trace_id'])
+            print(f"📋 Database now contains {len(steps)} steps for this trace:")
             print()
 
             for step in steps:
                 print(f"Step {step.step_number}: {step.step_type}")
                 print(f"  Timestamp: {step.timestamp}")
-                print(f"  Thread ID: {step.thread_id}")
+                print(f"  Trace ID: {step.trace_id}")
                 print(f"  Input: {step.input_data}")
                 print(f"  Output: {step.output_data}")
 
@@ -61,9 +61,9 @@ def demo_logging_system():
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT thread_id, COUNT(*) as step_count, MIN(timestamp) as first, MAX(timestamp) as last
+                SELECT trace_id, COUNT(*) as step_count, MIN(timestamp) as first, MAX(timestamp) as last
                 FROM agent_steps
-                GROUP BY thread_id
+                GROUP BY trace_id
                 ORDER BY last DESC
             ''')
 

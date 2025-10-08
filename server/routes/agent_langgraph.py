@@ -101,13 +101,13 @@ def visualize_graph():
 def get_threads():
     """Get all conversation threads"""
     try:
-        # Get all unique thread_ids from the database
+        # Get all unique trace_ids from the database
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT DISTINCT thread_id, MIN(timestamp) as first_message, MAX(timestamp) as last_message, COUNT(*) as step_count
+                SELECT DISTINCT trace_id, MIN(timestamp) as first_message, MAX(timestamp) as last_message, COUNT(*) as step_count
                 FROM agent_steps
-                GROUP BY thread_id
+                GROUP BY trace_id
                 ORDER BY last_message DESC
             ''')
 
@@ -115,7 +115,7 @@ def get_threads():
             threads = []
             for row in rows:
                 threads.append({
-                    "thread_id": row[0],
+                    "trace_id": row[0],
                     "first_message": row[1],
                     "last_message": row[2],
                     "step_count": row[3]
@@ -128,13 +128,13 @@ def get_threads():
         return APIResponse.error(f"Failed to retrieve threads: {str(e)}", 500)
 
 
-@agent_langgraph.route('/threads/<thread_id>', methods=['GET'])
-def get_thread_steps(thread_id):
-    """Get all steps for a specific thread"""
+@agent_langgraph.route('/threads/<trace_id>', methods=['GET'])
+def get_thread_steps(trace_id):
+    """Get all steps for a specific trace"""
     try:
-        steps = AgentStepDB.get_by_thread_id(thread_id)
+        steps = AgentStepDB.get_by_trace_id(trace_id)
         if not steps:
-            return APIResponse.error('Thread not found', 404)
+            return APIResponse.error('Trace not found', 404)
 
         # Convert to dictionaries
         steps_data = [step.to_dict() for step in steps]
@@ -163,7 +163,7 @@ def get_all_steps():
 
         # Get paginated results
         cursor.execute('''
-            SELECT id, thread_id, step_number, step_type, timestamp, input_data,
+            SELECT id, trace_id, step_number, step_type, timestamp, input_data,
                    output_data, rendered_prompt, llm_input, llm_output, error
             FROM agent_steps
             ORDER BY timestamp DESC
@@ -173,9 +173,9 @@ def get_all_steps():
         rows = cursor.fetchall()
         steps = []
         for row in rows:
-            steps.append({
-                "id": row[0],
-                "thread_id": row[1],
+                steps.append({
+                    "id": row[0],
+                    "trace_id": row[1],
                 "step_number": row[2],
                 "step_type": row[3],
                 "timestamp": row[4],
@@ -211,14 +211,14 @@ def conversation_stream():
         session_id = data.get('session_id')
         domain = data.get('domain', 'chat')
         conversation_context = data.get('conversation_context', [])
-        thread_id = data.get('thread_id', session_id)
+        trace_id = data.get('trace_id', session_id)
 
         if not input_text:
             return APIResponse.error('input_text is required')
 
-        # Generate thread_id if not provided
-        if not thread_id:
-            thread_id = f"chat-{int(time.time())}"
+        # Generate trace_id if not provided
+        if not trace_id:
+            trace_id = f"chat-{int(time.time())}"
 
         # Get the orchestrator to run step by step
         steps_data = []
@@ -229,8 +229,8 @@ def conversation_stream():
             'input_text': input_text,
             'session_id': session_id,
             'domain': domain,
-            'thread_id': thread_id,
-            'current_step': AgentStepDB.get_next_step_number(thread_id),
+            'trace_id': trace_id,
+            'current_step': AgentStepDB.get_next_step_number(trace_id),
             'planner_output': None,
             'actions_to_execute': [],
             'action_results': [],
@@ -277,7 +277,7 @@ def conversation_stream():
 
         # Log planner step
         AgentStepDB.create(
-            thread_id=thread_id,
+            trace_id=trace_id,
             step_number=initial_state['current_step'],
             step_type='planner_llm',
             input_data={'input_text': input_text, 'messages_count': len(messages), 'conversation_context_length': len(conversation_context)},
@@ -326,7 +326,7 @@ def conversation_stream():
 
             # Log action execution
             AgentStepDB.create(
-                thread_id=thread_id,
+                trace_id=trace_id,
                 step_number=initial_state['current_step'],
                 step_type='action_exec',
                 input_data={'actions_to_execute': initial_state['actions_to_execute']},
@@ -370,7 +370,7 @@ def conversation_stream():
 
         # Log synthesizer step
         AgentStepDB.create(
-            thread_id=thread_id,
+            trace_id=trace_id,
             step_number=initial_state['current_step'],
             step_type='synthesizer_llm',
             input_data={'action_results': initial_state['action_results'], 'input_text': input_text, 'conversation_context_length': len(conversation_context)},
@@ -394,7 +394,7 @@ def conversation_stream():
 
         # Return all steps for the frontend to display progressively
         return APIResponse.success('Conversation completed', {
-            'thread_id': thread_id,
+            'trace_id': trace_id,
             'steps': steps_data,
             'final_message': response,
             'total_steps': len(steps_data)
