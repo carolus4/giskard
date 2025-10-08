@@ -270,9 +270,13 @@ class TaskManager {
      * Handle opening task details
      */
     async _handleOpenTaskDetail(task) {
+        console.log('🔍 Opening task detail for task:', task);
         const result = await this.api.getTask(task.id);
         
+        console.log('🔍 API getTask result:', result);
+        
         if (result.success) {
+            console.log('🔍 Task data from API:', result.data);
             this.pageManager.showTaskDetail(task.id);
             this.pageManager.loadTaskIntoDetailPage(result.data);
         } else {

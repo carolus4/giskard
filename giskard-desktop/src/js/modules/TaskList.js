@@ -58,17 +58,17 @@ class TaskList {
         taskItem.dataset.status = task.status || 'open';
         taskItem.dataset.sortKey = task.sort_key !== undefined ? task.sort_key : 0;
         
-        // Set task content with project prefix
+        // Set task content without project prefix (project will be shown as badge)
         if (title) {
-            const displayTitle = this._formatTaskTitle(task);
-            title.textContent = displayTitle;
+            title.textContent = task.title || 'Untitled Task';
         }
         
-        // Set categories
+        // Set categories and project
         if (categoriesContainer) {
             // Categories should now always be an array
             const categories = task.categories || [];
-            this._renderCategories(categoriesContainer, categories);
+            const project = task.project;
+            this._renderCategoriesAndProject(categoriesContainer, categories, project);
         }
         
         // Add status classes
@@ -112,24 +112,31 @@ class TaskList {
     }
 
     /**
-     * Render category badges for a task
+     * Render category badges with colored dots and project badges for a task
      */
-    _renderCategories(container, categories) {
+    _renderCategoriesAndProject(container, categories, project) {
         if (!container) return;
         
         // Clear existing categories
         container.innerHTML = '';
         
-        if (!categories || categories.length === 0) {
-            return;
+        // Add project badge if project exists
+        if (project && project.trim()) {
+            const projectBadge = document.createElement('span');
+            projectBadge.className = 'project-badge';
+            projectBadge.innerHTML = `<i class="fas fa-clipboard-list"></i>${project}`;
+            container.appendChild(projectBadge);
         }
         
-        categories.forEach(category => {
-            const badge = document.createElement('span');
-            badge.className = `category-badge category-${category}`;
-            badge.textContent = category;
-            container.appendChild(badge);
-        });
+        // Add category badges with colored dots
+        if (categories && categories.length > 0) {
+            categories.forEach(category => {
+                const badge = document.createElement('span');
+                badge.className = `category-badge category-${category}`;
+                badge.innerHTML = `<span class="category-dot"></span>${category}`;
+                container.appendChild(badge);
+            });
+        }
     }
 
     /**
@@ -234,15 +241,14 @@ class TaskList {
         const startBtn = taskItem.querySelector('.start-btn');
         const stopBtn = taskItem.querySelector('.stop-btn');
 
-        // Update title with project prefix
+        // Update title without project prefix (project will be shown as badge)
         if (title && updatedTask.title) {
-            const displayTitle = this._formatTaskTitle(updatedTask);
-            title.textContent = displayTitle;
+            title.textContent = updatedTask.title;
         }
         
-        // Update categories
+        // Update categories and project
         if (categoriesContainer) {
-            this._renderCategories(categoriesContainer, updatedTask.categories || []);
+            this._renderCategoriesAndProject(categoriesContainer, updatedTask.categories || [], updatedTask.project);
         }
 
         // Update status
@@ -326,21 +332,6 @@ class TaskList {
         };
     }
 
-    /**
-     * Format task title with project prefix
-     * @param {Object} task - Task object with title and project
-     * @returns {string} Formatted title like "[Project] Title" or just "Title"
-     */
-    _formatTaskTitle(task) {
-        const title = task.title || 'Untitled Task';
-        const project = task.project;
-        
-        if (project && project.trim()) {
-            return `[${project}] ${title}`;
-        }
-        
-        return title;
-    }
 }
 
 export default TaskList;

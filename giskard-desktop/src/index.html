@@ -55,18 +55,14 @@
                 <div class="page" id="task-detail-page" style="display: none;">
                     <!-- Page Header -->
                     <div class="page-header">
-                        <button class="back-btn" id="back-to-tasks-btn">
-                            <i class="fas fa-arrow-left"></i>
-                            <span>Back to tasks</span>
-                        </button>
-                        
-                        <!-- Task Title as H1 -->
-                        <div class="task-title-header">
-                            <div class="task-title-section">
-                                <textarea class="task-title-h1" id="detail-title" placeholder="Task title..."></textarea>
-                                <div class="task-categories-detail" id="task-categories-detail"></div>
-                            </div>
-                            <div class="task-title-actions">
+                        <!-- Header Actions -->
+                        <div class="header-actions">
+                            <button class="back-btn" id="back-to-tasks-btn">
+                                <i class="fas fa-arrow-left"></i>
+                                <span>Back to tasks</span>
+                            </button>
+                            
+                            <div class="header-task-actions">
                                 <!-- Save/Add Task Button -->
                                 <button class="save-task-btn" id="save-task-btn" title="Save task">
                                     <i class="fas fa-save"></i>
@@ -91,6 +87,16 @@
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                             </div>
+                        </div>
+                        
+                        <!-- Task Title Header -->
+                        <div class="header-task-title">
+                            <textarea class="task-title-h1" id="detail-title" placeholder="Task title..."></textarea>
+                        </div>
+                        
+                        <!-- Task Categories -->
+                        <div class="header-task-categories">
+                            <div class="task-categories" id="task-categories-detail"></div>
                         </div>
                     </div>
                     
@@ -195,7 +201,7 @@
                     <span class="task-title"></span>
                     <div class="task-categories" id="task-categories"></div>
                 </div>
-                <div class="task-actions">
+                <div class="list-task-actions">
                     <button class="task-action start-btn" title="Start task">
                         <i class="fas fa-play"></i>
                     </button>

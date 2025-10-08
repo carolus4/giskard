@@ -162,54 +162,23 @@ class PageManager {
         if (titleTextarea) {
             // Auto-resize function
             this._autoResizeTextarea = () => {
-                // Reset height to auto to get natural height
+                // Reset height to auto to get the natural scrollHeight
                 titleTextarea.style.height = 'auto';
-                titleTextarea.style.minHeight = 'auto';
-                titleTextarea.style.maxHeight = 'none';
 
-                // Ensure the textarea has proper width for wrapping
-                titleTextarea.style.width = '100%';
-                titleTextarea.style.maxWidth = 'none';
-
-                // Force text wrapping
-                titleTextarea.style.whiteSpace = 'pre-wrap';
-                titleTextarea.style.wordWrap = 'break-word';
-                titleTextarea.style.overflowWrap = 'break-word';
-                titleTextarea.style.wordBreak = 'break-word';
-
-                // Force a reflow
-                titleTextarea.offsetHeight;
-
-                // Get the scroll height
+                // Get the scroll height (this is the height needed to show all content)
                 const scrollHeight = titleTextarea.scrollHeight;
 
-                // Calculate lines
-                const lines = titleTextarea.value.split('\n').length;
+                // Set a reasonable minimum height (about 1.2 lines)
+                const minHeight = 40; // 1.2 * 28px font size + padding
 
-                // Calculate appropriate height
-                let newHeight = scrollHeight;
-                if (lines > 1) {
-                    // Multiple lines - use scroll height
-                    newHeight = scrollHeight;
-                } else if (titleTextarea.value.length > 80) {
-                    // Very long single line - estimate if it would wrap
-                    const charsPerLine = Math.floor(titleTextarea.offsetWidth / 14); // Approximate chars per line
-                    const estimatedLines = Math.ceil(titleTextarea.value.length / charsPerLine);
-                    if (estimatedLines > 1) {
-                        newHeight = Math.max(scrollHeight, estimatedLines * 1.2 * 28);
-                    }
-                } else {
-                    // Short text - use natural height (will shrink)
-                    newHeight = scrollHeight;
-                }
+                // Set a reasonable maximum height (about 6 lines)
+                const maxHeight = 200; // 6 * 28px font size + padding
 
-                // Force the height regardless of current height
+                // Calculate the new height, constrained by min/max
+                let newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+
+                // Apply the new height
                 titleTextarea.style.height = newHeight + 'px';
-                // Only override minHeight for multi-line content
-                if (lines > 1) {
-                    titleTextarea.style.minHeight = newHeight + 'px';
-                }
-                titleTextarea.style.maxHeight = 'none';
             };
 
             // Bind multiple events to ensure it works
@@ -221,10 +190,12 @@ class PageManager {
             // Also trigger on focus
             titleTextarea.addEventListener('focus', this._autoResizeTextarea);
 
-            // Initial resize
+            // Initial resize after a short delay to ensure DOM is ready
             setTimeout(() => {
-                this._autoResizeTextarea();
-            }, 100);
+                requestAnimationFrame(() => {
+                    this._autoResizeTextarea();
+                });
+            }, 50);
         } else {
             console.log('Textarea not found!');
         }
@@ -408,7 +379,15 @@ class PageManager {
         });
 
         // Clear all fields
-        if (titleInput) titleInput.value = '';
+        if (titleInput) {
+            titleInput.value = '';
+            // Trigger auto-resize for empty content
+            if (this._autoResizeTextarea) {
+                requestAnimationFrame(() => {
+                    this._autoResizeTextarea();
+                });
+            }
+        }
         if (descriptionInput) descriptionInput.value = '';
         if (categoriesContainer) categoriesContainer.innerHTML = '';
 
@@ -476,16 +455,16 @@ class PageManager {
             return;
         }
 
-        // Parse the formatted title to extract project and title
-        const parsedTitle = this._parseTaskTitle(titleInput.value.trim());
+        // Get the title directly (no project prefix parsing needed)
+        const title = titleInput.value.trim();
 
         // Check if we're in add mode or edit mode
         if (this.currentTaskId === 'new') {
             // Add mode - immediate save (no debouncing for new tasks)
             const taskData = {
-                title: parsedTitle.title,
+                title: title,
                 description: descriptionInput?.value.trim() || '',
-                project: parsedTitle.project
+                project: null // Project will be handled separately in the future
             };
 
             console.log('Dispatching task:add-from-page event with data:', taskData);
@@ -502,19 +481,9 @@ class PageManager {
             
             const taskData = {
                 fileIdx: this.currentTaskId,
-                title: parsedTitle.title,
+                title: title,
                 description: descriptionInput?.value.trim() || ''
             };
-            
-            // Only include project if it's different from the original or if original had no project
-            if (originalTask) {
-                if (parsedTitle.project !== originalTask.project) {
-                    taskData.project = parsedTitle.project;
-                }
-            } else {
-                // Fallback if we can't find original task
-                taskData.project = parsedTitle.project;
-            }
 
             // Force immediate save (this will trigger classification)
             await this._debouncedUpdateTask(this.currentTaskId, taskData, true);
@@ -538,22 +507,9 @@ class PageManager {
                 clearTimeout(titleTimeout);
                 titleTimeout = setTimeout(async () => {
                     if (titleInput.value.trim()) {
-                        const parsedTitle = this._parseTaskTitle(titleInput.value.trim());
-                        
-                        // Get original task data to compare
-                        const allTasks = [...(window.app?.taskManager?.tasks?.in_progress || []), 
-                                         ...(window.app?.taskManager?.tasks?.open || []), 
-                                         ...(window.app?.taskManager?.tasks?.done || [])];
-                        const originalTask = allTasks.find(t => t.id === this.currentTaskId);
-                        
                         const updateData = {
-                            title: parsedTitle.title
+                            title: titleInput.value.trim()
                         };
-                        
-                        // Only include project if it's different from the original
-                        if (originalTask && parsedTitle.project !== originalTask.project) {
-                            updateData.project = parsedTitle.project;
-                        }
                         
                         await this._debouncedUpdateTask(this.currentTaskId, updateData);
                     }
@@ -671,21 +627,31 @@ class PageManager {
         const saveBtn = document.getElementById('save-task-btn');
 
         if (titleInput) {
-            // Show formatted title with project prefix
-            const displayTitle = this._formatTaskTitle(taskData);
-            titleInput.value = displayTitle;
-            
-            // Trigger auto-resize for the textarea with a small delay
+            // Show title without project prefix (project will be shown as badge)
+            titleInput.value = taskData.title || 'Untitled Task';
+
+            // Trigger auto-resize for the textarea immediately after setting value
             if (this._autoResizeTextarea) {
-                setTimeout(() => {
+                // Use requestAnimationFrame to ensure the value is set before resizing
+                requestAnimationFrame(() => {
                     this._autoResizeTextarea();
-                }, 10);
+                });
             }
         }
         
-        // Load categories
+        // Load categories and project
         if (categoriesContainer) {
-            this._renderCategoriesInDetail(categoriesContainer, taskData.categories || []);
+            console.log('🔍 Categories debug:', {
+                taskData: taskData,
+                categories: taskData.categories,
+                project: taskData.project,
+                categoriesType: typeof taskData.categories,
+                categoriesLength: taskData.categories?.length,
+                container: categoriesContainer
+            });
+            this._renderCategoriesAndProjectInDetail(categoriesContainer, taskData.categories || [], taskData.project);
+        } else {
+            console.log('❌ Categories container not found!');
         }
         
         // Bind detail page events when elements are available
@@ -760,63 +726,49 @@ class PageManager {
     }
 
     /**
-     * Render category badges in task detail page
+     * Render category badges with colored dots and project badges in task detail page
      */
-    _renderCategoriesInDetail(container, categories) {
-        if (!container) return;
+    _renderCategoriesAndProjectInDetail(container, categories, project) {
+        console.log('🎯 _renderCategoriesAndProjectInDetail called:', {
+            container: container,
+            categories: categories,
+            project: project,
+            categoriesType: typeof categories,
+            categoriesLength: categories?.length
+        });
+        
+        if (!container) {
+            console.log('❌ Container not found in _renderCategoriesAndProjectInDetail');
+            return;
+        }
         
         // Clear existing categories
         container.innerHTML = '';
         
-        if (!categories || categories.length === 0) {
-            return;
-        }
-        
-        categories.forEach(category => {
-            const badge = document.createElement('span');
-            badge.className = `category-badge-detail category-${category}`;
-            badge.textContent = category;
-            container.appendChild(badge);
-        });
-    }
-
-    /**
-     * Format task title with project prefix
-     * @param {Object} task - Task object with title and project
-     * @returns {string} Formatted title like "[Project] Title" or just "Title"
-     */
-    _formatTaskTitle(task) {
-        const title = task.title || 'Untitled Task';
-        const project = task.project;
-        
+        // Add project badge if project exists
         if (project && project.trim()) {
-            return `[${project}] ${title}`;
+            const projectBadge = document.createElement('span');
+            projectBadge.className = 'project-badge';
+            projectBadge.innerHTML = `<i class="fas fa-clipboard-list"></i>${project}`;
+            container.appendChild(projectBadge);
+            console.log('➕ Added project badge:', project);
         }
         
-        return title;
-    }
-
-    /**
-     * Parse formatted title back into project and title
-     * @param {string} formattedTitle - Title in format "[Project] Title" or just "Title"
-     * @returns {Object} Object with project and title properties
-     */
-    _parseTaskTitle(formattedTitle) {
-        const projectPattern = /^\[([^\]]+)\]\s+(.+)$/;
-        const match = formattedTitle.match(projectPattern);
-
-        if (match) {
-            return {
-                project: match[1].trim(),
-                title: match[2].trim()
-            };
+        // Add category badges with colored dots
+        if (categories && categories.length > 0) {
+            console.log('✅ Rendering categories:', categories);
+            categories.forEach(category => {
+                const badge = document.createElement('span');
+                badge.className = `category-badge category-${category}`;
+                badge.innerHTML = `<span class="category-dot"></span>${category}`;
+                container.appendChild(badge);
+                console.log('➕ Added category badge:', category);
+            });
+        } else {
+            console.log('⚠️ No categories to render:', categories);
         }
-
-        return {
-            project: null,
-            title: formattedTitle.trim()
-        };
     }
+
 
     /**
      * Debounced task update - saves changes but defers classification
