@@ -87,7 +87,8 @@ class ActionExecutor:
     
     def fetch_tasks(self, status: Optional[Union[str, List[str]]] = None,
                    completed_at_gte: Optional[str] = None,
-                   completed_at_lt: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
+                   completed_at_lt: Optional[str] = None,
+                   completed_at_period: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
         """Fetch tasks with optional status and completion date filtering
 
         Args:
@@ -95,10 +96,11 @@ class ActionExecutor:
                    Valid statuses: 'open', 'in_progress', 'done'
             completed_at_gte: ISO date string (YYYY-MM-DD) to filter tasks completed since this date
             completed_at_lt: ISO date string (YYYY-MM-DD) to filter tasks completed before this date
+            completed_at_period: Period string to filter tasks by completion period
         """
         try:
             # Use HTTP API call instead of direct DB access
-            response_data = self.api_client.get_tasks(status, completed_at_gte, completed_at_lt)
+            response_data = self.api_client.get_tasks(status, completed_at_gte, completed_at_lt, completed_at_period)
 
             # Extract tasks from the response format
             ui_tasks = response_data.get('tasks', {})
@@ -173,7 +175,8 @@ class ActionExecutor:
                 return self.fetch_tasks(
                     status=args.get("status"),
                     completed_at_gte=args.get("completed_at_gte"),
-                    completed_at_lt=args.get("completed_at_lt")
+                    completed_at_lt=args.get("completed_at_lt"),
+                    completed_at_period=args.get("completed_at_period")
                 )
             elif action_name == "update_task":
                 return self.update_task(

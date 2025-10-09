@@ -3,7 +3,7 @@ Clean REST API routes for the todo application
 """
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import logging
 
 from models.task_db import TaskDB
@@ -84,6 +84,63 @@ def filter_tasks_by_completed_at(tasks: List[TaskDB],
     return filtered_tasks
 
 
+def convert_period_to_date_range(period: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Convert a period string to date range (gte, lt)
+    
+    Args:
+        period: Period string (this_week, this_month, last_week, last_month, last_7_days, last_30_days)
+        
+    Returns:
+        Tuple of (completed_at_gte, completed_at_lt) ISO date strings
+    """
+    now = datetime.now()
+    today = now.date()
+    
+    if period == "this_week":
+        # Start of this week (Monday)
+        days_since_monday = today.weekday()
+        start_of_week = today - timedelta(days=days_since_monday)
+        return start_of_week.isoformat(), None
+    
+    elif period == "this_month":
+        # Start of this month
+        start_of_month = today.replace(day=1)
+        return start_of_month.isoformat(), None
+    
+    elif period == "last_week":
+        # Start and end of last week
+        days_since_monday = today.weekday()
+        start_of_this_week = today - timedelta(days=days_since_monday)
+        start_of_last_week = start_of_this_week - timedelta(days=7)
+        end_of_last_week = start_of_this_week - timedelta(days=1)
+        return start_of_last_week.isoformat(), end_of_last_week.isoformat()
+    
+    elif period == "last_month":
+        # Start and end of last month
+        if today.month == 1:
+            start_of_last_month = today.replace(year=today.year - 1, month=12, day=1)
+        else:
+            start_of_last_month = today.replace(month=today.month - 1, day=1)
+        
+        start_of_this_month = today.replace(day=1)
+        end_of_last_month = start_of_this_month - timedelta(days=1)
+        return start_of_last_month.isoformat(), end_of_last_month.isoformat()
+    
+    elif period == "last_7_days":
+        # 7 days ago to now
+        seven_days_ago = today - timedelta(days=7)
+        return seven_days_ago.isoformat(), None
+    
+    elif period == "last_30_days":
+        # 30 days ago to now
+        thirty_days_ago = today - timedelta(days=30)
+        return thirty_days_ago.isoformat(), None
+    
+    else:
+        raise ValueError(f"Invalid period: {period}. Valid options: this_week, this_month, last_week, last_month, last_7_days, last_30_days")
+
+
 @api.route('/tasks', methods=['GET'])
 def get_tasks():
     """Get all tasks grouped by status with optional filtering
@@ -92,12 +149,14 @@ def get_tasks():
         status: Filter by status (open, in_progress, done) - single status or comma-separated list
         completed_at_gte: ISO date string (YYYY-MM-DD) - only include tasks completed on or after this date
         completed_at_lt: ISO date string (YYYY-MM-DD) - only include tasks completed before this date
+        completed_at_period: Period string (this_week, this_month, last_week, last_month, last_7_days, last_30_days)
     """
     try:
         # Get query parameters
         status_filter = request.args.get('status')
         completed_at_gte = request.args.get('completed_at_gte')
         completed_at_lt = request.args.get('completed_at_lt')
+        completed_at_period = request.args.get('completed_at_period')
 
         # Parse status filter
         status_filters = None
@@ -125,6 +184,16 @@ def get_tasks():
                 datetime.fromisoformat(completed_at_lt.replace('Z', '+00:00'))
             except ValueError:
                 return APIResponse.error("Invalid completed_at_lt format. Use ISO format (e.g., 2025-09-29 or 2025-09-29T00:00:00)", 400)
+        
+        # Handle completed_at_period parameter
+        if completed_at_period:
+            try:
+                period_gte, period_lt = convert_period_to_date_range(completed_at_period)
+                # Override any existing date filters with period-based ones
+                completed_at_gte = period_gte
+                completed_at_lt = period_lt
+            except ValueError as e:
+                return APIResponse.error(str(e), 400)
         
         # Get all tasks
         open_tasks, in_progress_tasks, done_tasks = TaskDB.get_by_status()

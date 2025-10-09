@@ -58,7 +58,8 @@ class APIClient:
 
     def get_tasks(self, status: Optional[Union[str, List[str]]] = None,
                   completed_at_gte: Optional[str] = None,
-                  completed_at_lt: Optional[str] = None) -> Dict[str, Any]:
+                  completed_at_lt: Optional[str] = None,
+                  completed_at_period: Optional[str] = None) -> Dict[str, Any]:
         """
         Get tasks with optional filtering
 
@@ -66,6 +67,7 @@ class APIClient:
             status: Filter by status (single status or list of statuses)
             completed_at_gte: Filter tasks completed on or after this date (ISO format)
             completed_at_lt: Filter tasks completed before this date (ISO format)
+            completed_at_period: Filter by completion period (this_week, this_month, etc.)
 
         Returns:
             API response data
@@ -83,6 +85,9 @@ class APIClient:
 
         if completed_at_lt:
             params['completed_at_lt'] = completed_at_lt
+
+        if completed_at_period:
+            params['completed_at_period'] = completed_at_period
 
         response = self._make_request('GET', '/api/tasks', params=params)
         return response.json()
