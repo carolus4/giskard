@@ -324,54 +324,65 @@ def conversation_stream():
                 logger.warning(f"Failed to create Langfuse root span: {e}")
                 root_span = None
 
-        # Create planner span with proper prompt integration
-        planner_span = None
+        # Create planner generation with proper prompt integration
         planner_generation = None
         if client and root_span:
             try:
-                planner_span = client.start_span(
-                    trace_context=langfuse_trace_context,
-                    name="plan",
-                    input={"input_text": input_text, "messages_count": len(messages)}
-                )
-                
-                # Create planner generation with prompt reference
-                planner_generation = planner_span.start_observation(
+                # Create planner generation directly within the root span
+                # This ensures proper hierarchy and token counting
+                planner_generation = root_span.start_observation(
                     name="planner.llm",
                     as_type="generation",
                     input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
                     prompt=langfuse_prompt  # Pass the actual Langfuse prompt object
                 )
             except Exception as e:
-                logger.warning(f"Failed to create Langfuse planner span: {e}")
-                planner_span = None
+                logger.warning(f"Failed to create Langfuse planner generation: {e}")
                 planner_generation = None
         
         # Call LLM for planning
         logger.info("Calling LLM for planning")
-        response = orchestrator.llm.invoke(messages)
+        
+        # Get Langfuse callback handler for planner
+        langfuse_handler = None
+        if client and root_span:
+            try:
+                from config.langfuse_config import langfuse_config
+                langfuse_handler = langfuse_config.get_callback_handler(
+                    trace_id=trace_id,
+                    user_id=session_id
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get Langfuse callback handler: {e}")
+        
+        # Call LLM with Langfuse tracing
+        if langfuse_handler:
+            response = orchestrator.llm.invoke(
+                messages,
+                config={"callbacks": [langfuse_handler]}
+            )
+        else:
+            response = orchestrator.llm.invoke(messages)
+        
         logger.info("LLM planning response received")
+        
+        # Extract content from AIMessage
+        response_content = response.content if hasattr(response, 'content') else str(response)
         
         # Update generation with output
         if planner_generation:
             try:
-                planner_generation.update(output=response)
+                planner_generation.update(output=response_content)
             except Exception as e:
                 logger.warning(f"Failed to update Langfuse planner generation: {e}")
-        if planner_generation:
             try:
                 planner_generation.end()
             except Exception as e:
                 logger.warning(f"Failed to end Langfuse planner generation: {e}")
-        if planner_span:
-            try:
-                planner_span.end()
-            except Exception as e:
-                logger.warning(f"Failed to end Langfuse planner span: {e}")
 
         # Parse response
         try:
-            cleaned_response = response.strip()
+            cleaned_response = response_content.strip()
             if cleaned_response.startswith("```json"):
                 cleaned_response = cleaned_response[7:]
             if cleaned_response.endswith("```"):
@@ -396,11 +407,11 @@ def conversation_stream():
             step_number=initial_state['current_step'],
             step_type='planner_llm',
             input_data={'input_text': input_text, 'messages_count': len(messages), 'conversation_context_length': len(conversation_context)},
-            output_data={'llm_response': response, 'planner_output': planner_output, 'actions_to_execute': initial_state['actions_to_execute']},
+            output_data={'llm_response': response_content, 'planner_output': planner_output, 'actions_to_execute': initial_state['actions_to_execute']},
             rendered_prompt=compiled_prompt,
             llm_input={'messages': [{'type': msg.__class__.__name__, 'content': msg.content} for msg in messages]},
             llm_model='gemma3:4b',
-            llm_output=response
+            llm_output=response_content
         )
 
         # Get the assistant text for display
@@ -521,49 +532,58 @@ def conversation_stream():
         messages = [system_msg] + context_messages + [user_msg]
 
         # Call LLM for final response with Langfuse tracing
-        synthesizer_span = None
         synthesizer_generation = None
         if client and root_span:
             try:
-                synthesizer_span = client.start_span(
-                    trace_context=langfuse_trace_context,
-                    name="synthesize",
-                    input={"action_results": initial_state['action_results'], "input_text": input_text}
-                )
-                
-                synthesizer_generation = synthesizer_span.start_observation(
+                # Create synthesizer generation directly within the root span
+                # This ensures proper hierarchy and token counting
+                synthesizer_generation = root_span.start_observation(
                     name="synthesizer.llm",
                     as_type="generation",
                     input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
                     prompt=synthesizer_langfuse_prompt  # Pass the actual Langfuse prompt object
                 )
             except Exception as e:
-                logger.warning(f"Failed to create Langfuse synthesizer span: {e}")
-                synthesizer_span = None
+                logger.warning(f"Failed to create Langfuse synthesizer generation: {e}")
                 synthesizer_generation = None
         
         # Call LLM for final response
-        response = orchestrator.llm.invoke(messages)
+        # Get Langfuse callback handler for synthesizer
+        langfuse_handler = None
+        if client and root_span:
+            try:
+                from config.langfuse_config import langfuse_config
+                langfuse_handler = langfuse_config.get_callback_handler(
+                    trace_id=trace_id,
+                    user_id=session_id
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get Langfuse callback handler: {e}")
+        
+        # Call LLM with Langfuse tracing
+        if langfuse_handler:
+            response = orchestrator.llm.invoke(
+                messages,
+                config={"callbacks": [langfuse_handler]}
+            )
+        else:
+            response = orchestrator.llm.invoke(messages)
         
         # Update generation with output
         if synthesizer_generation:
             try:
-                synthesizer_generation.update(output=response)
+                synthesizer_generation.update(output=response_content)
             except Exception as e:
                 logger.warning(f"Failed to update Langfuse synthesizer generation: {e}")
             try:
                 synthesizer_generation.end()
             except Exception as e:
                 logger.warning(f"Failed to end Langfuse synthesizer generation: {e}")
-        if synthesizer_span:
-            try:
-                synthesizer_span.end()
-            except Exception as e:
-                logger.warning(f"Failed to end Langfuse synthesizer span: {e}")
 
         # Add to conversation history
-        initial_state['messages'].append(AIMessage(content=response))
-        initial_state['final_message'] = response
+        response_content = response.content if hasattr(response, 'content') else str(response)
+        initial_state['messages'].append(AIMessage(content=response_content))
+        initial_state['final_message'] = response_content
 
         # Log synthesizer step
         AgentStepDB.create(
@@ -572,18 +592,18 @@ def conversation_stream():
             step_number=initial_state['current_step'],
             step_type='synthesizer_llm',
             input_data={'action_results': initial_state['action_results'], 'input_text': input_text, 'conversation_context_length': len(conversation_context)},
-            output_data={'final_message': response, 'synthesis_success': True},
+            output_data={'final_message': response_content, 'synthesis_success': True},
             rendered_prompt=full_prompt,
             llm_input={'messages': [{'type': msg.__class__.__name__, 'content': msg.content} for msg in messages]},
             llm_model='gemma3:4b',
-            llm_output=response
+            llm_output=response_content
         )
 
         steps_data.append({
             'step_number': initial_state['current_step'],
             'step_type': 'synthesizer_llm',
             'status': 'completed',
-            'content': response,
+            'content': response_content,
             'details': {
                 'is_final': True
             },
@@ -593,7 +613,7 @@ def conversation_stream():
         # End root span
         if root_span:
             try:
-                root_span.update(output={"final_message": response, "total_steps": len(steps_data)})
+                root_span.update(output={"final_message": response_content, "total_steps": len(steps_data)})
                 root_span.end()
             except Exception as e:
                 logger.warning(f"Failed to end Langfuse root span: {e}")
@@ -601,12 +621,12 @@ def conversation_stream():
         # Complete the trace
         if langfuse_trace_context and client:
             try:
-                client.update_current_trace(output={"final_message": response, "total_steps": len(steps_data)})
+                client.update_current_trace(output={"final_message": response_content, "total_steps": len(steps_data)})
             except Exception as e:
                 logger.warning(f"Failed to update Langfuse current trace: {e}")
 
         # Mark trace as completed
-        trace.mark_completed(response)
+        trace.mark_completed(response_content)
 
         # Flush Langfuse events
         langfuse_config.flush()
@@ -616,7 +636,7 @@ def conversation_stream():
             'session_id': session_id,
             'trace_id': trace_id,
             'steps': steps_data,
-            'final_message': response,
+            'final_message': response_content,
             'total_steps': len(steps_data)
         })
 

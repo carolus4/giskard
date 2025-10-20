@@ -67,7 +67,7 @@ class APIClient:
             status: Filter by status (single status or list of statuses)
             completed_at_gte: Filter tasks completed on or after this date (ISO format)
             completed_at_lt: Filter tasks completed before this date (ISO format)
-            completed_at_period: Filter by completion period (this_week, this_month, etc.)
+            completed_at_period: Filter by completion period (this_week, this_month, last_week, last_month, last_7_days, last_30_days, today, yesterday)
 
         Returns:
             API response data

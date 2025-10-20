@@ -137,8 +137,17 @@ def convert_period_to_date_range(period: str) -> Tuple[Optional[str], Optional[s
         thirty_days_ago = today - timedelta(days=30)
         return thirty_days_ago.isoformat(), None
     
+    elif period == "today":
+        # Today only
+        return today.isoformat(), (today + timedelta(days=1)).isoformat()
+    
+    elif period == "yesterday":
+        # Yesterday only
+        yesterday = today - timedelta(days=1)
+        return yesterday.isoformat(), today.isoformat()
+    
     else:
-        raise ValueError(f"Invalid period: {period}. Valid options: this_week, this_month, last_week, last_month, last_7_days, last_30_days")
+        raise ValueError(f"Invalid period: {period}. Valid options: this_week, this_month, last_week, last_month, last_7_days, last_30_days, today, yesterday")
 
 
 @api.route('/tasks', methods=['GET'])
@@ -149,7 +158,7 @@ def get_tasks():
         status: Filter by status (open, in_progress, done) - single status or comma-separated list
         completed_at_gte: ISO date string (YYYY-MM-DD) - only include tasks completed on or after this date
         completed_at_lt: ISO date string (YYYY-MM-DD) - only include tasks completed before this date
-        completed_at_period: Period string (this_week, this_month, last_week, last_month, last_7_days, last_30_days)
+        completed_at_period: Period string (this_week, this_month, last_week, last_month, last_7_days, last_30_days, today, yesterday)
     """
     try:
         # Get query parameters

@@ -11,9 +11,8 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough, RunnableParallel
 from langchain_core.output_parsers import PydanticOutputParser
-from langchain_ollama import OllamaLLM
+from langchain_openai import ChatOpenAI
 from .tool_registry import ToolRegistry
-from config.langfuse_config import langfuse_config
 from config.prompt_manager import get_compiled_prompt
 
 logger = logging.getLogger(__name__)
@@ -54,8 +53,12 @@ class Router:
         self.prompt_name = prompt_name
         self.prompt_label = prompt_label
         
-        # Initialize components
-        self.llm = OllamaLLM(model=model_name, base_url=base_url)
+        # Initialize components with OpenAI-compatible format for Langfuse token counting
+        self.llm = ChatOpenAI(
+            model=model_name,
+            base_url=f"{base_url}/v1",  # OpenAI-compatible endpoint
+            api_key="ollama"  # Dummy key for Ollama
+        )
         self.tool_registry = ToolRegistry(api_base_url)
         self.tools = self.tool_registry.get_tools()
         
@@ -187,31 +190,23 @@ class Router:
     
     def plan_actions(self, user_input: str, trace_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Plan actions using the idiomatic router approach with Langfuse tracing
+        Plan actions using the idiomatic router approach without separate Langfuse tracing
         
         Args:
             user_input: The user's input text
-            trace_id: Optional trace ID for Langfuse tracing
-            user_id: Optional user ID for Langfuse tracing
+            trace_id: Optional trace ID (not used for separate tracing)
+            user_id: Optional user ID (not used for separate tracing)
             
         Returns:
             Dictionary with assistant_text, tool_name, and tool_args
         """
         try:
-            # Get Langfuse callback handler if available
-            langfuse_handler = langfuse_config.get_callback_handler(trace_id, user_id)
-            
             # Prepare the input for the chain
             chain_input = {"input": user_input}
             
-            # Execute the router chain with Langfuse tracing
-            if langfuse_handler:
-                decision = self.router_chain.invoke(
-                    chain_input, 
-                    config={"callbacks": [langfuse_handler]}
-                )
-            else:
-                decision = self.router_chain.invoke(chain_input)
+            # Execute the router chain without separate Langfuse tracing
+            # The main conversation flow will handle all tracing
+            decision = self.router_chain.invoke(chain_input)
             
             # Convert to dictionary format for compatibility
             return {

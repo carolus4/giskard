@@ -41,7 +41,7 @@ class FetchTasksArgs(BaseModel):
     status: Optional[str] = Field(default=None, description="Filter by status (open, in_progress, done)")
     completed_at_gte: Optional[str] = Field(default=None, description="ISO date to filter tasks completed since this date")
     completed_at_lt: Optional[str] = Field(default=None, description="ISO date to filter tasks completed before this date")
-    completed_at_period: Optional[str] = Field(default=None, description="Filter by completion period: this_week, this_month, last_week, last_month, last_7_days, last_30_days")
+    completed_at_period: Optional[str] = Field(default=None, description="Filter by completion period: this_week, this_month, last_week, last_month, last_7_days, last_30_days, today, yesterday")
 
 
 class ToolRegistry:
@@ -83,7 +83,7 @@ Args:
     status: Filter by status ("open", "in_progress", "done")
     completed_at_gte: Filter tasks completed on or after this date (ISO format)
     completed_at_lt: Filter tasks completed before this date (ISO format)
-    completed_at_period: Filter by completion period ("this_week", "this_month", "last_week", "last_month", "last_7_days", "last_30_days")
+    completed_at_period: Filter by completion period ("this_week", "this_month", "last_week", "last_month", "last_7_days", "last_30_days", "today", "yesterday")
                 """,
                 func=self._fetch_tasks_wrapper,
             ),

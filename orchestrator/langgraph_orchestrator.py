@@ -6,7 +6,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
-from langchain_ollama import OllamaLLM
+from langchain_openai import ChatOpenAI
 import json
 import logging
 from datetime import datetime
@@ -38,7 +38,12 @@ class LangGraphOrchestrator:
     """LangGraph-based orchestrator with proper state management"""
     
     def __init__(self):
-        self.llm = OllamaLLM(model="gemma3:4b", base_url="http://localhost:11434")
+        # Use OpenAI-compatible format for proper Langfuse token counting
+        self.llm = ChatOpenAI(
+            model="gemma3:4b",
+            base_url="http://localhost:11434/v1",  # OpenAI-compatible endpoint
+            api_key="ollama"  # Dummy key for Ollama
+        )
         self.action_executor = ActionExecutor()
         self.router = Router()
         self.tool_registry = ToolRegistry()
@@ -244,13 +249,16 @@ class LangGraphOrchestrator:
 
             # Call LLM with Langfuse tracing
             if langfuse_handler:
-                response = self.llm.invoke(
+                response_message = self.llm.invoke(
                     messages,
                     config={"callbacks": [langfuse_handler]}
                 )
             else:
-                response = self.llm.invoke(messages)
+                response_message = self.llm.invoke(messages)
 
+            # Extract content from AIMessage
+            response = response_message.content if hasattr(response_message, 'content') else str(response_message)
+            
             # Add AI message to conversation
             state["messages"].append(AIMessage(content=response))
             state["final_message"] = response
