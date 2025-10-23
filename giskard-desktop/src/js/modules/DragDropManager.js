@@ -4,44 +4,59 @@
 class DragDropManager {
     constructor() {
         // Debug flag - set to true only when debugging drag issues
-        this.DEBUG = true;
-        
+        this.DEBUG = false;
+
         // Core drag state
         this.draggedTask = null;
         this.insertionIndex = -1;
         this.lastMouseY = 0;
         this.isDropping = false;
         this.isDragging = false;
-        
+
         // Event handlers (stored for proper cleanup)
         this.dragOverHandler = null;
         this.dropHandler = null;
-        
+        this.taskEventHandlers = new Map(); // Track all mousedown handlers
+
         // Performance and reliability
         this.lastReorderTime = 0;
         this.reorderDebounceMs = 500;
         this.mouseMoveThrottle = null;
         this.throttleDelay = 16; // ~60fps
+        this.lastInitTime = 0;
+        this.initDebounceMs = 200; // Prevent rapid re-initialization
+        this.isCleanedUp = false; // Guard flag for throttled callbacks
     }
 
     /**
      * Initialize drag and drop for all task items
      */
     initializeDragDrop() {
+        // Debounce rapid re-initialization calls
+        const now = Date.now();
+        if (now - this.lastInitTime < this.initDebounceMs) {
+            if (this.DEBUG) console.log('⏱️ Initialization debounced, too soon since last init');
+            return;
+        }
+        this.lastInitTime = now;
+
         if (this.DEBUG) console.log('🔧 DragDropManager.initializeDragDrop() called');
-        
+
         // Clean up existing event listeners first
         this.cleanup();
-        
-        const taskItems = document.querySelectorAll('.task-item');
-        if (this.DEBUG) console.log(`📝 Found ${taskItems.length} task items to initialize`);
-        
-        taskItems.forEach((taskItem, index) => {
-            if (this.DEBUG) console.log(`⚙️  Initializing drag for task ${index + 1}:`, taskItem.dataset);
-            this.addDragHandlers(taskItem);
+
+        // Wait for DOM to be fully ready using requestAnimationFrame
+        requestAnimationFrame(() => {
+            const taskItems = document.querySelectorAll('.task-item');
+            if (this.DEBUG) console.log(`📝 Found ${taskItems.length} task items to initialize`);
+
+            taskItems.forEach((taskItem, index) => {
+                if (this.DEBUG) console.log(`⚙️  Initializing drag for task ${index + 1}:`, taskItem.dataset);
+                this.addDragHandlers(taskItem);
+            });
+
+            if (this.DEBUG) console.log('🎯 DragDropManager initialization complete');
         });
-        
-        if (this.DEBUG) console.log('🎯 DragDropManager initialization complete');
     }
     
     /**
@@ -49,6 +64,9 @@ class DragDropManager {
      */
     cleanup() {
         if (this.DEBUG) console.log('🧹 Cleaning up existing drag-drop listeners');
+
+        // Set guard flag to prevent throttled callbacks from executing
+        this.isCleanedUp = true;
 
         // Remove dragover and drop listeners from single container
         const container = document.querySelector('.content-body') || document.body;
@@ -58,6 +76,18 @@ class DragDropManager {
         if (container && this.dropHandler) {
             container.removeEventListener('drop', this.dropHandler);
         }
+
+        // Remove all tracked mousedown handlers
+        this.taskEventHandlers.forEach((handlers, taskElement) => {
+            const dragHandle = taskElement.querySelector('.task-drag-handle');
+            if (dragHandle && handlers.mousedown) {
+                dragHandle.removeEventListener('mousedown', handlers.mousedown);
+            }
+            if (dragHandle && handlers.contextmenu) {
+                dragHandle.removeEventListener('contextmenu', handlers.contextmenu);
+            }
+        });
+        this.taskEventHandlers.clear();
 
         // Clear insertion line
         const insertionLine = document.querySelector('.insertion-line');
@@ -81,6 +111,9 @@ class DragDropManager {
             clearTimeout(this.mouseMoveThrottle);
             this.mouseMoveThrottle = null;
         }
+
+        // Reset cleanup flag
+        this.isCleanedUp = false;
     }
 
     /**
@@ -102,7 +135,7 @@ class DragDropManager {
         let isDraggingThisItem = false;
 
         // Mouse down - start tracking for this specific item
-        dragHandle.addEventListener('mousedown', (e) => {
+        const mousedownHandler = (e) => {
             if (this.DEBUG) console.log('🖱️ Drag handle mousedown for task:', taskItem.dataset?.taskId);
             e.preventDefault(); // Prevent text selection
 
@@ -133,7 +166,10 @@ class DragDropManager {
                         clearTimeout(this.mouseMoveThrottle);
                     }
                     this.mouseMoveThrottle = setTimeout(() => {
-                        this._handleDragMove(moveEvent);
+                        // Guard: Don't execute if cleanup already happened
+                        if (!this.isCleanedUp) {
+                            this._handleDragMove(moveEvent);
+                        }
                     }, this.throttleDelay);
                 }
             };
@@ -147,20 +183,29 @@ class DragDropManager {
                 }
 
                 // Clean up document listeners for this drag operation
-                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mousemove', mouseMoveHandler, { passive: true });
                 document.removeEventListener('mouseup', mouseUpHandler);
                 isDraggingThisItem = false;
                 this.isDragging = false;
             };
 
-            // Add document listeners for this drag operation
-            document.addEventListener('mousemove', mouseMoveHandler);
-            document.addEventListener('mouseup', mouseUpHandler);
-        });
+            // Add document listeners for this drag operation with options
+            document.addEventListener('mousemove', mouseMoveHandler, { passive: true });
+            document.addEventListener('mouseup', mouseUpHandler, { once: true });
+        };
 
         // Prevent context menu on drag handle
-        dragHandle.addEventListener('contextmenu', (e) => {
+        const contextmenuHandler = (e) => {
             e.preventDefault();
+        };
+
+        dragHandle.addEventListener('mousedown', mousedownHandler);
+        dragHandle.addEventListener('contextmenu', contextmenuHandler);
+
+        // Track handlers for cleanup
+        this.taskEventHandlers.set(taskItem, {
+            mousedown: mousedownHandler,
+            contextmenu: contextmenuHandler
         });
     }
 
@@ -168,31 +213,37 @@ class DragDropManager {
      * Handle drag start
      */
     _handleDragStart(event, taskItem) {
+        // Validate element is still in DOM
+        if (!taskItem.isConnected) {
+            if (this.DEBUG) console.error('❌ Task element no longer in DOM');
+            return;
+        }
+
         const taskIdStr = taskItem.dataset.taskId;
         const taskId = taskIdStr && taskIdStr !== '' ? parseInt(taskIdStr) : null;
         const taskTitle = taskItem.querySelector('.task-title')?.textContent || 'Unknown';
-        
+
         if (taskId === null || isNaN(taskId)) {
             if (this.DEBUG) console.error(`❌ Invalid taskId for task: "${taskTitle}" - taskId: "${taskIdStr}"`);
             return;
         }
-        
+
         if (this.DEBUG) console.log(`🎯 DRAG START: "${taskTitle}" - taskId: ${taskId}`);
-        
+
         // Visual feedback
         document.body.classList.add('dragging');
         taskItem.classList.add('selected-for-move');
-        
+
         // Store drag state
         this.draggedTask = {
             id: taskId,
             title: taskTitle,
             element: taskItem
         };
-        
+
         // Initialize insertion tracking
         this._initializeInsertionTracking();
-        
+
         // Initial position update
         this.lastMouseY = event.clientY;
         this._updateInsertionLinePosition();
@@ -203,16 +254,23 @@ class DragDropManager {
      */
     _handleDragMove(event) {
         if (!this.isDragging || !this.draggedTask) return;
-        
+
+        // Validate dragged element is still in DOM
+        if (!this.draggedTask.element?.isConnected) {
+            if (this.DEBUG) console.error('❌ Dragged element no longer in DOM, aborting drag');
+            this._cleanupDragState();
+            return;
+        }
+
         // Update mouse position and insertion line
         this.lastMouseY = event.clientY;
-        
+
         // Calculate insertion index
         const insertionIndex = this._calculateInsertionIndex(event.clientY);
         this.insertionIndex = insertionIndex;
-        
+
         if (this.DEBUG) console.log('📍 DRAG MOVE: Y:', event.clientY, 'Index:', insertionIndex);
-        
+
         // Update insertion line position
         this._updateInsertionLinePosition();
     }
@@ -222,13 +280,22 @@ class DragDropManager {
      */
     _handleDragEnd(event, taskItem) {
         if (this.DEBUG) console.log(`🔚 DRAG END: ${this.draggedTask?.id} at index ${this.insertionIndex}`);
-        
+
+        // Validate dragged element is still in DOM before proceeding
+        const isValidDrop = this.isDragging &&
+                           this.insertionIndex !== -1 &&
+                           this.draggedTask &&
+                           !this.isDropping &&
+                           this.draggedTask.element?.isConnected;
+
         // Handle drop if valid
-        if (this.isDragging && this.insertionIndex !== -1 && this.draggedTask && !this.isDropping) {
+        if (isValidDrop) {
             if (this.DEBUG) console.log('✅ DROP: Performing reorder');
             this._handleDrop(event);
+        } else if (this.draggedTask && !this.draggedTask.element?.isConnected) {
+            if (this.DEBUG) console.warn('⚠️ DROP: Dragged element removed from DOM, skipping reorder');
         }
-        
+
         // Clean up drag state
         this._cleanupDragState();
     }

@@ -184,17 +184,13 @@ class TaskManager {
                 
                 // Update today date after rendering to ensure it's not overridden
                 this.ui.updateTodayDate(data.today_date);
-                
-                // Reinitialize drag drop after rendering
-                setTimeout(() => {
-                    const taskItems = document.querySelectorAll('.task-item');
-                    
-                    try {
-                        this.dragDrop.initializeDragDrop();
-                    } catch (error) {
-                        console.error('❌ Drag-drop failed:', error);
-                    }
-                }, 100);
+
+                // Reinitialize drag drop after rendering (uses requestAnimationFrame internally)
+                try {
+                    this.dragDrop.initializeDragDrop();
+                } catch (error) {
+                    console.error('❌ Drag-drop failed:', error);
+                }
             }
             
         } catch (error) {
