@@ -268,6 +268,12 @@ def get_tasks():
         completed_today_count = sum(1 for task in done_tasks if task.completed_at and task.completed_at.startswith(today_date))
         completed_yesterday_count = sum(1 for task in done_tasks if task.completed_at and task.completed_at.startswith(yesterday_date))
         
+        # Get completed tasks for today with their categories
+        completed_today_tasks = [
+            task for task in done_tasks 
+            if task.completed_at and task.completed_at.startswith(today_date)
+        ]
+        
         # Build response
         response_data = {
             'tasks': ui_tasks,
@@ -276,6 +282,14 @@ def get_tasks():
                 'completed_today': completed_today_count,
                 'completed_yesterday': completed_yesterday_count
             },
+            'completed_today_tasks': [
+                {
+                    'id': task.id,
+                    'title': task.title,
+                    'categories': task.categories or []
+                }
+                for task in completed_today_tasks
+            ],
             'today_date': datetime.now().strftime('Today - %A %b %d')
         }
         

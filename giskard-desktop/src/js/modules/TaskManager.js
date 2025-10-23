@@ -179,7 +179,7 @@ class TaskManager {
                 this.lastTasksHash = newHash;
                 
                 // Update UI
-                this.ui.updateCounts(data.counts);
+                this.ui.updateCounts(data.counts, data.completed_today_tasks);
                 this._renderCurrentView(allowAnimation);
                 
                 // Update today date after rendering to ensure it's not overridden

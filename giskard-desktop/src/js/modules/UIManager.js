@@ -8,7 +8,15 @@ class UIManager {
             today: 0,
             completed_today: 0
         };
+        this.completedTodayTasks = [];
         this.modelName = 'gemma3:4b'; // Default fallback
+        
+        // Category icon mapping
+        this.categoryIcons = {
+            'health': 'fa-spa',
+            'career': 'fa-laptop-code',
+            'learning': 'fa-lightbulb'
+        };
         
         this._bindNavigation();
         this._subscribeToModelUpdates();
@@ -126,8 +134,9 @@ class UIManager {
     /**
      * Update task counts in sidebar and header
      */
-    updateCounts(counts) {
+    updateCounts(counts, completedTodayTasks = []) {
         this.counts = { ...this.counts, ...counts };
+        this.completedTodayTasks = completedTodayTasks || [];
         
         this.updateTaskCount();
     }
@@ -148,10 +157,57 @@ class UIManager {
                 taskCountEl.textContent = `AI Productivity Coach • ${this.modelName}`;
             } else if (this.currentView === 'task-list') {
                 const completedCount = this.counts.completed_today || 0;
-                taskCountEl.textContent = `${completedCount} task${completedCount !== 1 ? 's' : ''} completed today`;
+                const categoryIcons = this._generateCategoryIcons();
+                taskCountEl.innerHTML = `${completedCount} task${completedCount !== 1 ? 's' : ''} completed today${categoryIcons}`;
                 taskCountEl.style.display = 'block';
             }
         }
+    }
+
+    /**
+     * Generate category icons for completed tasks today
+     * Groups icons by category in consistent order: health, career, learning
+     */
+    _generateCategoryIcons() {
+        if (!this.completedTodayTasks || this.completedTodayTasks.length === 0) {
+            return '';
+        }
+
+        // Count occurrences of each category across all completed tasks
+        const categoryCounts = {
+            'health': 0,
+            'career': 0,
+            'learning': 0
+        };
+
+        this.completedTodayTasks.forEach(task => {
+            if (task.categories && task.categories.length > 0) {
+                task.categories.forEach(category => {
+                    if (categoryCounts.hasOwnProperty(category)) {
+                        categoryCounts[category]++;
+                    }
+                });
+            }
+        });
+
+        // Generate icons in consistent order: health, career, learning
+        const icons = [];
+        const categoryOrder = ['health', 'career', 'learning'];
+        
+        categoryOrder.forEach(category => {
+            const count = categoryCounts[category];
+            if (count > 0) {
+                const iconClass = this.categoryIcons[category];
+                if (iconClass) {
+                    // Add the icon for each occurrence
+                    for (let i = 0; i < count; i++) {
+                        icons.push(`<i class="fas ${iconClass}"></i>`);
+                    }
+                }
+            }
+        });
+
+        return icons.length > 0 ? `: ${icons.join('')}` : '';
     }
 
     /**
