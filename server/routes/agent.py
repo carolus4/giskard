@@ -11,8 +11,56 @@ from models.task_db import AgentStepDB
 from models.session_db import SessionDB, TraceDB
 from database import get_connection
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+import tiktoken
 
 logger = logging.getLogger(__name__)
+
+# Initialize tokenizer for token counting
+try:
+    # Use cl100k_base encoding (used by GPT-4, GPT-3.5-turbo)
+    # This is a reasonable approximation for counting tokens
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+except Exception as e:
+    logger.warning(f"Failed to load tiktoken encoder: {e}")
+    tokenizer = None
+
+
+def count_tokens(text: str) -> int:
+    """
+    Count tokens in text using tiktoken
+
+    Args:
+        text: Text to count tokens for
+
+    Returns:
+        Number of tokens (or 0 if tokenizer unavailable)
+    """
+    if not tokenizer or not text:
+        return 0
+    try:
+        return len(tokenizer.encode(text))
+    except Exception as e:
+        logger.warning(f"Failed to count tokens: {e}")
+        return 0
+
+
+def count_message_tokens(messages: list) -> int:
+    """
+    Count total tokens in a list of messages
+
+    Args:
+        messages: List of LangChain messages
+
+    Returns:
+        Total token count
+    """
+    total = 0
+    for msg in messages:
+        content = msg.content if hasattr(msg, 'content') else str(msg)
+        total += count_tokens(content)
+        # Add tokens for message formatting (role, etc.)
+        total += 4  # Approximate overhead per message
+    return total
 
 # Create blueprint
 agent = Blueprint('agent', __name__)
@@ -342,37 +390,35 @@ def conversation_stream():
         
         # Call LLM for planning
         logger.info("Calling LLM for planning")
-        
-        # Get Langfuse callback handler for planner
-        langfuse_handler = None
-        if client and root_span:
-            try:
-                from config.langfuse_config import langfuse_config
-                langfuse_handler = langfuse_config.get_callback_handler(
-                    trace_id=trace_id,
-                    user_id=session_id
-                )
-            except Exception as e:
-                logger.warning(f"Failed to get Langfuse callback handler: {e}")
-        
-        # Call LLM with Langfuse tracing
-        if langfuse_handler:
-            response = orchestrator.llm.invoke(
-                messages,
-                config={"callbacks": [langfuse_handler]}
-            )
-        else:
-            response = orchestrator.llm.invoke(messages)
-        
+
+        # Note: We don't use CallbackHandler here because we're manually creating
+        # the observation above (planner_generation). Using both would create duplicates.
+        response = orchestrator.llm.invoke(messages)
+
         logger.info("LLM planning response received")
-        
+
         # Extract content from AIMessage
         response_content = response.content if hasattr(response, 'content') else str(response)
-        
-        # Update generation with output
+
+        # Update generation with output and token counts
         if planner_generation:
             try:
-                planner_generation.update(output=response_content)
+                # Count tokens for input and output
+                input_tokens = count_message_tokens(messages)
+                output_tokens = count_tokens(response_content)
+                total_tokens = input_tokens + output_tokens
+
+                # Update observation with output and usage
+                planner_generation.update(
+                    output=response_content,
+                    usage={
+                        "input": input_tokens,
+                        "output": output_tokens,
+                        "total": total_tokens,
+                        "unit": "TOKENS"
+                    }
+                )
+                logger.info(f"Planner tokens: {input_tokens} input + {output_tokens} output = {total_tokens} total")
             except Exception as e:
                 logger.warning(f"Failed to update Langfuse planner generation: {e}")
             try:
@@ -443,8 +489,8 @@ def conversation_stream():
                 tool_span = None
                 if client and root_span:
                     try:
-                        tool_span = client.start_span(
-                            trace_context=langfuse_trace_context,
+                        # Create span as child of root_span for proper hierarchy
+                        tool_span = root_span.start_span(
                             name=f"tool.execute.{action_name}",
                             input={"tool_name": action_name, "tool_args": action_args}
                         )
@@ -548,31 +594,32 @@ def conversation_stream():
                 synthesizer_generation = None
         
         # Call LLM for final response
-        # Get Langfuse callback handler for synthesizer
-        langfuse_handler = None
-        if client and root_span:
-            try:
-                from config.langfuse_config import langfuse_config
-                langfuse_handler = langfuse_config.get_callback_handler(
-                    trace_id=trace_id,
-                    user_id=session_id
-                )
-            except Exception as e:
-                logger.warning(f"Failed to get Langfuse callback handler: {e}")
-        
-        # Call LLM with Langfuse tracing
-        if langfuse_handler:
-            response = orchestrator.llm.invoke(
-                messages,
-                config={"callbacks": [langfuse_handler]}
-            )
-        else:
-            response = orchestrator.llm.invoke(messages)
-        
-        # Update generation with output
+        # Note: We don't use CallbackHandler here because we're manually creating
+        # the observation above (synthesizer_generation). Using both would create duplicates.
+        response = orchestrator.llm.invoke(messages)
+
+        # Extract content from AIMessage
+        response_content = response.content if hasattr(response, 'content') else str(response)
+
+        # Update generation with output and token counts
         if synthesizer_generation:
             try:
-                synthesizer_generation.update(output=response_content)
+                # Count tokens for input and output
+                input_tokens = count_message_tokens(messages)
+                output_tokens = count_tokens(response_content)
+                total_tokens = input_tokens + output_tokens
+
+                # Update observation with output and usage
+                synthesizer_generation.update(
+                    output=response_content,
+                    usage={
+                        "input": input_tokens,
+                        "output": output_tokens,
+                        "total": total_tokens,
+                        "unit": "TOKENS"
+                    }
+                )
+                logger.info(f"Synthesizer tokens: {input_tokens} input + {output_tokens} output = {total_tokens} total")
             except Exception as e:
                 logger.warning(f"Failed to update Langfuse synthesizer generation: {e}")
             try:
@@ -580,8 +627,7 @@ def conversation_stream():
             except Exception as e:
                 logger.warning(f"Failed to end Langfuse synthesizer generation: {e}")
 
-        # Add to conversation history
-        response_content = response.content if hasattr(response, 'content') else str(response)
+        # Add to conversation history (response_content already extracted above)
         initial_state['messages'].append(AIMessage(content=response_content))
         initial_state['final_message'] = response_content
 

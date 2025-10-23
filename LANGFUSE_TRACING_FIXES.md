@@ -91,3 +91,5 @@ After these fixes, you should see in Langfuse:
 3. **No separate traces**: No extra ChatOpenAI or synthesize traces
 4. **Proper lineage**: All operations nested under the main conversation trace
 
+
+

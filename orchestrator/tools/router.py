@@ -91,17 +91,19 @@ class Router:
         )
     
     def _load_prompt_template(self) -> str:
-        """Load and format the router prompt template using new prompt management"""
+        """Load and format the router prompt template using local file only"""
+        # Router is deprecated - use local prompt only
+        from config.prompt_manager import prompt_manager
+        
         try:
-            # Use the new prompt management system
-            compiled_prompt = get_compiled_prompt(
-                name=self.prompt_name,
-                label=self.prompt_label,
+            local_prompt_data = prompt_manager.load_local_prompt(self.prompt_name)
+            compiled_prompt = prompt_manager.compile_prompt(
+                local_prompt_data,
                 tool_descriptions=self.tool_registry.get_tool_descriptions()
             )
             return compiled_prompt
         except Exception as e:
-            logger.error(f"Failed to load prompt '{self.prompt_name}': {e}")
+            logger.error(f"Failed to load local prompt '{self.prompt_name}': {e}")
             raise
     
     def _parse_llm_response(self, response: Union[str, AIMessage]) -> Dict[str, Any]:

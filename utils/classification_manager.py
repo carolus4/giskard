@@ -152,6 +152,29 @@ class ClassificationManager:
                 logger.error(f"Error in classification queue processing: {str(e)}")
                 time.sleep(5)  # Wait longer on error
     
+    def _create_classification_trace_context(self, batch: List[Dict[str, Any]]):
+        """Create a Langfuse trace context for classification batch"""
+        try:
+            from config.langfuse_config import langfuse_config
+            
+            if not langfuse_config.enabled:
+                return None
+            
+            # Create trace context for classification batch
+            trace_context = langfuse_config.create_trace_context(
+                name="classification.batch",
+                input_data={
+                    "batch_size": len(batch),
+                    "task_ids": [task.get('id') for task in batch],
+                    "task_titles": [task.get('title', '') for task in batch]
+                }
+            )
+            
+            return trace_context
+        except Exception as e:
+            logger.warning(f"Failed to create classification trace context: {e}")
+            return None
+    
     def _process_queue_batch(self):
         """Process a batch of tasks from the queue"""
         if not self.classification_queue:
@@ -175,8 +198,11 @@ class ClassificationManager:
             
             logger.info(f"Processing classification batch of {len(batch)} tasks")
             
+            # Create trace context for classification batch
+            trace_context = self._create_classification_trace_context(batch)
+            
             # Classify the batch
-            results = self.classification_service.classify_tasks_batch(batch)
+            results = self.classification_service.classify_tasks_batch(batch, trace_context)
             
             # Update tasks in the database
             updated_count = 0
