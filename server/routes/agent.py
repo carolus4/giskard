@@ -11,7 +11,6 @@ from models.task_db import AgentStepDB
 from models.session_db import SessionDB, TraceDB
 from database import get_connection
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from langfuse.decorators import observe, langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -170,364 +169,23 @@ def conversation_test():
         data = request.get_json()
         input_text = data.get('input_text', '').strip()
         logger.info(f"Test endpoint received: {input_text}")
-
+        
         if not input_text:
             return APIResponse.error('input_text is required')
-
+        
         # Simple response without orchestrator
         return APIResponse.success('Test successful', {
             'message': f'Received: {input_text}',
             'timestamp': datetime.now().isoformat()
         })
-
+        
     except Exception as e:
         logger.error(f"Test endpoint error: {str(e)}")
         return APIResponse.error(f"Test endpoint error: {str(e)}", 500)
 
-
-# === Langfuse-traced helper functions ===
-
-@observe(name="planner.llm", as_type="generation")
-def call_planner_llm(orchestrator, input_text, conversation_context, trace_id, session_id):
-    """
-    Call the planner LLM with proper Langfuse tracing
-
-    Returns:
-        tuple: (planner_output dict, response_content str, compiled_prompt str, messages list)
-    """
-    from config.prompt_manager import get_prompt, get_compiled_prompt
-    from orchestrator.tools.tool_registry import ToolRegistry
-
-    # Get tool descriptions for the planner
-    tool_registry = ToolRegistry("http://localhost:5001")
-    tool_descriptions = tool_registry.get_tool_descriptions()
-
-    # Load and compile prompt
-    prompt_data = get_prompt("planner", label="production")
-    langfuse_prompt = prompt_data.get("langfuse_prompt")
-    compiled_prompt = get_compiled_prompt(
-        "planner",
-        label="production",
-        tool_descriptions=tool_descriptions
-    )
-
-    # Link the Langfuse prompt if available
-    if langfuse_prompt:
-        try:
-            langfuse_context.update_current_observation(
-                prompt=langfuse_prompt
-            )
-        except Exception as e:
-            logger.warning(f"Failed to link Langfuse prompt: {e}")
-
-    # Create messages
-    system_msg = SystemMessage(content=compiled_prompt)
-    user_msg = HumanMessage(content=input_text)
-    context_messages = convert_conversation_context_to_messages(conversation_context)
-    messages = [system_msg] + context_messages + [user_msg]
-
-    # Update observation with model metadata
-    try:
-        langfuse_context.update_current_observation(
-            model="gemma3:4b",
-            model_parameters={"temperature": 0.7},
-            metadata={
-                "trace_id": trace_id,
-                "session_id": session_id,
-                "step_type": "planner"
-            }
-        )
-    except Exception as e:
-        logger.warning(f"Failed to update observation metadata: {e}")
-
-    # Call LLM
-    response = orchestrator.llm.invoke(messages)
-    response_content = response.content if hasattr(response, 'content') else str(response)
-
-    # Parse response
-    try:
-        cleaned_response = response_content.strip()
-        if cleaned_response.startswith("```json"):
-            cleaned_response = cleaned_response[7:]
-        if cleaned_response.endswith("```"):
-            cleaned_response = cleaned_response[:-3]
-        cleaned_response = cleaned_response.strip()
-
-        planner_output = json.loads(cleaned_response)
-    except json.JSONDecodeError:
-        planner_output = {
-            "assistant_text": "I'm sorry, I had trouble understanding your request.",
-            "actions": [{"name": "no_op", "args": {}}]
-        }
-
-    return planner_output, response_content, compiled_prompt, messages
-
-
-@observe(name="tool.execute", as_type="span")
-def execute_action_with_tracing(orchestrator, action_name, action_args):
-    """
-    Execute a single action with proper Langfuse tracing
-
-    Returns:
-        dict: Action result with name, ok, result, and error fields
-    """
-    try:
-        # Update observation with metadata
-        langfuse_context.update_current_observation(
-            metadata={
-                "tool_name": action_name,
-                "tool_args": action_args
-            }
-        )
-
-        # Execute the action
-        success, result = orchestrator.action_executor.execute_action(action_name, action_args)
-
-        # Update observation with output
-        langfuse_context.update_current_observation(
-            output={
-                "success": success,
-                "result": result if success else None,
-                "error": result.get("error") if not success else None
-            }
-        )
-
-        return {
-            "name": action_name,
-            "ok": success,
-            "result": result if success else None,
-            "error": result.get("error") if not success else None
-        }
-    except Exception as e:
-        logger.error(f"Error executing action {action_name}: {e}")
-        langfuse_context.update_current_observation(
-            level="ERROR",
-            status_message=str(e)
-        )
-        return {
-            "name": action_name,
-            "ok": False,
-            "result": None,
-            "error": str(e)
-        }
-
-
-@observe(name="synthesizer.llm", as_type="generation")
-def call_synthesizer_llm(orchestrator, input_text, action_results, conversation_context, trace_id, session_id):
-    """
-    Call the synthesizer LLM with proper Langfuse tracing
-
-    Returns:
-        tuple: (response_content str, full_prompt str, messages list)
-    """
-    from config.prompt_manager import get_prompt, get_compiled_prompt
-
-    # Load and compile prompt
-    synthesizer_prompt_data = get_prompt("synthesizer", label="production")
-    synthesizer_langfuse_prompt = synthesizer_prompt_data.get("langfuse_prompt")
-
-    action_results_str = json.dumps(action_results, indent=2)
-    full_prompt = get_compiled_prompt(
-        "synthesizer",
-        label="production",
-        user_input=input_text,
-        action_results=action_results_str
-    )
-
-    # Link the Langfuse prompt if available
-    if synthesizer_langfuse_prompt:
-        try:
-            langfuse_context.update_current_observation(
-                prompt=synthesizer_langfuse_prompt
-            )
-        except Exception as e:
-            logger.warning(f"Failed to link Langfuse prompt: {e}")
-
-    # Create messages
-    system_msg = SystemMessage(content=full_prompt)
-    user_msg = HumanMessage(content=input_text)
-    context_messages = convert_conversation_context_to_messages(conversation_context)
-    messages = [system_msg] + context_messages + [user_msg]
-
-    # Update observation with model metadata
-    try:
-        langfuse_context.update_current_observation(
-            model="gemma3:4b",
-            model_parameters={"temperature": 0.7},
-            metadata={
-                "trace_id": trace_id,
-                "session_id": session_id,
-                "step_type": "synthesizer"
-            }
-        )
-    except Exception as e:
-        logger.warning(f"Failed to update observation metadata: {e}")
-
-    # Call LLM
-    response = orchestrator.llm.invoke(messages)
-    response_content = response.content if hasattr(response, 'content') else str(response)
-
-    return response_content, full_prompt, messages
-
-@observe(name="chat.turn", as_type="span")
-def process_conversation_with_tracing(input_text, session_id, domain, conversation_context, trace_id):
-    """
-    Core conversation processing logic with Langfuse tracing
-
-    Returns:
-        dict: Response data with steps, final_message, etc.
-    """
-    from config.langfuse_config import langfuse_config
-
-    # Update trace context with session tracking
-    try:
-        langfuse_context.update_current_trace(
-            session_id=session_id,
-            user_id=session_id,
-            metadata={
-                "domain": domain,
-                "trace_id": trace_id
-            },
-            tags=["conversation", domain]
-        )
-    except Exception as e:
-        logger.warning(f"Failed to update trace context: {e}")
-
-    steps_data = []
-    current_step = AgentStepDB.get_next_step_number(trace_id)
-
-    # Step 1: Planner LLM
-    current_step += 1
-    logger.info("Calling planner LLM")
-
-    planner_output, response_content, compiled_prompt, messages = call_planner_llm(
-        orchestrator, input_text, conversation_context, trace_id, session_id
-    )
-
-    actions_to_execute = planner_output.get("actions", [])
-
-    # Log planner step to database
-    AgentStepDB.create(
-        session_id=session_id,
-        trace_id=trace_id,
-        step_number=current_step,
-        step_type='planner_llm',
-        input_data={
-            'input_text': input_text,
-            'messages_count': len(messages),
-            'conversation_context_length': len(conversation_context)
-        },
-        output_data={
-            'llm_response': response_content,
-            'planner_output': planner_output,
-            'actions_to_execute': actions_to_execute
-        },
-        rendered_prompt=compiled_prompt,
-        llm_input={'messages': [{'type': msg.__class__.__name__, 'content': msg.content} for msg in messages]},
-        llm_model='gemma3:4b',
-        llm_output=response_content
-    )
-
-    # Add step to response data
-    assistant_text = planner_output.get('assistant_text', '')
-    display_content = assistant_text if assistant_text else f"🤔 Planning actions based on: '{input_text}'"
-
-    steps_data.append({
-        'step_number': current_step,
-        'step_type': 'planner_llm',
-        'status': 'completed',
-        'content': display_content,
-        'details': {
-            'assistant_text': assistant_text,
-            'actions_count': len(actions_to_execute)
-        },
-        'timestamp': datetime.now().isoformat()
-    })
-
-    # Step 2: Execute actions
-    action_results = []
-    if actions_to_execute:
-        current_step += 1
-
-        for action in actions_to_execute:
-            action_name = action.get("name", "no_op")
-            action_args = action.get("args", {})
-
-            # Execute with tracing
-            result = execute_action_with_tracing(orchestrator, action_name, action_args)
-            action_results.append(result)
-
-        # Log action execution to database
-        AgentStepDB.create(
-            session_id=session_id,
-            trace_id=trace_id,
-            step_number=current_step,
-            step_type='action_exec',
-            input_data={'actions_to_execute': actions_to_execute},
-            output_data={'action_results': action_results, 'actions_executed': len(action_results)}
-        )
-
-        steps_data.append({
-            'step_number': current_step,
-            'step_type': 'action_exec',
-            'status': 'completed',
-            'content': f"⚡ Executed {len(action_results)} actions",
-            'details': {
-                'successful_actions': len([r for r in action_results if r["ok"]]),
-                'failed_actions': len([r for r in action_results if not r["ok"]])
-            },
-            'timestamp': datetime.now().isoformat()
-        })
-
-    # Step 3: Synthesizer LLM
-    current_step += 1
-    logger.info("Calling synthesizer LLM")
-
-    final_message, full_prompt, synth_messages = call_synthesizer_llm(
-        orchestrator, input_text, action_results, conversation_context, trace_id, session_id
-    )
-
-    # Log synthesizer step to database
-    AgentStepDB.create(
-        session_id=session_id,
-        trace_id=trace_id,
-        step_number=current_step,
-        step_type='synthesizer_llm',
-        input_data={
-            'action_results': action_results,
-            'input_text': input_text,
-            'conversation_context_length': len(conversation_context)
-        },
-        output_data={'final_message': final_message, 'synthesis_success': True},
-        rendered_prompt=full_prompt,
-        llm_input={'messages': [{'type': msg.__class__.__name__, 'content': msg.content} for msg in synth_messages]},
-        llm_model='gemma3:4b',
-        llm_output=final_message
-    )
-
-    steps_data.append({
-        'step_number': current_step,
-        'step_type': 'synthesizer_llm',
-        'status': 'completed',
-        'content': final_message,
-        'details': {
-            'is_final': True
-        },
-        'timestamp': datetime.now().isoformat()
-    })
-
-    return {
-        'steps': steps_data,
-        'final_message': final_message,
-        'total_steps': len(steps_data)
-    }
-
-
 @agent.route('/conversation', methods=['POST'])
 def conversation_stream():
     """Handle step-by-step conversation with real-time updates"""
-    from config.langfuse_config import langfuse_config
-
     try:
         data = request.get_json()
         input_text = data.get('input_text', '').strip()
@@ -587,28 +245,400 @@ def conversation_stream():
         )
         logger.info(f"Created trace: {trace.id}")
 
+        # Create Langfuse trace context for the entire conversation
+        from config.langfuse_config import langfuse_config
+        langfuse_trace_context = langfuse_config.create_trace_context(
+            name="chat.turn",
+            trace_id=trace_id,
+            user_id=session_id,
+            input_data={"input_text": input_text, "session_id": session_id, "domain": domain}
+        )
+
+        # Get the orchestrator to run step by step
+        logger.info("Getting orchestrator for step-by-step execution")
+        steps_data = []
+
+        # Create initial state
+        initial_state = {
+            'messages': [],
+            'input_text': input_text,
+            'session_id': session_id,
+            'domain': domain,
+            'trace_id': trace_id,
+            'current_step': AgentStepDB.get_next_step_number(trace_id),
+            'planner_output': None,
+            'actions_to_execute': [],
+            'action_results': [],
+            'final_message': None
+        }
+
+        # Step 1: Planner LLM (thinking/planning phase)
+        initial_state['current_step'] += 1
+
+        # Load planner prompt using new prompt management system
+        from config.prompt_manager import get_prompt, get_compiled_prompt
+        
+        # Get the prompt (tries Langfuse first, falls back to local)
+        prompt_data = get_prompt("planner", label="production")
+        langfuse_prompt = prompt_data.get("langfuse_prompt")  # Get the actual Langfuse prompt object
+        
+        # Compile the prompt with template variables
+        # Get tool descriptions for the planner
+        from orchestrator.tools.tool_registry import ToolRegistry
+        tool_registry = ToolRegistry("http://localhost:5001")
+        tool_descriptions = tool_registry.get_tool_descriptions()
+        
+        compiled_prompt = get_compiled_prompt(
+            "planner", 
+            label="production",
+            tool_descriptions=tool_descriptions
+        )
+
+        # Create messages for LLM with conversation context
+        system_msg = SystemMessage(content=compiled_prompt)
+        user_msg = HumanMessage(content=input_text)
+        
+        # Include conversation context if available
+        context_messages = convert_conversation_context_to_messages(conversation_context)
+        messages = [system_msg] + context_messages + [user_msg]
+
+        # Call LLM for planning with Langfuse tracing
+        from config.langfuse_config import langfuse_config
+        if not langfuse_config.enabled:
+            # Handle case where Langfuse is not configured
+            logger.warning("Langfuse not configured, skipping tracing")
+            client = None
+        else:
+            client = langfuse_config.client
+        
+        # Create root span for the entire chat turn
+        root_span = None
+        if client and langfuse_trace_context:
+            try:
+                root_span = client.start_span(
+                    trace_context=langfuse_trace_context,
+                    name="chat.turn",
+                    input={"input_text": input_text, "session_id": session_id, "domain": domain}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to create Langfuse root span: {e}")
+                root_span = None
+
+        # Create planner generation with proper prompt integration
+        planner_generation = None
+        if client and root_span:
+            try:
+                # Create planner generation directly within the root span
+                # This ensures proper hierarchy and token counting
+                planner_generation = root_span.start_observation(
+                    name="planner.llm",
+                    as_type="generation",
+                    input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
+                    prompt=langfuse_prompt  # Pass the actual Langfuse prompt object
+                )
+            except Exception as e:
+                logger.warning(f"Failed to create Langfuse planner generation: {e}")
+                planner_generation = None
+        
+        # Call LLM for planning
+        logger.info("Calling LLM for planning")
+        
+        # Get Langfuse callback handler for planner
+        langfuse_handler = None
+        if client and root_span:
+            try:
+                from config.langfuse_config import langfuse_config
+                langfuse_handler = langfuse_config.get_callback_handler(
+                    trace_id=trace_id,
+                    user_id=session_id
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get Langfuse callback handler: {e}")
+        
+        # Call LLM with Langfuse tracing
+        if langfuse_handler:
+            response = orchestrator.llm.invoke(
+                messages,
+                config={"callbacks": [langfuse_handler]}
+            )
+        else:
+            response = orchestrator.llm.invoke(messages)
+        
+        logger.info("LLM planning response received")
+        
+        # Extract content from AIMessage
+        response_content = response.content if hasattr(response, 'content') else str(response)
+        
+        # Update generation with output
+        if planner_generation:
+            try:
+                planner_generation.update(output=response_content)
+            except Exception as e:
+                logger.warning(f"Failed to update Langfuse planner generation: {e}")
+            try:
+                planner_generation.end()
+            except Exception as e:
+                logger.warning(f"Failed to end Langfuse planner generation: {e}")
+
+        # Parse response
         try:
-            # Process conversation with Langfuse tracing (using @observe decorator)
-            result = process_conversation_with_tracing(
-                input_text, session_id, domain, conversation_context, trace_id
+            cleaned_response = response_content.strip()
+            if cleaned_response.startswith("```json"):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.endswith("```"):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+
+            planner_output = json.loads(cleaned_response)
+            initial_state['planner_output'] = planner_output
+            initial_state['actions_to_execute'] = planner_output.get("actions", [])
+
+        except json.JSONDecodeError:
+            planner_output = {
+                "assistant_text": "I'm sorry, I had trouble understanding your request.",
+                "actions": [{"name": "no_op", "args": {}}]
+            }
+            initial_state['actions_to_execute'] = [{"name": "no_op", "args": {}}]
+
+        # Log planner step
+        AgentStepDB.create(
+            session_id=session_id,
+            trace_id=trace_id,
+            step_number=initial_state['current_step'],
+            step_type='planner_llm',
+            input_data={'input_text': input_text, 'messages_count': len(messages), 'conversation_context_length': len(conversation_context)},
+            output_data={'llm_response': response_content, 'planner_output': planner_output, 'actions_to_execute': initial_state['actions_to_execute']},
+            rendered_prompt=compiled_prompt,
+            llm_input={'messages': [{'type': msg.__class__.__name__, 'content': msg.content} for msg in messages]},
+            llm_model='gemma3:4b',
+            llm_output=response_content
+        )
+
+        # Get the assistant text for display
+        assistant_text = planner_output.get('assistant_text', '')
+        display_content = assistant_text if assistant_text else f"🤔 Planning actions based on: '{input_text}'"
+        
+        steps_data.append({
+            'step_number': initial_state['current_step'],
+            'step_type': 'planner_llm',
+            'status': 'completed',
+            'content': display_content,
+            'details': {
+                'assistant_text': assistant_text,
+                'actions_count': len(initial_state['actions_to_execute'])
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+
+        # Step 2: Execute actions
+        if initial_state['actions_to_execute']:
+            initial_state['current_step'] += 1
+
+            action_results = []
+            for action in initial_state['actions_to_execute']:
+                action_name = action.get("name", "no_op")
+                action_args = action.get("args", {})
+
+                # Create individual tool execution span for each action
+                tool_span = None
+                if client and root_span:
+                    try:
+                        tool_span = client.start_span(
+                            trace_context=langfuse_trace_context,
+                            name=f"tool.execute.{action_name}",
+                            input={"tool_name": action_name, "tool_args": action_args}
+                        )
+                        
+                        # Add tool request event
+                        tool_span.create_event(
+                            name="tool.request",
+                            input={"tool_name": action_name, "tool_args": action_args}
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to create Langfuse tool span for {action_name}: {e}")
+                        tool_span = None
+
+                # Execute the action
+                success, result = orchestrator.action_executor.execute_action(action_name, action_args)
+
+                # Add tool response event and end span
+                if tool_span:
+                    try:
+                        tool_span.create_event(
+                            name="tool.response",
+                            input={"success": success, "result": result if success else None, "error": result.get("error") if not success else None}
+                        )
+                        tool_span.update(output={"success": success, "result": result if success else None})
+                        tool_span.end()
+                    except Exception as e:
+                        logger.warning(f"Failed to update Langfuse tool span for {action_name}: {e}")
+
+                action_results.append({
+                    "name": action_name,
+                    "ok": success,
+                    "result": result if success else None,
+                    "error": result.get("error") if not success else None
+                })
+
+            initial_state['action_results'] = action_results
+
+            # Log action execution
+            AgentStepDB.create(
+                session_id=session_id,
+                trace_id=trace_id,
+                step_number=initial_state['current_step'],
+                step_type='action_exec',
+                input_data={'actions_to_execute': initial_state['actions_to_execute']},
+                output_data={'action_results': action_results, 'actions_executed': len(action_results)}
             )
 
-            # Mark trace as completed
-            trace.mark_completed(result['final_message'])
-
-            # Return response
-            return APIResponse.success('Conversation completed', {
-                'session_id': session_id,
-                'trace_id': trace_id,
-                'steps': result['steps'],
-                'final_message': result['final_message'],
-                'total_steps': result['total_steps']
+            steps_data.append({
+                'step_number': initial_state['current_step'],
+                'step_type': 'action_exec',
+                'status': 'completed',
+                'content': f"⚡ Executed {len(action_results)} actions",
+                'details': {
+                    'successful_actions': len([r for r in action_results if r["ok"]]),
+                    'failed_actions': len([r for r in action_results if not r["ok"]])
+                },
+                'timestamp': datetime.now().isoformat()
             })
 
-        finally:
-            # Always flush Langfuse events, even if there's an error
-            logger.info("Flushing Langfuse events")
-            langfuse_config.flush()
+        # Step 3: Synthesize final response
+        initial_state['current_step'] += 1
+
+        # Load synthesizer prompt using new prompt management system
+        from config.prompt_manager import get_prompt, get_compiled_prompt
+        
+        # Get the prompt (tries Langfuse first, falls back to local)
+        synthesizer_prompt_data = get_prompt("synthesizer", label="production")
+        synthesizer_langfuse_prompt = synthesizer_prompt_data.get("langfuse_prompt")  # Get the actual Langfuse prompt object
+        
+        # Compile the prompt with template variables
+        action_results_str = json.dumps(initial_state['action_results'], indent=2)
+        full_prompt = get_compiled_prompt(
+            "synthesizer", 
+            label="production",
+            user_input=input_text,
+            action_results=action_results_str
+        )
+
+        # Create messages for synthesis with conversation context
+        system_msg = SystemMessage(content=full_prompt)
+        user_msg = HumanMessage(content=input_text)
+        
+        # Include conversation context if available
+        context_messages = convert_conversation_context_to_messages(conversation_context)
+        messages = [system_msg] + context_messages + [user_msg]
+
+        # Call LLM for final response with Langfuse tracing
+        synthesizer_generation = None
+        if client and root_span:
+            try:
+                # Create synthesizer generation directly within the root span
+                # This ensures proper hierarchy and token counting
+                synthesizer_generation = root_span.start_observation(
+                    name="synthesizer.llm",
+                    as_type="generation",
+                    input={"messages": [{"type": msg.__class__.__name__, "content": msg.content} for msg in messages]},
+                    prompt=synthesizer_langfuse_prompt  # Pass the actual Langfuse prompt object
+                )
+            except Exception as e:
+                logger.warning(f"Failed to create Langfuse synthesizer generation: {e}")
+                synthesizer_generation = None
+        
+        # Call LLM for final response
+        # Get Langfuse callback handler for synthesizer
+        langfuse_handler = None
+        if client and root_span:
+            try:
+                from config.langfuse_config import langfuse_config
+                langfuse_handler = langfuse_config.get_callback_handler(
+                    trace_id=trace_id,
+                    user_id=session_id
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get Langfuse callback handler: {e}")
+        
+        # Call LLM with Langfuse tracing
+        if langfuse_handler:
+            response = orchestrator.llm.invoke(
+                messages,
+                config={"callbacks": [langfuse_handler]}
+            )
+        else:
+            response = orchestrator.llm.invoke(messages)
+        
+        # Update generation with output
+        if synthesizer_generation:
+            try:
+                synthesizer_generation.update(output=response_content)
+            except Exception as e:
+                logger.warning(f"Failed to update Langfuse synthesizer generation: {e}")
+            try:
+                synthesizer_generation.end()
+            except Exception as e:
+                logger.warning(f"Failed to end Langfuse synthesizer generation: {e}")
+
+        # Add to conversation history
+        response_content = response.content if hasattr(response, 'content') else str(response)
+        initial_state['messages'].append(AIMessage(content=response_content))
+        initial_state['final_message'] = response_content
+
+        # Log synthesizer step
+        AgentStepDB.create(
+            session_id=session_id,
+            trace_id=trace_id,
+            step_number=initial_state['current_step'],
+            step_type='synthesizer_llm',
+            input_data={'action_results': initial_state['action_results'], 'input_text': input_text, 'conversation_context_length': len(conversation_context)},
+            output_data={'final_message': response_content, 'synthesis_success': True},
+            rendered_prompt=full_prompt,
+            llm_input={'messages': [{'type': msg.__class__.__name__, 'content': msg.content} for msg in messages]},
+            llm_model='gemma3:4b',
+            llm_output=response_content
+        )
+
+        steps_data.append({
+            'step_number': initial_state['current_step'],
+            'step_type': 'synthesizer_llm',
+            'status': 'completed',
+            'content': response_content,
+            'details': {
+                'is_final': True
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+
+        # End root span
+        if root_span:
+            try:
+                root_span.update(output={"final_message": response_content, "total_steps": len(steps_data)})
+                root_span.end()
+            except Exception as e:
+                logger.warning(f"Failed to end Langfuse root span: {e}")
+
+        # Complete the trace
+        if langfuse_trace_context and client:
+            try:
+                client.update_current_trace(output={"final_message": response_content, "total_steps": len(steps_data)})
+            except Exception as e:
+                logger.warning(f"Failed to update Langfuse current trace: {e}")
+
+        # Mark trace as completed
+        trace.mark_completed(response_content)
+
+        # Flush Langfuse events
+        langfuse_config.flush()
+
+        # Return all steps for the frontend to display progressively
+        return APIResponse.success('Conversation completed', {
+            'session_id': session_id,
+            'trace_id': trace_id,
+            'steps': steps_data,
+            'final_message': response_content,
+            'total_steps': len(steps_data)
+        })
 
     except Exception as e:
         logger.error(f"Conversation failed: {str(e)}")
