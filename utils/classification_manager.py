@@ -153,26 +153,58 @@ class ClassificationManager:
                 time.sleep(5)  # Wait longer on error
     
     def _create_classification_trace_context(self, batch: List[Dict[str, Any]]):
-        """Create a Langfuse trace context for classification batch"""
+        """Create a Langfuse trace and span for classification batch
+
+        Following the pattern from agent.py:
+        1. Create a trace context
+        2. Create a root span using that context
+        Individual task classifications will create generation observations within this span.
+        """
         try:
             from config.langfuse_config import langfuse_config
-            
+            import hashlib
+            import time
+
             if not langfuse_config.enabled:
                 return None
-            
-            # Create trace context for classification batch
+
+            client = langfuse_config.client
+
+            # Generate a unique trace ID for this batch
+            trace_id = hashlib.md5(f"classification-batch-{int(time.time() * 1000)}".encode()).hexdigest()
+
+            # Create trace context (like in agent.py)
             trace_context = langfuse_config.create_trace_context(
                 name="classification.batch",
+                trace_id=trace_id,
                 input_data={
                     "batch_size": len(batch),
                     "task_ids": [task.get('id') for task in batch],
                     "task_titles": [task.get('title', '') for task in batch]
                 }
             )
-            
-            return trace_context
+
+            # Create root span for the batch (like in agent.py)
+            root_span = client.start_span(
+                trace_context=trace_context,
+                name="classification.batch",
+                input={
+                    "batch_size": len(batch),
+                    "task_ids": [task.get('id') for task in batch],
+                    "task_titles": [task.get('title', '') for task in batch]
+                },
+                metadata={
+                    "batch_size": len(batch),
+                    "processing_type": "background_queue"
+                }
+            )
+
+            logger.info(f"Created Langfuse trace and span for classification batch of {len(batch)} tasks")
+            return root_span
         except Exception as e:
-            logger.warning(f"Failed to create classification trace context: {e}")
+            logger.warning(f"Failed to create classification trace: {e}")
+            import traceback
+            logger.debug(f"Traceback: {traceback.format_exc()}")
             return None
     
     def _process_queue_batch(self):
@@ -198,32 +230,53 @@ class ClassificationManager:
             
             logger.info(f"Processing classification batch of {len(batch)} tasks")
             
-            # Create trace context for classification batch
-            trace_context = self._create_classification_trace_context(batch)
-            
+            # Create trace and root span for classification batch
+            root_span = self._create_classification_trace_context(batch)
+
             # Classify the batch
-            results = self.classification_service.classify_tasks_batch(batch, trace_context)
-            
+            results = self.classification_service.classify_tasks_batch(batch, root_span)
+
             # Update tasks in the database
             updated_count = 0
-            
+
             for task_data in batch:
                 task_id = task_data['id']
                 task = TaskDB.get_by_id(task_id)
-                
+
                 if task and task_id in results:
                     old_categories = task.categories.copy() if task.categories else []
                     task.categories = results[task_id]
-                    
+
                     if task.categories != old_categories:
                         task.save()  # Save to database
                         updated_count += 1
                         logger.debug(f"Updated task '{task.title}' with categories: {task.categories}")
-            
+
+            # Finalize the root span with results
+            if root_span:
+                try:
+                    root_span.update(
+                        output={
+                            "updated_count": updated_count,
+                            "total_tasks": len(batch),
+                            "results": {task_id: cats for task_id, cats in results.items()}
+                        }
+                    )
+                    logger.info(f"Updated Langfuse span for classification batch")
+                except Exception as e:
+                    logger.warning(f"Failed to update span: {e}")
+
+                # End the root span (required for it to be sent to Langfuse)
+                try:
+                    root_span.end()
+                    logger.info(f"✅ Ended Langfuse span for classification batch")
+                except Exception as e:
+                    logger.warning(f"Failed to end span: {e}")
+
             if updated_count > 0:
                 logger.info(f"Updated {updated_count} tasks with new categories")
-                
-            
+
+
         except Exception as e:
             logger.error(f"Error processing classification batch: {str(e)}")
         finally:

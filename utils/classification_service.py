@@ -42,7 +42,7 @@ class TaskClassificationService:
             logger.warning(f"Model warmup failed: {str(e)}")
             return False
         
-    def classify_task(self, title: str, description: str = "", project: str = "", trace_context=None) -> List[str]:
+    def classify_task(self, title: str, description: str = "", project: str = "", root_span=None) -> List[str]:
         """
         Classify a task into categories: health, career, learning
         
@@ -94,20 +94,20 @@ class TaskClassificationService:
                 clean_description = ""
             
             prompt, prompt_metadata = self._build_classification_prompt(clean_title, clean_description)
-            
+
             # Create Langfuse observation for classification
             observation = None
-            if trace_context:
+            if root_span:
                 logger.info(f"Creating Langfuse observation for classification: {title}")
                 observation = self._create_classification_observation(
-                    trace_context, title, description, prompt, prompt_metadata
+                    root_span, title, description, prompt, prompt_metadata
                 )
                 if observation:
                     logger.info("✅ Langfuse observation created successfully")
                 else:
                     logger.warning("❌ Failed to create Langfuse observation")
             else:
-                logger.info("No trace context provided, skipping Langfuse observation")
+                logger.info("No root span provided, skipping Langfuse observation")
             
             # Send to Ollama
             response, metrics = self._send_to_ollama(prompt)
@@ -120,7 +120,14 @@ class TaskClassificationService:
                 logger.info("Updating Langfuse observation with results")
                 self._update_classification_observation(observation, response, categories, metrics)
                 logger.info("✅ Langfuse observation updated successfully")
-                
+
+                # End the observation (required for it to be sent to Langfuse)
+                try:
+                    observation.end()
+                    logger.info("✅ Langfuse observation ended")
+                except Exception as e:
+                    logger.warning(f"Failed to end Langfuse observation: {e}")
+
                 # Flush Langfuse events to ensure they're sent
                 try:
                     from config.langfuse_config import langfuse_config
@@ -197,7 +204,7 @@ class TaskClassificationService:
         
         return categories
     
-    def classify_tasks_batch(self, tasks: List[Dict[str, Any]], trace_context=None) -> Dict[int, List[str]]:
+    def classify_tasks_batch(self, tasks: List[Dict[str, Any]], root_span=None) -> Dict[int, List[str]]:
         """
         Classify multiple tasks in batch
         
@@ -220,7 +227,7 @@ class TaskClassificationService:
             
             try:
                 project = task.get('project', '')
-                categories = self.classify_task(title, description, project, trace_context)
+                categories = self.classify_task(title, description, project, root_span)
                 results[task_id] = categories
                 
                 # Add small delay between requests to prevent overwhelming the model
@@ -236,46 +243,59 @@ class TaskClassificationService:
                 
         return results
     
-    def _create_classification_observation(self, trace_context, title: str, description: str, prompt: str, prompt_metadata: dict):
-        """Create a Langfuse observation for classification task"""
+    def _create_classification_observation(self, root_span, title: str, description: str, prompt: str, prompt_metadata: dict):
+        """Create a Langfuse observation for classification task
+
+        Following the pattern from agent.py:
+        - Create generation observation within the root span using start_observation()
+        - Pass the Langfuse prompt object if available for proper reference tracking
+        - This ensures proper hierarchy: span -> observation
+
+        Args:
+            root_span: The root span created by classification_manager
+            title: Task title
+            description: Task description
+            prompt: The compiled prompt text
+            prompt_metadata: Metadata about the prompt (includes langfuse_prompt object if from Langfuse)
+        """
         try:
             from config.langfuse_config import langfuse_config
-            
-            if not langfuse_config.enabled:
+
+            if not langfuse_config.enabled or not root_span:
                 return None
-            
-            client = langfuse_config.client
-            
-            # Create a span first, then observation within it (like the main system)
-            span = client.start_span(
-                trace_context=trace_context,
-                name="classifier.llm",
-                input={
-                    "task_title": title,
-                    "task_description": description
-                }
-            )
-            
-            # Create observation within the span
-            observation = span.start_observation(
+
+            # Create generation observation within the root span (like in agent.py)
+            observation = root_span.start_observation(
                 name="classifier.llm",
                 as_type="generation",
                 input={
                     "task_title": title,
                     "task_description": description,
-                    "prompt": prompt
+                    "prompt_text": prompt
                 },
+                # Pass the Langfuse prompt object if source is langfuse for proper reference tracking
                 prompt=prompt_metadata.get("langfuse_prompt") if prompt_metadata.get("source") == "langfuse" else None,
-                model="gemma3:4b"  # Using the same model as other parts of the system
+                model="gemma3:4b",  # Using the same model as other parts of the system
+                metadata={
+                    "prompt_source": prompt_metadata.get("source", "unknown"),
+                    "prompt_name": prompt_metadata.get("name", "classifier"),
+                    "prompt_label": prompt_metadata.get("label", "production")
+                }
             )
-            
+
+            logger.info(f"Created Langfuse observation with prompt source: {prompt_metadata.get('source')}")
             return observation
         except Exception as e:
             logger.warning(f"Failed to create Langfuse observation for classification: {e}")
+            import traceback
+            logger.debug(f"Traceback: {traceback.format_exc()}")
             return None
     
     def _update_classification_observation(self, observation, response: str, categories: list, metrics: dict):
-        """Update the Langfuse observation with classification results"""
+        """Update the Langfuse observation with classification results
+
+        Following the pattern from agent.py for token usage format.
+        """
         try:
             observation.update(
                 output={
@@ -283,38 +303,42 @@ class TaskClassificationService:
                     "raw_response": response
                 },
                 usage={
-                    "prompt_tokens": metrics.get('prompt_tokens', 0),
-                    "completion_tokens": metrics.get('response_tokens', 0),
-                    "total_tokens": metrics.get('prompt_tokens', 0) + metrics.get('response_tokens', 0)
-                },
-                end_time=None  # Let Langfuse set the end time
+                    "input": metrics.get('prompt_tokens', 0),
+                    "output": metrics.get('response_tokens', 0),
+                    "total": metrics.get('prompt_tokens', 0) + metrics.get('response_tokens', 0),
+                    "unit": "TOKENS"
+                }
             )
+            logger.debug(f"Updated observation with {metrics.get('prompt_tokens', 0)} input + {metrics.get('response_tokens', 0)} output tokens")
         except Exception as e:
             logger.warning(f"Failed to update Langfuse observation: {e}")
+            import traceback
+            logger.debug(f"Traceback: {traceback.format_exc()}")
     
     def _build_classification_prompt(self, title: str, description: str) -> tuple[str, dict]:
         """Build the classification prompt for the LLM using Langfuse prompt manager
-        
+
         Returns:
             tuple: (compiled_prompt_text, prompt_metadata)
         """
         from config.prompt_manager import prompt_manager
-        
+
         task_text = title
         if description:
             task_text += f" - {description}"
-        
+
         try:
             # Get prompt from Langfuse with fallback to local
             prompt_data = prompt_manager.get_prompt("classifier", label="production")
             compiled_prompt = prompt_manager.compile_prompt(prompt_data, task_text=task_text)
-            
+
+            logger.info(f"✅ Using {prompt_data.get('source')} prompt for classification")
             return compiled_prompt, prompt_data
         except Exception as e:
-            logger.warning(f"Failed to load Langfuse prompt, falling back to local: {e}")
-            # Fallback to local prompt
+            logger.warning(f"Failed to load prompt from manager, using fallback: {e}")
+            # Ultimate fallback to hardcoded prompt
             from config.prompts import get_classification_prompt
-            return get_classification_prompt(task_text), {"source": "fallback"}
+            return get_classification_prompt(task_text), {"source": "hardcoded_fallback"}
     
     def _send_to_ollama(self, prompt: str, max_retries: int = 1) -> tuple[str, dict]:
         """Send request to Ollama API with retry logic
