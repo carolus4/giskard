@@ -188,8 +188,21 @@ class TaskManager {
                 // Reinitialize drag drop after rendering (uses requestAnimationFrame internally)
                 try {
                     this.dragDrop.initializeDragDrop();
+
+                    // Verify initialization after a brief delay
+                    setTimeout(() => {
+                        if (!this.dragDrop.verifyInitialization()) {
+                            console.warn('⚠️ Drag-drop verification failed, attempting recovery...');
+                            this.dragDrop.forceReinit();
+                        }
+                    }, 300);
                 } catch (error) {
                     console.error('❌ Drag-drop failed:', error);
+                    // Attempt recovery
+                    setTimeout(() => {
+                        console.log('🔄 Attempting drag-drop recovery...');
+                        this.dragDrop.forceReinit();
+                    }, 500);
                 }
             }
             
