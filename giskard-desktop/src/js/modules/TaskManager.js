@@ -676,6 +676,23 @@ class TaskManager {
      */
     _handlePageChanged({ page }) {
         this._renderCurrentView();
+
+        // Re-initialize drag-drop when navigating back to task list
+        // This ensures handlers aren't lost when switching between pages
+        if (page === 'task-list') {
+            // Use setTimeout to ensure DOM is fully rendered
+            setTimeout(() => {
+                this.dragDrop.initializeDragDrop();
+
+                // Verify initialization after a brief delay
+                setTimeout(() => {
+                    if (!this.dragDrop.verifyInitialization()) {
+                        console.warn('⚠️ Drag-drop verification failed after page change, recovering...');
+                        this.dragDrop.forceReinit();
+                    }
+                }, 300);
+            }, 100);
+        }
     }
 }
 

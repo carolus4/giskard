@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DragDrop Refactoring Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+
+        .test-container {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .task-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            cursor: default;
+        }
+
+        .task-drag-handle {
+            cursor: grab;
+            padding: 8px;
+            margin-right: 12px;
+            color: #999;
+            user-select: none;
+        }
+
+        .task-drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .task-title {
+            flex: 1;
+        }
+
+        .task-item.selected-for-move {
+            opacity: 0.5;
+            background: #f0f0f0;
+        }
+
+        body.dragging {
+            cursor: grabbing !important;
+        }
+
+        .insertion-line {
+            position: fixed;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #4CAF50;
+            pointer-events: none;
+            z-index: 1000;
+            transition: top 0.1s ease;
+        }
+
+        .insertion-line::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: -4px;
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+        }
+
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin: 4px;
+            border: none;
+            border-radius: 4px;
+            background: #2196F3;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #1976D2;
+        }
+
+        button.secondary {
+            background: #757575;
+        }
+
+        button.secondary:hover {
+            background: #616161;
+        }
+
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .log-entry {
+            margin: 4px 0;
+            padding: 2px 0;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        h2 {
+            color: #666;
+            font-size: 18px;
+            margin-top: 30px;
+        }
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .status.success {
+            background: #C8E6C9;
+            color: #2E7D32;
+        }
+
+        .status.error {
+            background: #FFCDD2;
+            color: #C62828;
+        }
+
+        .status.info {
+            background: #BBDEFB;
+            color: #1565C0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 DragDropManager Refactoring Test</h1>
+
+    <div class="status info">
+        <strong>Test Environment:</strong> This page tests the refactored DragDropManager with modular architecture.
+    </div>
+
+    <div class="controls">
+        <h2>Controls</h2>
+        <button onclick="testRefactored()">✅ Load Refactored Version</button>
+        <button onclick="enableDebug()">🐛 Enable Debug</button>
+        <button onclick="disableDebug()">🔇 Disable Debug</button>
+        <button onclick="verifyInit()">🔍 Verify Initialization</button>
+        <button onclick="reinitialize()" class="secondary">🔄 Re-initialize</button>
+        <button onclick="clearLog()" class="secondary">🗑️ Clear Log</button>
+    </div>
+
+    <h2>Test Tasks</h2>
+    <div class="test-container">
+        <div class="task-item" data-task-id="1">
+            <div class="task-drag-handle">⋮⋮</div>
+            <div class="task-title">Task 1: First test task</div>
+        </div>
+        <div class="task-item" data-task-id="2">
+            <div class="task-drag-handle">⋮⋮</div>
+            <div class="task-title">Task 2: Second test task</div>
+        </div>
+        <div class="task-item" data-task-id="3">
+            <div class="task-drag-handle">⋮⋮</div>
+            <div class="task-title">Task 3: Third test task</div>
+        </div>
+        <div class="task-item" data-task-id="4">
+            <div class="task-drag-handle">⋮⋮</div>
+            <div class="task-title">Task 4: Fourth test task</div>
+        </div>
+        <div class="task-item" data-task-id="5">
+            <div class="task-drag-handle">⋮⋮</div>
+            <div class="task-title">Task 5: Fifth test task</div>
+        </div>
+    </div>
+
+    <h2>Event Log</h2>
+    <div class="log" id="log">
+        <div class="log-entry">Ready to test. Click "Load Refactored Version" to begin.</div>
+    </div>
+
+    <script type="module">
+        let dragDropManager = null;
+
+        // Log function
+        window.log = function(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        };
+
+        // Load refactored version
+        window.testRefactored = async function() {
+            try {
+                log('📦 Loading refactored DragDropManager...');
+
+                const DragDropManager = await import('./src/js/modules/DragDropManager-refactored.js').then(m => m.default);
+
+                dragDropManager = new DragDropManager();
+                window.dragDropManager = dragDropManager; // Make globally accessible
+
+                log('✅ DragDropManager loaded successfully');
+                log('🔧 Initializing drag-drop...');
+
+                dragDropManager.initializeDragDrop();
+
+                log('✅ Initialization complete');
+                log('📋 Try dragging a task by its handle (⋮⋮)');
+
+                // Listen for reorder events
+                document.addEventListener('task:reorder', (e) => {
+                    const sequence = e.detail.taskIdSequence;
+                    log(`🔄 REORDER EVENT: New sequence = [${sequence.join(', ')}]`);
+                });
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        };
+
+        window.enableDebug = function() {
+            if (dragDropManager) {
+                dragDropManager.enableDebug();
+                log('🐛 Debug mode enabled - check console for detailed logs');
+            } else {
+                log('⚠️ Load DragDropManager first');
+            }
+        };
+
+        window.disableDebug = function() {
+            if (dragDropManager) {
+                dragDropManager.disableDebug();
+                log('🔇 Debug mode disabled');
+            } else {
+                log('⚠️ Load DragDropManager first');
+            }
+        };
+
+        window.verifyInit = function() {
+            if (dragDropManager) {
+                const isValid = dragDropManager.verifyInitialization();
+                if (isValid) {
+                    log('✅ Initialization verified - all tasks have handlers');
+                } else {
+                    log('⚠️ Initialization issue - check console for details');
+                }
+            } else {
+                log('⚠️ Load DragDropManager first');
+            }
+        };
+
+        window.reinitialize = function() {
+            if (dragDropManager) {
+                log('🔄 Re-initializing...');
+                dragDropManager.forceReinit();
+                log('✅ Re-initialization complete');
+            } else {
+                log('⚠️ Load DragDropManager first');
+            }
+        };
+
+        window.clearLog = function() {
+            document.getElementById('log').innerHTML = '';
+            log('🗑️ Log cleared');
+        };
+    </script>
+</body>
+</html>
