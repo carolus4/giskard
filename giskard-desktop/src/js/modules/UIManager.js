@@ -156,9 +156,15 @@ class UIManager {
             if (this.currentView === 'giskard') {
                 taskCountEl.textContent = `AI Productivity Coach • ${this.modelName}`;
             } else if (this.currentView === 'task-list') {
+                const totalTasks = this.counts.today || 0;
                 const completedCount = this.counts.completed_today || 0;
                 const categoryIcons = this._generateCategoryIcons();
-                taskCountEl.innerHTML = `${completedCount} task${completedCount !== 1 ? 's' : ''} completed today${categoryIcons}`;
+                
+                if (totalTasks > 0) {
+                    taskCountEl.innerHTML = `${totalTasks} task${totalTasks !== 1 ? 's' : ''} • ${completedCount} completed today${categoryIcons}`;
+                } else {
+                    taskCountEl.innerHTML = `No tasks • ${completedCount} completed today${categoryIcons}`;
+                }
                 taskCountEl.style.display = 'block';
             }
         }

@@ -104,10 +104,8 @@
                     <div class="task-detail-content">
                         <div class="task-detail-main">
                             <div class="task-description-section">
-                                <div class="task-detail-description">
-                                    <i class="fas fa-align-left description-icon"></i>
-                                    <textarea class="description-input" id="detail-description" placeholder="Add description..."></textarea>
-                                </div>
+                                <!-- GitHub-like Editor Container -->
+                                <div id="github-editor-container"></div>
                                 
                                 <div class="description-actions">
                                     <button class="delete-link" id="detail-delete-btn" title="Delete task">
@@ -221,6 +219,10 @@
             console.log('🎯 Window loaded - JavaScript working!');
         });
     </script>
+    
+    <!-- GitHub-like Editor Modules -->
+    <script type="module" src="js/modules/MarkdownRenderer.js"></script>
+    <script type="module" src="js/modules/GitHubLikeEditor.js"></script>
     
     <script type="module" src="js/app.js"></script>
 </body>

@@ -1391,6 +1391,308 @@ body.dragging .insertion-line {
     color: #999;
 }
 
+/* GitHub-like Editor Styles */
+.github-editor {
+    position: relative;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    background: #ffffff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.github-editor:hover {
+    border-color: #8AB6B5;
+}
+
+.github-editor:focus-within {
+    border-color: #8AB6B5;
+    box-shadow: 0 0 0 2px rgba(138, 182, 181, 0.1);
+}
+
+/* View Mode */
+.editor-view-mode {
+    padding: 16px;
+    cursor: text;
+    min-height: 60px;
+    position: relative;
+}
+
+.editor-view-mode:hover .edit-hint {
+    opacity: 1;
+}
+
+.edit-hint {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    font-size: 12px;
+    color: #656d76;
+    background: #f6f8fa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #d0d7de;
+}
+
+.edit-hint kbd {
+    background: #f3f4f6;
+    border: 1px solid #d0d7de;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* Markdown Content */
+.markdown-content {
+    line-height: 1.6;
+    color: #24292f;
+    font-size: 16px;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+    margin: 16px 0 8px 0;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.markdown-content h1 {
+    font-size: 24px;
+    border-bottom: 1px solid #d0d7de;
+    padding-bottom: 8px;
+}
+
+.markdown-content h2 {
+    font-size: 20px;
+}
+
+.markdown-content h3 {
+    font-size: 18px;
+}
+
+.markdown-content p {
+    margin: 8px 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.markdown-content li {
+    margin: 4px 0;
+}
+
+.markdown-content .task-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 4px 0;
+    gap: 8px;
+}
+
+.markdown-content .task-item input[type="checkbox"] {
+    margin: 0;
+    margin-top: 2px;
+}
+
+.markdown-content .task-item.completed span {
+    text-decoration: line-through;
+    color: #656d76;
+}
+
+.markdown-content code {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 14px;
+}
+
+.markdown-content pre {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.markdown-content pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 14px;
+}
+
+.markdown-content a {
+    color: #0969da;
+    text-decoration: none;
+}
+
+.markdown-content a:hover {
+    text-decoration: underline;
+}
+
+.markdown-content strong {
+    font-weight: 600;
+}
+
+.markdown-content em {
+    font-style: italic;
+}
+
+.markdown-content .empty-description {
+    color: #656d76;
+    font-style: italic;
+    margin: 0;
+}
+
+/* Edit Mode */
+.editor-edit-mode {
+    display: none;
+}
+
+.editor-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f6f8fa;
+    border-bottom: 1px solid #d0d7de;
+    border-radius: 6px 6px 0 0;
+}
+
+.toolbar-group {
+    display: flex;
+    gap: 4px;
+}
+
+.toolbar-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 6px;
+    cursor: pointer;
+    color: #656d76;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.toolbar-btn:hover {
+    background: #ffffff;
+    border-color: #d0d7de;
+    color: #24292f;
+}
+
+.toolbar-btn:active {
+    background: #f3f4f6;
+}
+
+.editor-textarea {
+    width: 100%;
+    min-height: 200px;
+    max-height: 400px;
+    padding: 16px;
+    border: none;
+    outline: none;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #24292f;
+    background: #ffffff;
+    resize: vertical;
+    overflow-y: auto;
+}
+
+.editor-textarea::placeholder {
+    color: #656d76;
+}
+
+.editor-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    background: #f6f8fa;
+    border-top: 1px solid #d0d7de;
+    border-radius: 0 0 6px 6px;
+}
+
+.save-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.save-status.saved {
+    color: #1a7f37;
+}
+
+.save-status.saving {
+    color: #656d76;
+}
+
+.save-status.error {
+    color: #d1242f;
+}
+
+.save-status::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.editor-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid;
+}
+
+.btn-primary {
+    background: #2da44e;
+    border-color: #2da44e;
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background: #2c974b;
+    border-color: #2c974b;
+}
+
+.btn-secondary {
+    background: #ffffff;
+    border-color: #d0d7de;
+    color: #24292f;
+}
+
+.btn-secondary:hover {
+    background: #f6f8fa;
+    border-color: #8AB6B5;
+}
+
+/* Legacy styles for backward compatibility */
 .task-detail-description {
     display: flex;
     gap: 12px;

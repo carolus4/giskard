@@ -491,6 +491,40 @@ class PageManager {
     }
 
     /**
+     * Initialize GitHub-like editor for task descriptions
+     */
+    _initializeGitHubEditor(task) {
+        const container = document.getElementById('github-editor-container');
+        if (!container) {
+            console.error('GitHub editor container not found');
+            return;
+        }
+
+        // Destroy existing editor if it exists
+        if (this.githubEditor) {
+            this.githubEditor.destroy();
+        }
+
+        // Create new GitHub-like editor
+        this.githubEditor = new GitHubLikeEditor('github-editor-container', {
+            placeholder: 'Add description...',
+            autosaveDelay: 1500
+        });
+
+        // Set initial content
+        const description = task.description || '';
+        this.githubEditor.setContent(description.replace(/\\n/g, '\n'));
+
+        // Listen for save events
+        container.addEventListener('github-editor-save', async (e) => {
+            const content = e.detail.content;
+            await this._debouncedUpdateTask(this.currentTaskId, {
+                description: content
+            });
+        });
+    }
+
+    /**
      * Bind real-time save handlers for automatic updates
      */
     _bindRealTimeSaveHandlers() {
@@ -498,7 +532,6 @@ class PageManager {
         if (this.currentTaskId === 'new') return;
 
         const titleInput = document.getElementById('detail-title');
-        const descriptionInput = document.getElementById('detail-description');
 
         if (titleInput) {
             // Debounced save on title changes
@@ -517,18 +550,7 @@ class PageManager {
             });
         }
 
-        if (descriptionInput) {
-            // Debounced save on description changes
-            let descriptionTimeout;
-            descriptionInput.addEventListener('input', () => {
-                clearTimeout(descriptionTimeout);
-                descriptionTimeout = setTimeout(async () => {
-                    await this._debouncedUpdateTask(this.currentTaskId, {
-                        description: descriptionInput.value.trim()
-                    });
-                }, 1500); // 1.5 second debounce for description changes
-            });
-        }
+        // GitHub editor handles its own saving via events
     }
 
     /**
@@ -619,7 +641,6 @@ class PageManager {
      */
     loadTaskIntoDetailPage(taskData) {
         const titleInput = document.getElementById('detail-title');
-        const descriptionInput = document.getElementById('detail-description');
         const categoriesContainer = document.getElementById('task-categories-detail');
         const titleHeader = document.querySelector('.task-title-header');
         const progressBtn = document.getElementById('detail-progress-btn');
@@ -658,35 +679,11 @@ class PageManager {
             console.log('❌ Categories container not found!');
         }
         
+        // Initialize GitHub-like editor
+        this._initializeGitHubEditor(task);
+        
         // Bind detail page events when elements are available
         this._bindDetailPageEvents();
-        
-        if (descriptionInput) {
-            // Unescape newlines for display in textarea
-            const description = task.description || '';
-            descriptionInput.value = description.replace(/\\n/g, '\n');
-            
-            // Add click handler to ensure textarea stays expanded
-            descriptionInput.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // Ensure textarea is focused and expanded
-                descriptionInput.focus();
-                descriptionInput.style.minHeight = '250px';
-            });
-            
-            // Add focus handler to maintain expansion
-            descriptionInput.addEventListener('focus', () => {
-                descriptionInput.style.minHeight = '250px';
-            });
-            
-            // Add blur handler to maintain expansion if there's content
-            descriptionInput.addEventListener('blur', () => {
-                // Only collapse if textarea is empty
-                if (!descriptionInput.value.trim()) {
-                    descriptionInput.style.minHeight = '200px';
-                }
-            });
-        }
         
         // Show all elements for edit mode
         if (progressBtn) {
