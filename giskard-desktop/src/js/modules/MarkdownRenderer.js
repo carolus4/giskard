@@ -42,9 +42,17 @@ class MarkdownRenderer {
             .replace(/^## (.*$)/gim, '<h2>$1</h2>')
             .replace(/^# (.*$)/gim, '<h1>$1</h1>')
             
-            // Task lists (- [ ] and - [x])
-            .replace(/^- \[ \] (.*$)/gim, '<div class="task-item"><input type="checkbox" disabled> <span>$1</span></div>')
-            .replace(/^- \[x\] (.*$)/gim, '<div class="task-item completed"><input type="checkbox" checked disabled> <span>$1</span></div>')
+            // Task lists (- [ ] and - [x]) - handle indented ones too
+            .replace(/^(\s*)- \[ \] (.*$)/gim, (match, indent, text) => {
+                const indentLevel = indent.length;
+                const marginLeft = indentLevel * 20;
+                return `<div class="task-item" style="margin-left: ${marginLeft}px"><input type="checkbox" disabled> <span>${text}</span></div>`;
+            })
+            .replace(/^(\s*)- \[x\] (.*$)/gim, (match, indent, text) => {
+                const indentLevel = indent.length;
+                const marginLeft = indentLevel * 20;
+                return `<div class="task-item completed" style="margin-left: ${marginLeft}px"><input type="checkbox" checked disabled> <span>${text}</span></div>`;
+            })
             
             // Unordered lists
             .replace(/^- (.*$)/gim, '<li>$1</li>')

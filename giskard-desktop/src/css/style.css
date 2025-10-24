@@ -1490,13 +1490,35 @@ body.dragging .insertion-line {
 .markdown-content .task-item {
     display: flex;
     align-items: flex-start;
-    margin: 4px 0;
-    gap: 8px;
+    margin: 1px 0;
+    gap: 6px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1.3;
+    background: none;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
 }
 
 .markdown-content .task-item input[type="checkbox"] {
     margin: 0;
-    margin-top: 2px;
+    margin-top: 1px;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: #0969da;
+    border-radius: 2px;
+}
+
+.markdown-content .task-item span {
+    flex: 1;
+    color: #24292f;
+    font-weight: normal;
+    background: none;
+    padding: 0;
+    border: none;
 }
 
 .markdown-content .task-item.completed span {
