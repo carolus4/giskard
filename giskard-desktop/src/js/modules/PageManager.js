@@ -364,7 +364,6 @@ class PageManager {
         console.log('_setupAddTaskMode called');
         
         const titleInput = document.getElementById('detail-title');
-        const descriptionInput = document.getElementById('detail-description');
         const categoriesContainer = document.getElementById('task-categories-detail');
         const progressBtn = document.getElementById('detail-progress-btn');
         const deleteBtn = document.getElementById('detail-delete-btn');
@@ -373,7 +372,6 @@ class PageManager {
 
         console.log('Found elements:', {
             titleInput: !!titleInput,
-            descriptionInput: !!descriptionInput,
             saveBtn: !!saveBtn,
             titleHeader: !!titleHeader
         });
@@ -388,8 +386,10 @@ class PageManager {
                 });
             }
         }
-        if (descriptionInput) descriptionInput.value = '';
         if (categoriesContainer) categoriesContainer.innerHTML = '';
+        
+        // Initialize GitHub editor for new task (empty content)
+        this._initializeGitHubEditor({ description: '' });
 
         // Hide elements not needed for add mode
         if (progressBtn) progressBtn.style.display = 'none';
@@ -442,7 +442,6 @@ class PageManager {
      */
     async _handleSaveTaskFromPage() {
         const titleInput = document.getElementById('detail-title');
-        const descriptionInput = document.getElementById('detail-description');
 
         console.log('_handleSaveTaskFromPage called (programmatic save)', {
             currentTaskId: this.currentTaskId,
@@ -457,13 +456,16 @@ class PageManager {
 
         // Get the title directly (no project prefix parsing needed)
         const title = titleInput.value.trim();
+        
+        // Get description from GitHub editor
+        const description = this.githubEditor ? this.githubEditor.getContent() : '';
 
         // Check if we're in add mode or edit mode
         if (this.currentTaskId === 'new') {
             // Add mode - immediate save (no debouncing for new tasks)
             const taskData = {
                 title: title,
-                description: descriptionInput?.value.trim() || '',
+                description: description.trim(),
                 project: null // Project will be handled separately in the future
             };
 
@@ -482,7 +484,7 @@ class PageManager {
             const taskData = {
                 fileIdx: this.currentTaskId,
                 title: title,
-                description: descriptionInput?.value.trim() || ''
+                description: description.trim()
             };
 
             // Force immediate save (this will trigger classification)

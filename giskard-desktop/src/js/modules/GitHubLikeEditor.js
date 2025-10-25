@@ -78,8 +78,7 @@ class GitHubLikeEditor {
                             <span class="status-text">All changes saved</span>
                         </div>
                         <div class="editor-actions">
-                            <button type="button" class="btn-secondary" id="cancel-edit">Cancel</button>
-                            <button type="button" class="btn-primary" id="save-edit">Save</button>
+                            <button type="button" class="btn-primary" id="save-edit">Done</button>
                         </div>
                     </div>
                 </div>
@@ -106,7 +105,10 @@ class GitHubLikeEditor {
 
         // Edit mode events
         this.textarea.addEventListener('keydown', (e) => this.handleKeydown(e));
-        this.textarea.addEventListener('input', () => this.handleInput());
+        this.textarea.addEventListener('input', () => {
+            this.handleInput();
+            this._autoResizeTextarea();
+        });
         this.textarea.addEventListener('blur', (e) => {
             // Only auto-save on blur if content has changed
             if (this.textarea.value !== this.originalContent) {
@@ -124,7 +126,6 @@ class GitHubLikeEditor {
         });
 
         // Action buttons
-        document.getElementById('cancel-edit').addEventListener('click', () => this.cancelEdit());
         document.getElementById('save-edit').addEventListener('click', () => this.saveAndExit());
 
         // Global keyboard shortcuts
@@ -261,6 +262,9 @@ class GitHubLikeEditor {
         this.viewMode.style.display = 'none';
         this.editMode.style.display = 'block';
         
+        // Auto-resize the textarea to fit content
+        this._autoResizeTextarea();
+        
         this.textarea.focus();
         this.textarea.setSelectionRange(this.textarea.value.length, this.textarea.value.length);
     }
@@ -347,8 +351,15 @@ class GitHubLikeEditor {
     }
 
     setContent(content) {
+        // Ensure we're in view mode when setting content
+        if (this.isEditing) {
+            this.exitEditMode();
+        }
+        
         this.textarea.value = content || '';
+        this.originalContent = content || '';
         this.updateRenderedContent();
+        this.updateSaveStatus('saved');
     }
 
     getContent() {
@@ -363,13 +374,47 @@ class GitHubLikeEditor {
         }
     }
 
+    _autoResizeTextarea() {
+        if (!this.textarea) return;
+        
+        // Reset height to auto to get the natural scrollHeight
+        this.textarea.style.height = 'auto';
+        
+        // Get the scroll height (this is the height needed to show all content)
+        const scrollHeight = this.textarea.scrollHeight;
+        
+        // Set a reasonable minimum height (about 1.2 lines)
+        const minHeight = 200; // Match the CSS min-height
+        
+        // No maximum height - let it expand to show all content
+        const newHeight = Math.max(minHeight, scrollHeight);
+        
+        // Apply the new height
+        this.textarea.style.height = newHeight + 'px';
+    }
+
     destroy() {
+        // Clear any pending autosave
         if (this.autosaveTimeout) {
             clearTimeout(this.autosaveTimeout);
+            this.autosaveTimeout = null;
+        }
+        
+        // Exit edit mode if currently editing
+        if (this.isEditing) {
+            this.exitEditMode();
         }
         
         // Remove event listeners
         document.removeEventListener('keydown', this.handleGlobalKeydown);
+        
+        // Clear content
+        if (this.textarea) {
+            this.textarea.value = '';
+        }
+        if (this.markdownContent) {
+            this.markdownContent.innerHTML = '<p class="empty-description">No description provided</p>';
+        }
     }
 }
 
