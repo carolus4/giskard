@@ -180,7 +180,8 @@ class ClassificationManager:
                 input_data={
                     "batch_size": len(batch),
                     "task_ids": [task.get('id') for task in batch],
-                    "task_titles": [task.get('title', '') for task in batch]
+                    "task_titles": [task.get('title', '') for task in batch],
+                    "task_descriptions": [task.get('description', '') for task in batch]
                 }
             )
 
@@ -191,7 +192,8 @@ class ClassificationManager:
                 input={
                     "batch_size": len(batch),
                     "task_ids": [task.get('id') for task in batch],
-                    "task_titles": [task.get('title', '') for task in batch]
+                    "task_titles": [task.get('title', '') for task in batch],
+                    "task_descriptions": [task.get('description', '') for task in batch]
                 },
                 metadata={
                     "batch_size": len(batch),

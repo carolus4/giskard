@@ -524,9 +524,10 @@ class PageManager {
                 titleTimeout = setTimeout(async () => {
                     if (titleInput.value.trim()) {
                         const updateData = {
-                            title: titleInput.value.trim()
+                            title: titleInput.value.trim(),
+                            description: this.githubEditor ? this.githubEditor.getContent() : ''
                         };
-                        
+
                         await this._debouncedUpdateTask(this.currentTaskId, updateData);
                     }
                 }, 1000); // 1 second debounce for title changes

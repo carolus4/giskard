@@ -32,46 +32,101 @@ class TaskDB:
         """Save task to database (create or update)"""
         with get_connection() as conn:
             cursor = conn.cursor()
-            
+
             now = datetime.now().isoformat()
             self.updated_at = now
-            
+
             if self.id is None:
                 # Create new task
                 if self.sort_key is None:
                     self.sort_key = get_next_sort_key()
-                
+
                 cursor.execute('''
-                    INSERT INTO tasks (title, description, status, sort_key, project, categories, 
+                    INSERT INTO tasks (title, description, status, sort_key, project, categories,
                                      created_at, updated_at, started_at, completed_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (self.title, self.description, self.status, self.sort_key, self.project,
                       json.dumps(self.categories), self.created_at, self.updated_at, self.started_at, self.completed_at))
-                
+
                 self.id = cursor.lastrowid
+
+                # Log task creation to history
+                self._log_history(cursor, 'title', None, self.title, 'create', now)
+                self._log_history(cursor, 'description', None, self.description, 'create', now)
+                self._log_history(cursor, 'status', None, self.status, 'create', now)
+                if self.project:
+                    self._log_history(cursor, 'project', None, self.project, 'create', now)
+                if self.categories:
+                    self._log_history(cursor, 'categories', None, json.dumps(self.categories), 'create', now)
             else:
-                # Update existing task
+                # Get old values before update
                 cursor.execute('''
-                    UPDATE tasks SET title=?, description=?, status=?, sort_key=?, project=?, 
-                                   categories=?, updated_at=?, started_at=?, completed_at=?
-                    WHERE id=?
-                ''', (self.title, self.description, self.status, self.sort_key, self.project,
-                      json.dumps(self.categories), self.updated_at, self.started_at, self.completed_at, self.id))
-            
+                    SELECT title, description, status, project, categories, started_at, completed_at
+                    FROM tasks WHERE id=?
+                ''', (self.id,))
+                old_row = cursor.fetchone()
+
+                if old_row:
+                    old_title, old_description, old_status, old_project, old_categories, old_started_at, old_completed_at = old_row
+
+                    # Track which fields changed
+                    changes = []
+                    if self.title != old_title:
+                        changes.append(('title', old_title, self.title, 'update'))
+                    if self.description != old_description:
+                        changes.append(('description', old_description, self.description, 'update'))
+                    if self.status != old_status:
+                        changes.append(('status', old_status, self.status, 'status_change'))
+                    if self.project != old_project:
+                        changes.append(('project', old_project, self.project, 'update'))
+
+                    new_categories_json = json.dumps(self.categories)
+                    if new_categories_json != old_categories:
+                        changes.append(('categories', old_categories, new_categories_json, 'update'))
+
+                    if self.started_at != old_started_at:
+                        changes.append(('started_at', old_started_at, self.started_at, 'status_change'))
+                    if self.completed_at != old_completed_at:
+                        changes.append(('completed_at', old_completed_at, self.completed_at, 'status_change'))
+
+                    # Update existing task
+                    cursor.execute('''
+                        UPDATE tasks SET title=?, description=?, status=?, sort_key=?, project=?,
+                                       categories=?, updated_at=?, started_at=?, completed_at=?
+                        WHERE id=?
+                    ''', (self.title, self.description, self.status, self.sort_key, self.project,
+                          json.dumps(self.categories), self.updated_at, self.started_at, self.completed_at, self.id))
+
+                    # Log all changes to history
+                    for field_name, old_value, new_value, change_type in changes:
+                        self._log_history(cursor, field_name, old_value, new_value, change_type, now)
+
             conn.commit()
         return self
+
+    def _log_history(self, cursor, field_name: str, old_value: Optional[str],
+                     new_value: Optional[str], change_type: str, changed_at: str):
+        """Log a field change to task_history table"""
+        cursor.execute('''
+            INSERT INTO task_history (task_id, field_name, old_value, new_value, changed_at, change_type)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (self.id, field_name, old_value, new_value, changed_at, change_type))
     
     def delete(self) -> bool:
         """Delete task from database"""
         if self.id is None:
             return False
-        
+
         with get_connection() as conn:
             cursor = conn.cursor()
-            
+
+            # Log deletion to history before deleting
+            now = datetime.now().isoformat()
+            self._log_history(cursor, 'task', None, None, 'delete', now)
+
             cursor.execute('DELETE FROM tasks WHERE id=?', (self.id,))
             deleted = cursor.rowcount > 0
-            
+
             conn.commit()
         return deleted
     
@@ -208,7 +263,36 @@ class TaskDB:
             status='open'
         )
         return task.save()
-    
+
+    @classmethod
+    def get_history(cls, task_id: int) -> List[Dict[str, Any]]:
+        """Get change history for a specific task"""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT id, task_id, field_name, old_value, new_value, changed_at, change_type
+                FROM task_history
+                WHERE task_id=?
+                ORDER BY changed_at ASC
+            ''', (task_id,))
+
+            rows = cursor.fetchall()
+
+            history = []
+            for row in rows:
+                history.append({
+                    'id': row[0],
+                    'task_id': row[1],
+                    'field_name': row[2],
+                    'old_value': row[3],
+                    'new_value': row[4],
+                    'changed_at': row[5],
+                    'change_type': row[6]
+                })
+
+            return history
+
     def __repr__(self) -> str:
         return f"TaskDB(id={self.id}, title='{self.title}', status='{self.status}')"
 

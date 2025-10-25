@@ -95,7 +95,34 @@ def init_database():
     cursor.execute('''
         CREATE INDEX IF NOT EXISTS idx_agent_steps_llm_model ON agent_steps(llm_model)
     ''')
-    
+
+    # Create the task_history table for tracking changes
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS task_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
+            field_name TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT,
+            changed_at TEXT NOT NULL,
+            change_type TEXT NOT NULL CHECK (change_type IN ('create','update','delete','status_change')),
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Create indexes for efficient querying
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_task_history_task_id ON task_history(task_id)
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_task_history_changed_at ON task_history(changed_at)
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_task_history_field_name ON task_history(field_name)
+    ''')
+
     conn.commit()
     conn.close()
     

@@ -504,6 +504,28 @@ def delete_task(task_id):
         return APIResponse.error(f"Failed to delete task: {str(e)}", 500)
 
 
+@api.route('/tasks/<int:task_id>/history', methods=['GET'])
+def get_task_history(task_id):
+    """Get change history for a specific task"""
+    try:
+        # Check if task exists
+        task = TaskDB.get_by_id(task_id)
+        if not task:
+            return APIResponse.error('Task not found', 404)
+
+        # Get history
+        history = TaskDB.get_history(task_id)
+
+        return jsonify(APIResponse.success('Task history retrieved', {
+            'task_id': task_id,
+            'history': history
+        }))
+
+    except Exception as e:
+        logger.error(f"Failed to get task history: {str(e)}")
+        return APIResponse.error(f"Failed to get task history: {str(e)}", 500)
+
+
 @api.route('/tasks/reorder', methods=['POST'])
 def reorder_tasks():
     """Reorder tasks by updating their sort_key values"""
