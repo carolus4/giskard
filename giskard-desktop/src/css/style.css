@@ -921,10 +921,6 @@ body.dragging .insertion-line {
     color: #ff9500;
 }
 
-/* Content Footer */
-.content-footer {
-    padding: 20px;
-}
 
 /* Empty State */
 .empty-state {
