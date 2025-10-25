@@ -100,7 +100,6 @@ class PageManager {
         const detailDeleteBtn = document.getElementById('detail-delete-btn');
         const detailProgressBtn = document.getElementById('detail-progress-btn');
         const statusSelector = document.getElementById('status-selector');
-        const moreActionsBtn = document.getElementById('more-actions-btn');
         const saveTaskBtn = document.getElementById('save-task-btn');
 
         if (detailDeleteBtn) {
@@ -134,17 +133,6 @@ class PageManager {
                 }
             };
             statusSelector.addEventListener('click', this._statusSelectorHandler);
-        }
-
-        // More actions button events
-        if (moreActionsBtn) {
-            this._moreActionsHandler = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('More actions button clicked');
-                this._handleMoreActionsClick();
-            };
-            moreActionsBtn.addEventListener('click', this._moreActionsHandler);
         }
 
         if (saveTaskBtn) {
@@ -227,7 +215,6 @@ class PageManager {
         const detailDeleteBtn = document.getElementById('detail-delete-btn');
         const detailProgressBtn = document.getElementById('detail-progress-btn');
         const statusSelector = document.getElementById('status-selector');
-        const moreActionsBtn = document.getElementById('more-actions-btn');
         const saveTaskBtn = document.getElementById('save-task-btn');
 
         if (detailDeleteBtn && this._deleteTaskHandler) {
@@ -241,10 +228,6 @@ class PageManager {
 
         if (statusSelector && this._statusSelectorHandler) {
             statusSelector.removeEventListener('click', this._statusSelectorHandler);
-        }
-
-        if (moreActionsBtn && this._moreActionsHandler) {
-            moreActionsBtn.removeEventListener('click', this._moreActionsHandler);
         }
 
         if (saveTaskBtn && this._saveTaskHandler) {
@@ -395,11 +378,9 @@ class PageManager {
         if (progressBtn) progressBtn.style.display = 'none';
         if (deleteBtn) deleteBtn.style.display = 'none';
         
-        // Hide status selector and more actions in add mode
+        // Hide status selector in add mode
         const statusSelector = document.getElementById('status-selector');
-        const moreActionsBtn = document.getElementById('more-actions-btn');
         if (statusSelector) statusSelector.style.display = 'none';
-        if (moreActionsBtn) moreActionsBtn.style.display = 'none';
 
         // Show save button in add mode
         if (saveBtn) {
@@ -609,14 +590,6 @@ class PageManager {
         }));
     }
 
-    /**
-     * Handle more actions button click
-     */
-    _handleMoreActionsClick() {
-        // For now, just show a simple alert or could implement a dropdown menu
-        console.log('More actions clicked - could implement dropdown menu here');
-        // TODO: Implement dropdown menu with additional actions
-    }
 
     /**
      * Update status selector to reflect current task status
@@ -699,11 +672,9 @@ class PageManager {
             saveBtn.style.display = 'none';
         }
 
-        // Show status selector and more actions in edit mode
+        // Show status selector in edit mode
         const statusSelector = document.getElementById('status-selector');
-        const moreActionsBtn = document.getElementById('more-actions-btn');
         if (statusSelector) statusSelector.style.display = 'flex';
-        if (moreActionsBtn) moreActionsBtn.style.display = 'flex';
 
         // Update status selector
         this._updateStatusSelector(task.status);
