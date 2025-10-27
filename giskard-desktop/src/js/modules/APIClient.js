@@ -194,11 +194,11 @@ class APIClient {
         if (typeof description !== 'string') {
             return { success: false, error: 'Description must be a string' };
         }
-        
-        // Sanitize inputs (trim whitespace, limit length)
-        const sanitizedTitle = title.trim().substring(0, 500); // Max 500 chars
-        const sanitizedDescription = description.trim().substring(0, 2000); // Max 2000 chars
-        
+
+        // Sanitize inputs (trim whitespace)
+        const sanitizedTitle = title.trim();
+        const sanitizedDescription = description.trim();
+
         if (!sanitizedTitle) {
             return { success: false, error: 'Task title cannot be empty after trimming' };
         }
