@@ -363,7 +363,9 @@ class GitHubLikeEditor {
     }
 
     getContent() {
-        return this.textarea.value;
+        // If in edit mode, return current textarea value
+        // If in view mode, return the saved content
+        return this.isEditing ? this.textarea.value : this.originalContent;
     }
 
     focus() {

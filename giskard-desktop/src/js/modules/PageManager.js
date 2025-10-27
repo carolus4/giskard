@@ -1,3 +1,5 @@
+import TaskDataManager from './TaskDataManager.js';
+
     /**
      * PageManager - Handles page navigation and routing
      */
@@ -9,6 +11,9 @@ class PageManager {
         // Debouncing for task updates to avoid overwhelming classification queue
         this.updateTimeouts = new Map();
         this.pendingUpdates = new Map();
+
+        // Centralized task data management
+        this.taskDataManager = new TaskDataManager(this);
 
         this._bindEvents();
         this._initialize();
@@ -435,37 +440,25 @@ class PageManager {
             return;
         }
 
-        // Get the title directly (no project prefix parsing needed)
-        const title = titleInput.value.trim();
-        
-        // Get description from GitHub editor
-        const description = this.githubEditor ? this.githubEditor.getContent() : '';
+        // Get task data from centralized manager
+        const taskData = this.taskDataManager.getCurrentTaskData();
 
         // Check if we're in add mode or edit mode
         if (this.currentTaskId === 'new') {
             // Add mode - immediate save (no debouncing for new tasks)
-            const taskData = {
-                title: title,
-                description: description.trim(),
-                project: null // Project will be handled separately in the future
-            };
-
             console.log('Dispatching task:add-from-page event with data:', taskData);
             // Dispatch event to TaskManager
             document.dispatchEvent(new CustomEvent('task:add-from-page', {
-                detail: taskData
+                detail: {
+                    ...taskData,
+                    project: null // Project will be handled separately in the future
+                }
             }));
         } else {
-            // Edit mode - get original task data to compare
-            const allTasks = [...(window.app?.taskManager?.tasks?.in_progress || []), 
-                             ...(window.app?.taskManager?.tasks?.open || []), 
-                             ...(window.app?.taskManager?.tasks?.done || [])];
-            const originalTask = allTasks.find(t => t.id === this.currentTaskId);
-            
-            const taskData = {
+            // Edit mode - dispatch save event
+            const saveData = {
                 fileIdx: this.currentTaskId,
-                title: title,
-                description: description.trim()
+                ...taskData
             };
 
             // Force immediate save (this will trigger classification)
@@ -523,11 +516,8 @@ class PageManager {
                 clearTimeout(titleTimeout);
                 titleTimeout = setTimeout(async () => {
                     if (titleInput.value.trim()) {
-                        const updateData = {
-                            title: titleInput.value.trim(),
-                            description: this.githubEditor ? this.githubEditor.getContent() : ''
-                        };
-
+                        // Use centralized data manager to get current state
+                        const updateData = this.taskDataManager.getCurrentTaskData();
                         await this._debouncedUpdateTask(this.currentTaskId, updateData);
                     }
                 }, 1000); // 1 second debounce for title changes

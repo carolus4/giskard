@@ -496,13 +496,13 @@ class TaskManager {
         
         // First, save any changes made in the page (title, description)
         const titleInput = document.getElementById('detail-title');
-        const descriptionInput = document.getElementById('detail-description');
-        
+
         if (titleInput && titleInput.value.trim()) {
+            // Use centralized TaskDataManager to collect current task state
+            const currentData = this.pageManager.taskDataManager.getCurrentTaskData();
             const taskData = {
                 fileIdx: taskId,
-                title: titleInput.value.trim(),
-                description: descriptionInput?.value.trim() || ''
+                ...currentData
             };
             await this._handleSaveTaskFromPage(taskData);
         }
@@ -535,13 +535,13 @@ class TaskManager {
         
         // First, save any changes made in the page (title, description)
         const titleInput = document.getElementById('detail-title');
-        const descriptionInput = document.getElementById('detail-description');
-        
+
         if (titleInput && titleInput.value.trim()) {
+            // Use centralized TaskDataManager to collect current task state
+            const currentData = this.pageManager.taskDataManager.getCurrentTaskData();
             const taskData = {
                 fileIdx: taskId,
-                title: titleInput.value.trim(),
-                description: descriptionInput?.value.trim() || ''
+                ...currentData
             };
             await this._handleSaveTaskFromPage(taskData);
         }
@@ -577,13 +577,13 @@ class TaskManager {
         
         // First, save any changes made in the page (title, description)
         const titleInput = document.getElementById('detail-title');
-        const descriptionInput = document.getElementById('detail-description');
-        
+
         if (titleInput && titleInput.value.trim()) {
+            // Use centralized TaskDataManager to collect current task state
+            const currentData = this.pageManager.taskDataManager.getCurrentTaskData();
             const taskData = {
                 fileIdx: taskId,
-                title: titleInput.value.trim(),
-                description: descriptionInput?.value.trim() || ''
+                ...currentData
             };
             await this._handleSaveTaskFromPage(taskData);
         }

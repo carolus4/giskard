@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskDataManager Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 3px solid #00ff00;
+        }
+        .test-result.error {
+            border-left-color: #ff0000;
+            color: #ff0000;
+        }
+        .test-result.success {
+            border-left-color: #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <h1>TaskDataManager Integration Test</h1>
+    <div id="test-output"></div>
+
+    <!-- Mock DOM elements -->
+    <input type="text" id="detail-title" value="Test Task Title" style="display:none">
+    <div id="github-editor-container" style="display:none"></div>
+
+    <script type="module">
+        import TaskDataManager from './src/js/modules/TaskDataManager.js';
+
+        const output = document.getElementById('test-output');
+
+        function logTest(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = `test-result ${isError ? 'error' : 'success'}`;
+            div.textContent = `${isError ? '❌' : '✅'} ${message}`;
+            output.appendChild(div);
+        }
+
+        // Mock PageManager
+        class MockPageManager {
+            constructor() {
+                this.githubEditor = {
+                    getContent: () => 'Test description content'
+                };
+            }
+        }
+
+        // Run tests
+        async function runTests() {
+            try {
+                logTest('Starting TaskDataManager tests...');
+
+                // Test 1: Instantiation
+                const mockPageManager = new MockPageManager();
+                const manager = new TaskDataManager(mockPageManager);
+                logTest('TaskDataManager instantiated successfully');
+
+                // Test 2: Get current task data
+                const taskData = manager.getCurrentTaskData();
+                if (taskData.title === 'Test Task Title') {
+                    logTest(`Title collected correctly: "${taskData.title}"`);
+                } else {
+                    logTest(`Title mismatch: got "${taskData.title}"`, true);
+                }
+
+                if (taskData.description === 'Test description content') {
+                    logTest(`Description collected correctly: "${taskData.description}"`);
+                } else {
+                    logTest(`Description mismatch: got "${taskData.description}"`, true);
+                }
+
+                // Test 3: Validation - valid data
+                try {
+                    const validated = manager.validateTaskData({
+                        title: 'Valid Title',
+                        description: 'Valid description'
+                    });
+                    logTest('Valid data passes validation');
+                } catch (e) {
+                    logTest(`Valid data failed validation: ${e.message}`, true);
+                }
+
+                // Test 4: Validation - empty title
+                try {
+                    manager.validateTaskData({ title: '  ' });
+                    logTest('Empty title should fail validation', true);
+                } catch (e) {
+                    logTest(`Empty title correctly rejected: ${e.message}`);
+                }
+
+                // Test 5: Validation - title too long
+                try {
+                    const longTitle = 'x'.repeat(201);
+                    manager.validateTaskData({ title: longTitle });
+                    logTest('Long title should fail validation', true);
+                } catch (e) {
+                    logTest(`Long title correctly rejected: ${e.message}`);
+                }
+
+                // Test 6: isValid method
+                if (manager.isValid()) {
+                    logTest('isValid() correctly returns true for valid data');
+                } else {
+                    logTest('isValid() incorrectly returns false', true);
+                }
+
+                // Test 7: prepareForAPI
+                const apiData = manager.prepareForAPI({ title: 'Override Title' });
+                if (apiData.title === 'Override Title') {
+                    logTest('prepareForAPI correctly merges overrides');
+                } else {
+                    logTest('prepareForAPI failed to merge overrides', true);
+                }
+
+                logTest('\n=== All tests completed ===');
+
+            } catch (error) {
+                logTest(`Fatal error: ${error.message}`, true);
+                console.error(error);
+            }
+        }
+
+        // Run tests when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runTests);
+        } else {
+            runTests();
+        }
+    </script>
+</body>
+</html>
