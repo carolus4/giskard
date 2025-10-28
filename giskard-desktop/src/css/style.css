@@ -1500,7 +1500,7 @@ body.dragging .insertion-line {
     margin: 4px 0;
 }
 
-.markdown-content .task-item {
+.markdown-task-item {
     display: flex;
     align-items: flex-start;
     margin: 2px 0;
@@ -1514,7 +1514,7 @@ body.dragging .insertion-line {
     box-shadow: none;
 }
 
-.markdown-content .task-item input[type="checkbox"] {
+.markdown-task-item input[type="checkbox"] {
     margin: 0;
     margin-top: 1px;
     width: 14px;
@@ -1525,7 +1525,7 @@ body.dragging .insertion-line {
     border-radius: 2px;
 }
 
-.markdown-content .task-item span {
+.markdown-task-item span {
     flex: 1;
     color: #24292f;
     font-weight: normal;
@@ -1534,7 +1534,7 @@ body.dragging .insertion-line {
     border: none;
 }
 
-.markdown-content .task-item.completed span {
+.markdown-task-item.completed span {
     text-decoration: line-through;
     color: #656d76;
 }
