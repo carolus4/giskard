@@ -26,7 +26,7 @@ class MarkdownRenderer {
             .replace(/>/g, '&gt;')
             
             // Code blocks (fenced)
-            .replace(/```([\s\S]*?)```/g, (match, code) => {
+            .replace(/```([\s\S]*?)```/g, (_match, code) => {
                 const escapedCode = code.trim()
                     .replace(/&amp;/g, '&')
                     .replace(/&lt;/g, '<')
@@ -43,17 +43,16 @@ class MarkdownRenderer {
             .replace(/^# (.*$)/gim, '<h1>$1</h1>')
             
             // Task lists (- [ ] and - [x]) - handle indented ones too
-            .replace(/^- \[ \] (.*$)/gim, (match, text) => {
+            .replace(/^- \[ \] (.*$)/gim, (_match, text) => {
                 return `<div class="markdown-task-item"><input type="checkbox" disabled> <span>${text}</span></div>`;
             })
-            .replace(/^- \[x\] (.*$)/gim, (match, text) => {
+            .replace(/^- \[x\] (.*$)/gim, (_match, text) => {
                 return `<div class="markdown-task-item completed"><input type="checkbox" checked disabled> <span>${text}</span></div>`;
             })
             
             // Unordered lists
             .replace(/^- (.*$)/gim, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-            
+
             // Ordered lists
             .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
             
@@ -83,9 +82,42 @@ class MarkdownRenderer {
             .replace(/<br>\s*(<div class="markdown-task-item)/g, '$1')  // Remove <br> before task items
             .replace(/(<\/div>)\s*<br>/g, '$1')  // Remove <br> after divs
             .replace(/<br>\s*(<ul>)/g, '$1')  // Remove <br> before lists
-            .replace(/(<\/ul>)\s*<br>/g, '$1');  // Remove <br> after lists
+            .replace(/(<\/ul>)\s*<br>/g, '$1')  // Remove <br> after lists
+            .replace(/<br>\s*(<li>)/g, '$1')  // Remove <br> before list items
+            .replace(/(<\/li>)\s*<br>/g, '$1');  // Remove <br> after list items
+
+        // Remove <p> tags around block-level elements
+        html = html
+            .replace(/<p>(\s*<h[123]>)/g, '$1')  // Remove <p> before headers
+            .replace(/(<\/h[123]>\s*)<\/p>/g, '$1')  // Remove </p> after headers
+            .replace(/<p>(\s*<ul>)/g, '$1')  // Remove <p> before lists
+            .replace(/(<\/ul>\s*)<\/p>/g, '$1')  // Remove </p> after lists
+            .replace(/<p>(\s*<div class="markdown-task-item)/g, '$1')  // Remove <p> before task items
+            .replace(/(<\/div>\s*)<\/p>/g, '$1');  // Remove </p> after divs
+
+        // Wrap consecutive <li> tags in <ul> (but don't cross block boundaries)
+        html = this._wrapListItems(html);
 
         return html;
+    }
+
+    /**
+     * Wrap consecutive <li> tags in <ul> without crossing block boundaries
+     * @param {string} html - HTML content with <li> tags
+     * @returns {string} HTML with proper <ul> wrapping
+     */
+    _wrapListItems(html) {
+        // Split by block-level elements to avoid wrapping across boundaries
+        const parts = html.split(/(<h[123]>.*?<\/h[123]>|<div class="markdown-task-item.*?<\/div>|<pre>.*?<\/pre>)/s);
+
+        return parts.map(part => {
+            // If this part contains <li> tags, wrap consecutive ones in <ul>
+            if (part.includes('<li>')) {
+                // Replace sequences of <li> tags with <ul> wrapped version
+                return part.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs, '<ul>$1</ul>');
+            }
+            return part;
+        }).join('');
     }
 
     /**
