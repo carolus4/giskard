@@ -75,7 +75,16 @@ class MarkdownRenderer {
 
         // Clean up empty paragraphs
         html = html.replace(/<p><\/p>/g, '');
-        
+
+        // Remove <br> tags around block-level elements (headings, divs, lists)
+        html = html
+            .replace(/<br>\s*(<h[123]>)/g, '$1')  // Remove <br> before headers
+            .replace(/(<\/h[123]>)\s*<br>/g, '$1')  // Remove <br> after headers
+            .replace(/<br>\s*(<div class="markdown-task-item)/g, '$1')  // Remove <br> before task items
+            .replace(/(<\/div>)\s*<br>/g, '$1')  // Remove <br> after divs
+            .replace(/<br>\s*(<ul>)/g, '$1')  // Remove <br> before lists
+            .replace(/(<\/ul>)\s*<br>/g, '$1');  // Remove <br> after lists
+
         return html;
     }
 
